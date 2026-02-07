@@ -43,7 +43,7 @@
         [class.active]="mode === 'view'"
         title="View"
       >
-        <img src="assets/view.svg" alt="" />
+        <img src="assets/mouse-pointer.svg" alt="" />
       </button>
       <button
         (click)="setMode('add-text')"
@@ -51,13 +51,6 @@
         title="Add text comment"
       >
         <img src="assets/type.svg" alt="" />
-      </button>
-      <button
-        (click)="setMode('add-stamp')"
-        [class.active]="mode === 'add-stamp'"
-        title="Add stamp"
-      >
-        <img src="assets/stamp.svg" alt="" />
       </button>
       <button
         (click)="setMode('select')"
@@ -74,21 +67,8 @@
       </button>
     </div>
 
-    <!-- Stamp type selector (only visible when stamp mode is active) -->
-    <div class="tool-group" *ngIf="mode === 'add-stamp'">
-      <select
-        [value]="selectedStampType"
-        (change)="setStampType($any($event.target).value)"
-        title="Stamp Type"
-      >
-        <option value="reviewed">Reviewed</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
-      </select>
-    </div>
-
     <!-- Text style -->
-    <div class="tool-group" *ngIf="mode === 'add-text'">
+    <div class="tool-group">
       <input
         type="color"
         [value]="textColor"
@@ -170,7 +150,7 @@
     {{ statusMessage }}
   </div>
 
-  <div class="canvas-container" [ngClass]="{'select-mode': mode === 'select', 'add-text-mode': mode === 'add-text', 'add-stamp-mode': mode === 'add-stamp'}">
+  <div class="canvas-container" [ngClass]="{'select-mode': mode === 'select', 'add-text-mode': mode === 'add-text'}">
     <div class="page-wrapper">
       <canvas #pdfCanvas class="pdf-canvas"></canvas>
       <div
@@ -178,38 +158,15 @@
         class="annotation-layer"
         (click)="onPdfClick($event)"
       >
-        <!-- Text annotations -->
         <div
           *ngFor="let a of pageAnnotations"
           class="annotation"
-          [ngClass]="{
-            'selected': a.id === selectedAnnotationId,
-            'text-annotation': a.type === 'text',
-            'stamp-annotation': a.type === 'stamp',
-            'stamp-reviewed': a.type === 'stamp' && a.stampType === 'reviewed',
-            'stamp-approved': a.type === 'stamp' && a.stampType === 'approved',
-            'stamp-rejected': a.type === 'stamp' && a.stampType === 'rejected'
-          }"
+          [ngClass]="{'selected': a.id === selectedAnnotationId}"
           [ngStyle]="getAnnotationStyle(a)"
           (click)="onAnnotationClick(a, $event)"
           (mousedown)="onAnnotationMouseDown(a, $event)"
         >
-          <!-- Display text for text annotations -->
-          <ng-container *ngIf="a.type === 'text'">
-            {{ a.text }}
-          </ng-container>
-          
-          <!-- Display stamp for stamp annotations -->
-          <ng-container *ngIf="a.type === 'stamp'">
-            <div class="stamp-content">
-              <div class="stamp-header">
-                {{ a.stampType?.toUpperCase() }}
-              </div>
-              <div class="stamp-details">
-                By {{ a.reviewerName }} at {{ a.reviewDate }}
-              </div>
-            </div>
-          </ng-container>
+          {{ a.text }}
         </div>
       </div>
 

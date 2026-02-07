@@ -23,6 +23,7 @@ import { ForgotPasswordComponent } from './components/forgot-password/forgot-pas
 import { SubmissionComponent } from './submission/submission.component';
 import { RequestsComponent } from './requests/requests.component';
 import { CanvasComponent } from './canvas/canvas.component';
+import { FooterComponent } from './footer/footer.component';
 
 
 @NgModule({
@@ -44,7 +45,8 @@ import { CanvasComponent } from './canvas/canvas.component';
     ForgotPasswordComponent,
     SubmissionComponent,
     RequestsComponent,
-    CanvasComponent
+    CanvasComponent,
+    FooterComponent
 
   ],
   imports: [

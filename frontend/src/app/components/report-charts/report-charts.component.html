@@ -9,6 +9,7 @@
       [dataLabels]="chartOptionsErrors.dataLabels!"
       [plotOptions]="chartOptionsErrors.plotOptions!"
       [xaxis]="chartOptionsErrors.xaxis!"
+      [tooltip]="chartOptionsErrors.tooltip!"
       
     ></apx-chart>
     <p class="no-data" *ngIf="(chartOptionsErrors?.series || []).length === 0">

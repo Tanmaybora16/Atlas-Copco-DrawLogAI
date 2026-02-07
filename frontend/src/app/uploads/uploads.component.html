@@ -127,8 +127,24 @@
                       {{ getErrorDescription(predictedErrors[i]) }}
                     </td>
 
-                    <td class="edit-cell">
+                    <!-- <td class="edit-cell">
                       <img class="edit-icon" src="/assets/edit.svg" (click)="editRow(i)">
+                    </td> -->
+                    <td class="action-cell">
+                      <div class="action-buttons">
+                        <img 
+                          class="edit-icon" 
+                          src="/assets/edit.svg" 
+                          (click)="editRow(i)"
+                          title="Edit error code"
+                          alt="Edit">
+                        <img 
+                          class="delete-icon" 
+                          src="/assets/delete.svg" 
+                          (click)="deleteRow(i)"
+                          title="Delete this comment"
+                          alt="Delete">
+                      </div>
                     </td>
                   </tr>
                 </tbody>

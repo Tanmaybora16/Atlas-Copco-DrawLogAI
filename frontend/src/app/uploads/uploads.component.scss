@@ -300,7 +300,7 @@ gap: 15px;
 }
 
 .edit-code-input:focus {
-  border-color: #6C6C6C; 
+  border-color: #6b6b6b; 
   background-color: #f4f4f4; 
   outline: none; 
 }
@@ -327,8 +327,40 @@ gap: 15px;
   width: 90%;
 }
 
-tr:hover .edit-icon {
-  visibility: visible; 
+/* Updated action cell styles */
+.action-cell {
+  text-align: center;
+  width: 80px;
+  padding: 8px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-icon,
+.delete-icon {
+  cursor: pointer;
+  visibility: hidden;
+  width: 18px;
+  height: 18px;
+  transition: all 0.2s ease;
+}
+
+.edit-icon:hover {
+  filter: brightness(0.7);
+}
+
+.delete-icon:hover {
+  filter: brightness(0) saturate(100%) invert(27%) sepia(93%) saturate(3456%) hue-rotate(349deg) brightness(92%) contrast(95%);
+}
+
+tr:hover .edit-icon,
+tr:hover .delete-icon {
+  visibility: visible;
 }
 
 select {

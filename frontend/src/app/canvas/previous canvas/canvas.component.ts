@@ -13,7 +13,7 @@ import { firstValueFrom } from 'rxjs';
 import * as pdfjsLib from 'pdfjs-dist';
 import { environment } from 'src/environments/environment';
  
-type CanvasMode = 'view' | 'add-text' | 'select' | 'add-stamp';
+type CanvasMode = 'view' | 'add-text' | 'select';
  
 /**
  * A lightweight text annotation that is always stored in
@@ -33,10 +33,6 @@ export interface Annotation {
   updatedAt?: string;
   color?: string;
   fontSize?: number;
-  type?: 'text' | 'stamp'; // New property to distinguish annotation types
-  stampType?: 'reviewed' | 'approved' | 'rejected'; // Type of stamp
-  reviewerName?: string; // Name of the person who stamped
-  reviewDate?: string; // Date of the stamp
 }
 
 @Component({
@@ -81,10 +77,6 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   // Styles
   textColor = '#000000';
   fontSize = 16;
-
-  // Stamp properties
-  selectedStampType: 'reviewed' | 'approved' | 'rejected' = 'reviewed';
-  reviewerName = 'Anuj Khande'; // This could come from user settings/profile
 
   // Dragging state
   private isDragging = false;
@@ -242,264 +234,219 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   }
  
   // ───────────────────────────────────────────────────────────────────────────
-  // Mode switching & PDF clicks
+  // Pagination / Zoom
   // ───────────────────────────────────────────────────────────────────────────
-  setMode(m: CanvasMode): void {
-    this.mode = m;
+  previousPage(): void {
+    if (this.pageNum <= 1) return;
+    this.pageNum--;
+    this.renderPage(this.pageNum);
+    // Reset editing/selection when page changes
     this.selectedAnnotationId = null;
     this.isEditingText = false;
     this.editingAnnotationId = null;
+    this.isDragging = false;
+    this.dragAnnotationId = null;
   }
 
-  setStampType(type: 'reviewed' | 'approved' | 'rejected'): void {
-    this.selectedStampType = type;
-  }
- 
-  onPdfClick(event: MouseEvent): void {
-    // Only proceed if in add-text or add-stamp mode
-    if (this.mode !== 'add-text' && this.mode !== 'add-stamp') {
-      return;
-    }
-    const target = event.target as HTMLElement;
-    if (target.classList.contains('annotation')) {
-      return;
-    }
-    event.stopPropagation();
- 
-    const layer = this.annotationLayerRef?.nativeElement;
-    if (!layer) return;
- 
-    const rect = layer.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
- 
-    const normalizedX = clickX / rect.width;
-    const normalizedY = clickY / rect.height;
- 
-    if (this.mode === 'add-stamp') {
-      // Add a stamp annotation
-      this.addStampAnnotation(normalizedX, normalizedY);
-    } else {
-      // Add a text annotation (existing behavior)
-      this.addTextAnnotation(normalizedX, normalizedY, clickX, clickY);
-    }
+  nextPage(): void {
+    if (this.pageNum >= this.totalPages) return;
+    this.pageNum++;
+    this.renderPage(this.pageNum);
+    // Reset editing/selection when page changes
+    this.selectedAnnotationId = null;
+    this.isEditingText = false;
+    this.editingAnnotationId = null;
+    this.isDragging = false;
+    this.dragAnnotationId = null;
   }
 
-  private addStampAnnotation(normalizedX: number, normalizedY: number): void {
-    const now = new Date();
-    const dateStr = now.toLocaleString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
+  zoomIn(): void {
+    this.scale = Math.min(this.scale + 0.25, 5);
+    this.renderPage(this.pageNum);
+  }
 
-    const stamp: Annotation = {
-      id: this.generateId(),
-      documentId: this.drawingNumber,
-      page: this.pageNum,
-      x: normalizedX,
-      y: normalizedY,
-      text: '', // Empty for stamps, as they use stampType instead
-      type: 'stamp',
-      stampType: this.selectedStampType,
-      reviewerName: this.reviewerName,
-      reviewDate: dateStr,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+  zoomOut(): void {
+    this.scale = Math.max(this.scale - 0.25, 0.5);
+    this.renderPage(this.pageNum);
+  }
+
+  @HostListener('wheel', ['$event'])
+  onWheel(e: WheelEvent): void {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    e.deltaY < 0 ? this.zoomIn() : this.zoomOut();
+  }
+ 
+  // ───────────────────────────────────────────────────────────────────────────
+  // File input (manual upload to *view* new PDF locally)
+  // ───────────────────────────────────────────────────────────────────────────
+  onFileSelected(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files.length) this.loadPdfFile(input.files[0]);
+  }
+  openFileSelector(): void { this.fileInputRef.nativeElement.click(); }
+
+  private async loadPdfFile(file: File): Promise<void> {
+    this.currentPdfFile = file;
+    const fileReader = new FileReader();
+    fileReader.onload = async (e) => {
+      const typedArray = new Uint8Array(e.target!.result as ArrayBuffer);
+      try {
+        this.pdfDoc = await pdfjsLib.getDocument(typedArray).promise;
+        this.totalPages = this.pdfDoc.numPages;
+        this.pageNum = 1;
+        this.scale = 1.5;
+        await this.renderPage(this.pageNum);
+        this.showStatusMessageFunc('PDF loaded successfully!');
+      } catch (error) {
+        console.error('Error loading PDF file:', error);
+        this.showStatusMessageFunc('Error loading PDF file');
+        this.renderMockPage();
+      }
     };
-
-    this.annotations.push(stamp);
-    this.toast(`${this.selectedStampType.toUpperCase()} stamp added.`);
-  }
-
-  private addTextAnnotation(normalizedX: number, normalizedY: number, clickX: number, clickY: number): void {
-    const newAnnotation: Annotation = {
-      id: this.generateId(),
-      documentId: this.drawingNumber,
-      page: this.pageNum,
-      x: normalizedX,
-      y: normalizedY,
-      text: '',
-      type: 'text',
-      color: this.textColor,
-      fontSize: this.fontSize,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
- 
-    this.annotations.push(newAnnotation);
-    this.selectedAnnotationId = newAnnotation.id;
- 
-    this.textInputPosition = { x: clickX, y: clickY };
-    this.textInputValue = '';
-    this.isEditingText = true;
-    this.editingAnnotationId = newAnnotation.id;
- 
-    setTimeout(() => {
-      this.textInputRef?.nativeElement.focus();
-    }, 0);
+    fileReader.readAsArrayBuffer(file);
   }
  
-  onTextInputChange(): void {
-    if (this.editingAnnotationId) {
+  // ───────────────────────────────────────────────────────────────────────────
+  // Annotation tools and interaction
+  // ───────────────────────────────────────────────────────────────────────────
+  setMode(mode: CanvasMode): void {
+    this.mode = mode;
+    if (mode !== 'add-text' && this.isEditingText) {
+      this.finishTextEditing();
+    }
+  }
+ 
+  setColor(e: Event): void {
+    const val = (e.target as HTMLInputElement).value;
+    this.textColor = val;
+
+    if (this.selectedAnnotationId) {
       this.annotations = this.annotations.map(a =>
-        a.id === this.editingAnnotationId ? { ...a, text: this.textInputValue } : a
+        a.id === this.selectedAnnotationId ? { ...a, color: val } : a
       );
     }
   }
  
-  finishTextEditing(): void {
-    if (this.editingAnnotationId && this.textInputValue.trim() === '') {
-      this.annotations = this.annotations.filter(a => a.id !== this.editingAnnotationId);
-    }
-    this.isEditingText = false;
-    this.editingAnnotationId = null;
-    this.textInputValue = '';
-  }
- 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Annotation selection & deletion
-  // ───────────────────────────────────────────────────────────────────────────
-  onAnnotationClick(annotation: Annotation, event: MouseEvent): void {
-    event.stopPropagation();
-    if (this.mode === 'select') {
-      this.selectedAnnotationId = annotation.id;
-    } else if (this.mode === 'add-text' && annotation.type === 'text') {
-      this.selectedAnnotationId = annotation.id;
-      const layer = this.annotationLayerRef?.nativeElement;
-      if (!layer) return;
-      const rect = layer.getBoundingClientRect();
-      const left = annotation.x * rect.width;
-      const top = annotation.y * rect.height;
-      this.textInputPosition = { x: left, y: top };
-      this.textInputValue = annotation.text;
-      this.isEditingText = true;
-      this.editingAnnotationId = annotation.id;
-      setTimeout(() => this.textInputRef?.nativeElement.focus(), 0);
+  setFontSize(e: Event): void {
+    const val = parseInt((e.target as HTMLSelectElement).value, 10);
+    if (!isNaN(val)) {
+      this.fontSize = val;
+
+      if (this.selectedAnnotationId) {
+        this.annotations = this.annotations.map(a =>
+          a.id === this.selectedAnnotationId ? { ...a, fontSize: val } : a
+        );
+      }
     }
   }
  
-  onAnnotationMouseDown(annotation: Annotation, event: MouseEvent): void {
-    if (this.mode !== 'select') return;
-    event.preventDefault();
-    event.stopPropagation();
-    const layer = this.annotationLayerRef?.nativeElement;
-    if (!layer) return;
+  onPdfClick(event: MouseEvent): void {
+    if (this.mode !== 'add-text') {
+      return;
+    }
+    const layer = this.annotationLayerRef.nativeElement;
     const rect = layer.getBoundingClientRect();
     const xNorm = (event.clientX - rect.left) / rect.width;
     const yNorm = (event.clientY - rect.top) / rect.height;
-    this.dragOffset.x = xNorm - annotation.x;
-    this.dragOffset.y = yNorm - annotation.y;
+ 
+    const id = this.generateId();
+    const annotation: Annotation = {
+      id,
+      documentId: this.drawingNumber,
+      page: this.pageNum,
+      x: xNorm,
+      y: yNorm,
+      text: 'New comment',
+      color: this.textColor,
+      fontSize: this.fontSize
+    };
+    this.annotations = [...this.annotations, annotation];
+    this.startTextEditing(annotation, layer);
+  }
+ 
+  onAnnotationClick(annotation: Annotation, event: MouseEvent): void {
+    event.stopPropagation();
+    this.selectedAnnotationId = annotation.id;
+    if (this.mode === 'add-text' || this.mode === 'select') {
+      const layer = this.annotationLayerRef.nativeElement;
+      this.startTextEditing(annotation, layer);
+    }
+  }
+
+  onAnnotationMouseDown(annotation: Annotation, event: MouseEvent): void {
+    if (this.mode !== 'select') {
+      return;
+    }
+    event.stopPropagation();
+    const layer = this.annotationLayerRef.nativeElement;
+    const rect = layer.getBoundingClientRect();
+    const xNorm = (event.clientX - rect.left) / rect.width;
+    const yNorm = (event.clientY - rect.top) / rect.height;
+
+    this.selectedAnnotationId = annotation.id;
     this.isDragging = true;
     this.dragAnnotationId = annotation.id;
-    this.selectedAnnotationId = annotation.id;
+    this.dragOffset = {
+      x: xNorm - annotation.x,
+      y: yNorm - annotation.y
+    };
   }
  
   deleteSelected(): void {
-    if (this.selectedAnnotationId) {
-      this.annotations = this.annotations.filter(a => a.id !== this.selectedAnnotationId);
-      this.selectedAnnotationId = null;
-      this.toast('Annotation deleted.');
-    } else {
-      this.toast('No annotation selected.');
+    if (!this.selectedAnnotationId) return;
+    this.annotations = this.annotations.filter(a => a.id !== this.selectedAnnotationId);
+    this.selectedAnnotationId = null;
+    this.isEditingText = false;
+    this.editingAnnotationId = null;
+  }
+ 
+  private startTextEditing(annotation: Annotation, layer: HTMLElement): void {
+    this.isEditingText = true;
+    this.editingAnnotationId = annotation.id;
+    this.textInputValue = annotation.text;
+ 
+    const leftPx = annotation.x * layer.clientWidth;
+    const topPx = annotation.y * layer.clientHeight;
+    this.textInputPosition = { x: leftPx, y: topPx };
+ 
+    setTimeout(() => {
+      this.textInputRef?.nativeElement?.focus();
+      this.textInputRef?.nativeElement?.select();
+    }, 0);
+  }
+ 
+  onTextInputChange(): void {
+    if (!this.editingAnnotationId) return;
+    this.annotations = this.annotations.map(a =>
+      a.id === this.editingAnnotationId ? { ...a, text: this.textInputValue } : a
+    );
+  }
+ 
+  finishTextEditing(): void {
+    if (this.isEditingText) {
+      this.onTextInputChange();
     }
+    this.isEditingText = false;
+    this.editingAnnotationId = null;
   }
  
-  // ───────────────────────────────────────────────────────────────────────────
-  // Zoom & navigation
-  // ───────────────────────────────────────────────────────────────────────────
-  async zoomIn(): Promise<void> {
-    this.scale = Math.min(this.scale + 0.2, 3);
-    await this.renderPage(this.pageNum);
-  }
- 
-  async zoomOut(): Promise<void> {
-    this.scale = Math.max(this.scale - 0.2, 0.4);
-    await this.renderPage(this.pageNum);
-  }
- 
-  async previousPage(): Promise<void> {
-    if (this.pageNum <= 1) return;
-    this.pageNum--;
-    await this.renderPage(this.pageNum);
-  }
- 
-  async nextPage(): Promise<void> {
-    if (this.pageNum >= this.totalPages) return;
-    this.pageNum++;
-    await this.renderPage(this.pageNum);
-  }
- 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Text style
-  // ───────────────────────────────────────────────────────────────────────────
-  setColor(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.textColor = input.value;
-  }
- 
-  setFontSize(event: Event): void {
-    const select = event.target as HTMLSelectElement;
-    this.fontSize = Number(select.value);
-  }
- 
-  // ───────────────────────────────────────────────────────────────────────────
-  // File upload
-  // ───────────────────────────────────────────────────────────────────────────
-  openFileSelector(): void {
-    this.fileInputRef?.nativeElement.click();
-  }
- 
-  async onFileSelected(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
- 
-    this.currentPdfFile = file;
-    const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    this.pdfDoc = await loadingTask.promise;
-    this.totalPages = this.pdfDoc.numPages;
-    this.pageNum = 1;
-    await this.renderPage(this.pageNum);
-    this.toast('PDF uploaded and loaded.');
-  }
- 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Positioning helper
-  // ───────────────────────────────────────────────────────────────────────────
-  getAnnotationStyle(a: Annotation): any {
+  getAnnotationStyle(a: Annotation): { [key: string]: string } {
     const layer = this.annotationLayerRef?.nativeElement;
-    if (!layer) {
-      return {};
-    }
-    const rect = layer.getBoundingClientRect();
-    const left = a.x * rect.width;
-    const top = a.y * rect.height;
+    const width = layer?.clientWidth ?? 0;
+    const height = layer?.clientHeight ?? 0;
+    const left = a.x * width;
+    const top = a.y * height;
     const isSelected = a.id === this.selectedAnnotationId;
-    
-    // Different styling for stamps vs text annotations
-    if (a.type === 'stamp') {
-      return {
-        left: `${left}px`,
-        top: `${top}px`,
-        border: isSelected ? '2px solid #0ea5e9' : 'none'
-      };
-    } else {
-      // Text annotation styling
-      const color = a.color ?? this.textColor;
-      const fontSize = a.fontSize ?? this.fontSize;
-      return {
-        left: `${left}px`,
-        top: `${top}px`,
-        fontSize: `${fontSize}px`,
-        color,
-        border: isSelected ? '1px solid #0ea5e9' : '1px solid transparent'
-      };
-    }
+    const color = a.color ?? this.textColor;
+    const fontSize = a.fontSize ?? this.fontSize;
+    return {
+      left: `${left}px`,
+      top: `${top}px`,
+      fontSize: `${fontSize}px`,
+      color,
+      border: isSelected ? '1px solid #0ea5e9' : '1px solid transparent'
+    };
   }
  
   // ───────────────────────────────────────────────────────────────────────────

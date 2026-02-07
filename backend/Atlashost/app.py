@@ -1,5 +1,5 @@
 from tkinter import messagebox
-from flask import Flask, jsonify, request, send_file, Response
+from flask import Flask, jsonify, request, send_file, Response, g
 from flask_cors import CORS
 import os, base64, traceback
 import fitz
@@ -70,7 +70,10 @@ def connect_to_db():
                 user=os.getenv("DB_USER", "root"),
                 password=os.getenv("DB_PASSWORD", "root"),
                 database=os.getenv("DB_NAME", "error_db"),
-                connect_timeout=5
+                connect_timeout=5,
+                autocommit=False,
+                charset='utf8mb4',
+                init_command="SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'",
             )
             print("✅ Database connected")
             return db
@@ -81,23 +84,39 @@ def connect_to_db():
     print("❌ Database connection failed after retries")
     return None
 
-db = connect_to_db()
-if not db:
-    raise Exception("Database not available")
-cursor = db.cursor()
+
+@app.before_request
+def before_request():
+    """Establish a database connection for each request"""
+    g.db = connect_to_db()
+    if g.db is None:
+        raise Exception("Database not available")
+
+
+@app.teardown_request
+def teardown_request(exception):
+    """Close the database connection after each request"""
+    db = getattr(g, 'db', None)
+    if db is not None:
+        try:
+            db.close()
+        except:
+            pass
+
+# Global db connection removed - using Flask g object with before_request/teardown_request
 
 model = joblib.load(MODEL_PATH)
 tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 
 # SMTP Email Configuration (Use your SMTP server details)
-# EMAIL_SENDER = "Errorloggingportal@atlascopco.com"
-# SMTP_SERVER = "smtp.onevirtualoffice.local"  
-# SMTP_PORT = 25  
+EMAIL_SENDER = "Errorloggingportal@atlascopco.com"
+SMTP_SERVER = "smtp.onevirtualoffice.local"  
+SMTP_PORT = 25  
 
-EMAIL_SENDER = "atlascopcotestmail2025@gmail.com"
-EMAIL_PASSWORD = "pwbd zgow smzm ywza"
-SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
-SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
+# EMAIL_SENDER = "atlascopcotestmail2025@gmail.com"
+# EMAIL_PASSWORD = "pwbd zgow smzm ywza"
+# SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
+# SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
 
 
 def extract_annotations(pdf_path):
@@ -161,7 +180,7 @@ def dbg_fail(step, err, extra=None, code=500):
 
 @app.route('/submit', methods=['POST'])
 def submit_data():
-    if db is None:
+    if not hasattr(g, 'db') or g.db is None:
         return dbg_fail("db-check", "Database connection is not established", code=500)
 
     try:
@@ -222,7 +241,7 @@ def submit_data():
 
         # -------- DB work --------
         try:
-            cursor = db.cursor()
+            cursor = g.db.cursor()
         except Exception as e:
             return dbg_fail("cursor", e)
 
@@ -388,7 +407,7 @@ def submit_data():
             cursor.execute("SELECT EMP_email, EMP_Name FROM Employees WHERE emp_id = %s", (creator_id,))
             row = cursor.fetchone()
             if not row:
-                db.rollback()
+                g.db.rollback()
                 return dbg_fail("creator-lookup", "Creator not found", extra={"creator_id": creator_id}, code=404)
 
             creator_email, creator_name = row[0], row[1]
@@ -429,7 +448,7 @@ def submit_data():
             print(" email-send failed:", e)
 
         try:
-            db.commit()
+            g.db.commit()
         except pymysql.MySQLError as e:
             return dbg_fail("commit", e)
 
@@ -446,8 +465,8 @@ def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, 
     try:
         # Set up the SMTP server
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        # server.starttls()
+        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         # Email content
         subject = f"Drawing Review Notification :- {drawing_id} (Revision number :- {revision_no})"
@@ -469,6 +488,8 @@ def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, 
         Decision: {decision.upper()}
 
         The reviewed document is attached for your reference.
+
+        Portal Link:- https://drawlogai.atlascopco.group/
 
         Best regards,  
         Team Error Logging 
@@ -504,15 +525,17 @@ def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, 
 
 @app.route('/get-employees', methods=['GET'])
 def get_employees():
-    connection = connect_to_db()
-    cursor = connection.cursor()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({"error": "Database connection not available"}), 500
+    
+    cursor = g.db.cursor()
 
     # Fetch both emp_id and emp_name
     cursor.execute("SELECT emp_id, emp_name FROM employees")
     employees = cursor.fetchall()
 
     cursor.close()
-    connection.close()
 
     # Format response with both fields
     employees_list = [
@@ -526,12 +549,14 @@ def get_employees():
 # API to get full details of a selected employee
 @app.route('/get-employee/<emp_id>', methods=['GET'])
 def get_employee_details(emp_id):
-    connection = connect_to_db()
-    cursor = connection.cursor()
-    cursor.execute("SELECT emp_PC, emp_division, emp_team, emp_email FROM employees WHERE emp_id = %s", (emp_id))
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({"error": "Database connection not available"}), 500
+        
+    cursor = g.db.cursor()
+    cursor.execute("SELECT emp_PC, emp_division, emp_team, emp_email FROM employees WHERE emp_id = %s", (emp_id,))
     employee = cursor.fetchone()
     cursor.close()
-    connection.close()
 
     if employee:
         return jsonify({
@@ -560,8 +585,11 @@ def admin_login():
         if not username or not password:
             return jsonify({"success": False, "message": "Username and Password required"}), 400
 
-        conn = connect_to_db()
-        with conn.cursor() as cursor:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({"success": False, "message": "DB connection failed"}), 500
+
+        with g.db.cursor() as cursor:
             cursor.execute("""
                 SELECT username, password, access_type
                   FROM login
@@ -606,8 +634,8 @@ def send_otp_email(to_email: str, emp_id: str, otp_plain: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        # server.starttls()
+        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Your OTP for Password Reset (valid for 5 minutes)"
         body = f"""Dear User ({emp_id}),
@@ -668,14 +696,14 @@ def forgot_password_initiate():
         if not emp_id or not email:
             return jsonify({"success": False, "message": "Emp_ID and Email are required"}), 400
 
-        conn = connect_to_db()
-        if conn is None:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
-        cleanup_otps(conn)
+        cleanup_otps(g.db)
 
         # 1) Check user exists in login
-        with conn.cursor() as c:
+        with g.db.cursor() as c:
             c.execute("SELECT 1 FROM login WHERE username=%s LIMIT 1", (emp_id,))
             if not c.fetchone():
                 return jsonify({"success": False, "message": "Invalid Emp_ID"}), 404
@@ -695,7 +723,7 @@ def forgot_password_initiate():
         otp_hash = bcrypt.hashpw(otp_plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
         # 5) Upsert OTP row, expire in 5 minutes (use MySQL NOW() in IST)
-        with conn.cursor() as c:
+        with g.db.cursor() as c:
             c.execute("""
                 INSERT INTO login_otp (username, purpose, otp, expires_at, consumed)
                 VALUES (%s, 'password_reset', %s, DATE_ADD(NOW(), INTERVAL 5 MINUTE), 0)
@@ -704,7 +732,7 @@ def forgot_password_initiate():
                     expires_at = VALUES(expires_at),
                     consumed = 0
             """, (emp_id, otp_hash))
-        conn.commit()
+        g.db.commit()
 
         # 6) Email the OTP
         try:
@@ -736,14 +764,14 @@ def forgot_password_verify():
         if not emp_id or not otp_in or not otp_in.isdigit() or len(otp_in) != 4:
             return jsonify({"success": False, "message": "Invalid Emp_ID or OTP"}), 400
 
-        conn = connect_to_db()
-        if conn is None:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
-        cleanup_otps(conn)
+        cleanup_otps(g.db)
 
         # Fetch active OTP row (not expired)
-        with conn.cursor() as c:
+        with g.db.cursor() as c:
             c.execute("""
                 SELECT otp, consumed
                   FROM login_otp
@@ -756,9 +784,9 @@ def forgot_password_verify():
 
         if not row:
             # Optional cleanup of expired rows for this user
-            with conn.cursor() as c2:
+            with g.db.cursor() as c2:
                 c2.execute("DELETE FROM login_otp WHERE username=%s AND purpose='password_reset' AND expires_at <= NOW()", (emp_id,))
-                conn.commit()
+                g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
 
         otp_hash, consumed = row
@@ -802,18 +830,18 @@ def forgot_password_reset():
             return jsonify({"success": False, "message": "Invalid OTP"}), 400
 
         # Password policy: at least 1 upper, 1 lower, 1 digit, 1 symbol from !@#$%^&*_+-=?
-        policy = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*_+\-=?])[A-Za-z\d!@#$%^&*_+\-=?]{8,64}$')
+        policy = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*_+\-=\?])[A-Za-z\d!@#$%^&*_+\-=\?]{8,64}$')
         if not policy.match(new_password):
             return jsonify({"success": False, "message": "Password must be 8-64 chars with upper, lower, number, and symbol (!@#$%^&*_+-=?)"}), 400
 
-        conn = connect_to_db()
-        if conn is None:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
-        cleanup_otps(conn)
+        cleanup_otps(g.db)
 
         # Fetch active OTP row (not expired)
-        with conn.cursor() as c:
+        with g.db.cursor() as c:
             c.execute("""
                 SELECT otp, consumed
                   FROM login_otp
@@ -824,9 +852,9 @@ def forgot_password_reset():
             """, (emp_id,))
             row = c.fetchone()
         if not row:
-            with conn.cursor() as c2:
+            with g.db.cursor() as c2:
                 c2.execute("DELETE FROM login_otp WHERE username=%s AND purpose='password_reset' AND expires_at <= NOW()", (emp_id,))
-                conn.commit()
+                g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
 
         otp_hash, consumed = row
@@ -859,10 +887,10 @@ def forgot_password_reset():
 
         # Update password in login and delete OTP
         new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        with conn.cursor() as c:
+        with g.db.cursor() as c:
             c.execute("UPDATE login SET password=%s WHERE username=%s", (new_hash, emp_id))
             c.execute("DELETE FROM login_otp WHERE username=%s AND purpose='password_reset'", (emp_id,))
-        conn.commit()
+        g.db.commit()
 
         # Send notification (non-blocking for success path)
         if user_email:
@@ -886,8 +914,8 @@ def send_password_change_notification(to_email: str, emp_id: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        # server.starttls()
+        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Your Atlas Copco AI Error Logging Portal account password was changed"
         body = f"""Dear User ({emp_id}),
@@ -940,16 +968,16 @@ def change_password():
             return jsonify({"success": False, "message": "Passwords do not match"}), 400
 
         # Policy: ≥1 lower, ≥1 upper, ≥1 digit, ≥1 symbol from !@#$%^&*_+-=?
-        policy = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*_+\-=?])[A-Za-z\d!@#$%^&*_+\-=?]{8,64}$')
+        policy = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*_+\-=\?])[A-Za-z\d!@#$%^&*_+\-=\?]{8,64}$')
         if not policy.match(new_password):
             return jsonify({"success": False, "message": "Password must be 8-64 chars with upper, lower, number, and symbol (!@#$%^&*_+-=?)"}), 400
 
-        conn = connect_to_db()
-        if conn is None:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
         # Fetch current hash
-        with conn.cursor() as c:
+        with g.db.cursor() as c:
             c.execute("SELECT password FROM login WHERE username=%s LIMIT 1", (emp_id,))
             row = c.fetchone()
         if not row:
@@ -966,12 +994,12 @@ def change_password():
 
         # Update to new hash
         new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        with conn.cursor() as c:
+        with g.db.cursor() as c:
             c.execute("UPDATE login SET password=%s WHERE username=%s", (new_hash, emp_id))
-        conn.commit()
+        g.db.commit()
 
         # Email the user (if we can find the email)
-        with conn.cursor() as c:
+        with g.db.cursor() as c:
             c.execute("SELECT EMP_Email FROM employees WHERE Emp_ID=%s LIMIT 1", (emp_id,))
             row_email = c.fetchone()
         user_email = row_email[0] if row_email else None
@@ -1001,8 +1029,8 @@ def send_welcome_credentials_email(to_email: str, emp_id: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        # server.starttls()
+        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Welcome to Atlas Copco Error Logging"
         body = f"""Dear User,
@@ -1038,7 +1066,6 @@ Atlas Copco AI Error Logging System
 # Add Employee (creates login + emails credentials)
 @app.route('/add-employee', methods=['POST'])
 def add_employee():
-    conn = None
     cursor = None
     try:
         if not request.is_json:
@@ -1063,10 +1090,10 @@ def add_employee():
         emp_pc = str(emp_pc).strip()
         emp_team = str(emp_team).strip()
 
-        conn = connect_to_db()
-        if conn is None:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
-        cursor = conn.cursor()
+        cursor = g.db.cursor()
 
         table_name = f"{emp_id}"
 
@@ -1104,7 +1131,7 @@ def add_employee():
                 access_type = VALUES(access_type)
         """, (table_name, password_hash, 'Employee'))
 
-        conn.commit()  # ✅ commit DB changes before emailing
+        g.db.commit()  # ✅ commit DB changes before emailing
 
         # Send welcome email with username (EMP_<id>) and instructions
         try:
@@ -1116,12 +1143,15 @@ def add_employee():
         return jsonify({"success": True, "message": "Employee added successfully"}), 201
 
     except Exception as e:
-        if conn: conn.rollback()
+        if hasattr(g, 'db') and g.db: 
+            try:
+                g.db.rollback()
+            except:
+                pass
         print("Error in add_employee:", e)
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
     finally:
         if cursor: cursor.close()
-        if conn: conn.close()
 
 
 @app.route('/health')
@@ -1145,8 +1175,10 @@ def edit_employee():
         return jsonify({"error": "All fields are required!"}), 400
     
     try:
-        conn = connect_to_db()
-        cursor = conn.cursor()
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({"success": False, "message": "DB connection failed"}), 500
+        cursor = g.db.cursor()
         
         # Ensure Emp_ID is not changed
         cursor.execute("SELECT * FROM employees WHERE Emp_ID = %s", (emp_id,))
@@ -1160,19 +1192,17 @@ def edit_employee():
             WHERE Emp_ID=%s
         """, (emp_name, emp_email, emp_division, emp_pc, emp_team, emp_id))
         
-        conn.commit()
+        g.db.commit()
         return jsonify({"success": "Employee details updated successfully!"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
-        conn.close()
 
 # Delete Employee API
 
 @app.route('/delete-employee/<emp_id>', methods=['DELETE'])
 def delete_employee(emp_id):
-    conn = None
     cursor = None
     try:
         # Basic whitelist for the per-employee table identifier
@@ -1180,8 +1210,10 @@ def delete_employee(emp_id):
         if not re.fullmatch(r'[A-Za-z0-9_]+', emp_id):
             return jsonify({"error": "Invalid employee id"}), 400
 
-        conn = connect_to_db()
-        cursor = conn.cursor()
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({"success": False, "message": "DB connection failed"}), 500
+        cursor = g.db.cursor()
 
         # 1) Clean up auth artifacts first
         cursor.execute("DELETE FROM login_otp WHERE username = %s", (emp_id,))
@@ -1193,18 +1225,19 @@ def delete_employee(emp_id):
         # 3) Remove from employees
         cursor.execute("DELETE FROM employees WHERE Emp_ID = %s", (emp_id,))
 
-        conn.commit()
+        g.db.commit()
         return jsonify({"success": True, "message": "Employee, login, and related data deleted successfully!"}), 200
 
     except Exception as e:
-        if conn:
-            conn.rollback()
+        if hasattr(g, 'db') and g.db:
+            try:
+                g.db.rollback()
+            except:
+                pass
         return jsonify({"error": str(e)}), 500
     finally:
         if cursor:
             cursor.close()
-        if conn:
-            conn.close()
 
 
 
@@ -1212,8 +1245,11 @@ def delete_employee(emp_id):
 @app.route('/fetch-all-employees', methods=['GET'])
 def fetch_all_employees():
     try:
-        conn = connect_to_db()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({"error": "Database connection not available"}), 500
+        
+        cursor = g.db.cursor(pymysql.cursors.DictCursor)
         cursor.execute("SELECT * FROM employees")
         employees = cursor.fetchall()
         return jsonify(employees)
@@ -1221,18 +1257,17 @@ def fetch_all_employees():
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
-        conn.close()
         
 # Employee page code end..............
 
 
 @app.route('/api/monthly-drawing-status', methods=['GET'])
 def monthly_drawing_status():
-    db = connect_to_db()
-    if db is None:
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
 
-    cursor = db.cursor()
+    cursor = g.db.cursor()
     try:
         # Extract filters from request
         division = request.args.get('division')
@@ -1299,13 +1334,15 @@ def monthly_drawing_status():
         return jsonify(results)
     finally:
         cursor.close()
-        db.close()
         
 # Bar chart code (reports page number 1)
 @app.route('/api/monthly-error-report', methods=['GET'])
 def monthly_error_report():
-    db = connect_to_db()
-    cursor = db.cursor()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    cursor = g.db.cursor()
     try:
         selected_divisions = request.args.getlist('division')
         selected_pcs = request.args.getlist('pc')
@@ -1371,15 +1408,17 @@ def monthly_error_report():
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
-        db.close()
 
 # Bar chart code (reports page number 2)
 from datetime import datetime, timedelta
 
 @app.route('/api/trend-error-report', methods=['GET'])
 def trend_error_report():
-    db = connect_to_db()
-    cursor = db.cursor()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    cursor = g.db.cursor()
     try:
         selected_divisions = request.args.getlist('division')
         selected_pcs = request.args.getlist('pc')
@@ -1448,18 +1487,17 @@ def trend_error_report():
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
-        db.close()
 
  
 
 # Line chart code (reports page number 2)
 @app.route('/api/drawings-trend', methods=['GET'])
 def get_drawings_trend():
-    db = connect_to_db()
-    if db is None:
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
 
-    cursor = db.cursor()
+    cursor = g.db.cursor()
     try:
         # Extract filters
         division = request.args.get('division', '').strip()
@@ -1525,7 +1563,6 @@ def get_drawings_trend():
         return jsonify(trend_data)
     finally:
         cursor.close()
-        db.close()
 
 # Pass Ratio code (reports page number 3)
 @app.route('/get-pass-ratio', methods=['POST'])
@@ -1536,8 +1573,11 @@ def get_pass_ratio():
     start_date = data.get('start_date', '')
     end_date = data.get('end_date', '')
 
-    connection = connect_to_db()
-    cursor = connection.cursor()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    cursor = g.db.cursor()
 
     cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'error_db' AND TABLE_NAME LIKE 'EC_%'")
     tables = [row[0] for row in cursor.fetchall()]
@@ -1615,7 +1655,6 @@ def get_pass_ratio():
                     "pass_ratio": f"{pass_ratio}%" if pass_ratio != "NA" else "NA"
                 }
     cursor.close()
-    connection.close()
     pass_ratio_data = list(months_map.values())
     return jsonify(pass_ratio_data)
 
@@ -1665,8 +1704,11 @@ def employee_report():
     sql = " ".join(query)
 
     try:
-        conn = connect_to_db()
-        with conn.cursor() as cur:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({'error': 'Database connection error'}), 500
+        
+        with g.db.cursor() as cur:
             # Fetch rows
             cur.execute(sql, tuple(args))
             rows = cur.fetchall()
@@ -1674,7 +1716,7 @@ def employee_report():
 
         # Fetch profile info for summary (name/PC/division)
         emp_name = pc = division = ""
-        with conn.cursor() as cur:
+        with g.db.cursor() as cur:
             cur.execute("""
                 SELECT EMP_Name, emp_PC, emp_division
                 FROM Employees
@@ -1684,7 +1726,6 @@ def employee_report():
             if r:
                 emp_name, pc, division = r[0] or "", r[1] or "", r[2] or ""
 
-        conn.close()
 
         result = []
         for tup in rows:
@@ -1729,12 +1770,14 @@ def drawing_report():
     sql = " ".join(query)
 
     try:
-        conn = connect_to_db()
-        with conn.cursor() as cur:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({'error': 'Database connection error'}), 500
+        
+        with g.db.cursor() as cur:
             cur.execute(sql, tuple(args))
             rows = cur.fetchall()
             cols = [d[0] for d in cur.description]
-        conn.close()
 
         result = []
         for tup in rows:
@@ -1760,14 +1803,16 @@ def download_drawing(drawing_id, revision):
     table_name = f"`{drawing_id}`"
 
     try:
-        conn = connect_to_db()
-        with conn.cursor() as cur:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({'error': 'Database connection error'}), 500
+        
+        with g.db.cursor() as cur:
             cur.execute(
                 f"SELECT Drawing_PDF FROM {table_name} WHERE Revision_num = %s",
                 (revision,)
             )
             row = cur.fetchone()
-        conn.close()
 
         if not row:
             return jsonify({"error": "Drawing/revision not found"}), 404
@@ -1791,8 +1836,11 @@ def download_drawing(drawing_id, revision):
 # Get dropdown data for employees in report page
 @app.route('/api/employees-dropdown', methods=['GET'])
 def get_employee_ids():
-    connection = connect_to_db()
-    cursor = connection.cursor()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({"error": "Database connection error"}), 500
+    
+    cursor = g.db.cursor()
     
     try:
         cursor.execute("SELECT EMP_ID FROM employees;")
@@ -1802,13 +1850,15 @@ def get_employee_ids():
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
-        connection.close()
 
 # Get dropdown data for drawings in report page
 @app.route('/api/drawings-dropdown', methods=['GET'])
 def get_drawing_ids():
-    connection = connect_to_db()
-    cursor = connection.cursor()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({"error": "Database connection error"}), 500
+    
+    cursor = g.db.cursor()
     
     try:
         cursor.execute("SELECT drawing_ID FROM drawings;")
@@ -1818,16 +1868,15 @@ def get_drawing_ids():
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
-        connection.close()
 
 # Employee reports page column charts(reports page number 4)
 # /api/employee-drawing-status — use `Date` column (and case-insensitive Decision)
 @app.route('/api/employee-drawing-status', methods=['GET'])
 def employee_drawing_status():
-    db = connect_to_db()
-    if db is None:
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
-    cursor = db.cursor()
+    cursor = g.db.cursor()
     try:
         employee_id = request.args.get('employeeId')
         start_date = request.args.get('start_date')
@@ -1835,6 +1884,11 @@ def employee_drawing_status():
 
         if not employee_id:
             return jsonify({'error': 'Missing employee_id'}), 400
+
+        # Validate employee_id format to prevent SQL injection
+        import re
+        if not re.match(r'^[A-Za-z0-9_]+$', employee_id):
+            return jsonify({'error': 'Invalid employee_id format'}), 400
 
         cursor.execute("SHOW TABLES LIKE %s", (employee_id,))
         if not cursor.fetchone():
@@ -1850,21 +1904,24 @@ def employee_drawing_status():
             start_month = max(1, end_dt.month - 5)
             start_dt = end_dt.replace(month=start_month)
 
-        query = """
+        # Safely construct the query with the validated table name
+        query = f"""
             SELECT
-                DATE_FORMAT(`Review_Date`, '%%m-%%Y') AS month,
+                DATE_FORMAT(Review_Date, '%%m-%%Y') AS month,
                 SUM(CASE WHEN LOWER(Decision) = 'approve' THEN 1 ELSE 0 END) AS approved,
-                SUM(CASE WHEN LOWER(Decision) = 'reject'  THEN 1 ELSE 0 END) AS rejected
-            FROM `{table}`
-            WHERE `Review_Date` BETWEEN %s AND %s
-            GROUP BY month
-            ORDER BY STR_TO_DATE(month, '%%m-%%Y')
-        """.format(table=employee_id)
+                SUM(CASE WHEN LOWER(Decision) = 'reject' THEN 1 ELSE 0 END) AS rejected
+            FROM `{employee_id}`
+            WHERE Review_Date BETWEEN %s AND %s
+            GROUP BY DATE_FORMAT(Review_Date, '%%m-%%Y')
+            ORDER BY STR_TO_DATE(DATE_FORMAT(Review_Date, '%%m-%%Y'), '%%m-%%Y')
+        """
 
         cursor.execute(query, (start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d')))
 
         results = {}
-        for month, approved, rejected in cursor.fetchall():
+        rows = cursor.fetchall()
+        for row in rows:
+            month, approved, rejected = row
             # keys like EC_01_2025
             results[f"EC_{month.replace('-', '_')}"] = {
                 "approve": int(approved or 0),
@@ -1872,16 +1929,21 @@ def employee_drawing_status():
             }
 
         return jsonify(results)
+    except Exception as e:
+        print(f"Error in employee_drawing_status: {str(e)}")
+        return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
-        db.close()
 
 
 # Error codes in employees and drawings(Reports page number 4 and 5)
 @app.route('/api/error-summary', methods=['GET'])
 def error_summary():
-    db = connect_to_db()
-    cursor = db.cursor()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    cursor = g.db.cursor()
     try:
         employee_id = request.args.get('employeeId')
         drawing_id = request.args.get('drawingId')
@@ -1942,7 +2004,6 @@ def error_summary():
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
-        db.close()
 
 
 
@@ -1987,8 +2048,8 @@ def send_single_summary_email(to_email: str, items: list[tuple[str, int]], creat
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        # server.starttls()
+        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Drawings ready for review"
         pairs_str = ', '.join([f"{did} - {rev}" for did, rev in items])
@@ -2053,15 +2114,15 @@ def submit_batch():
         _design_no    = (request.form.get('design_no') or '').strip()
         _client_rev   = (request.form.get('client_revision_no') or '').strip()
 
-        conn = connect_to_db()
-        if conn is None:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
         results = []  # (drawing_id, new_revision)
         today = datetime.today()
 
         try:
-            with conn.cursor() as c:
+            with g.db.cursor() as c:
                 for f in files:
                     if not f or not f.filename.lower().endswith('.pdf'):
                         continue
@@ -2106,14 +2167,14 @@ def submit_batch():
                         """, (drawing_id, revision_from_file, reviewer_emp_id, creator_emp_id, today,
                               checklist, drawing_type, pdf_bytes))
 
-                    results.append((drawing_id, revision_from_file))
+                results.append((drawing_id, revision_from_file))
 
-            conn.commit()
+            g.db.commit()
 
             # Lookup creator name once for email
             creator_name = creator_emp_id
             try:
-                with conn.cursor() as c2:
+                with g.db.cursor() as c2:
                     c2.execute("SELECT Emp_Name FROM employees WHERE Emp_ID=%s LIMIT 1", (creator_emp_id,))
                     r = c2.fetchone()
                     if r and r[0]:
@@ -2121,28 +2182,30 @@ def submit_batch():
             except Exception as e:
                 print("Creator name lookup failed:", e)
 
-        finally:
+            # Send one summary email
             try:
-                conn.close()
+                send_single_summary_email(
+                    to_email=reviewer_email,
+                    items=results,
+                    creator_emp_id=creator_emp_id,
+                    creator_name=creator_name
+                )
+            except Exception as e:
+                print("Email send error:", e)
+
+            return jsonify({
+                "success": True,
+                "message": "Processed files successfully.",
+                "results": [{"drawing_id": did, "revision": rev} for did, rev in results]
+            }), 200
+        except Exception as e:
+            # Rollback in case of error
+            try:
+                g.db.rollback()
             except:
                 pass
-
-        # Send one summary email
-        try:
-            send_single_summary_email(
-                to_email=reviewer_email,
-                items=results,
-                creator_emp_id=creator_emp_id,
-                creator_name=creator_name
-            )
-        except Exception as e:
-            print("Email send error:", e)
-
-        return jsonify({
-            "success": True,
-            "message": "Processed files successfully.",
-            "results": [{"drawing_id": did, "revision": rev} for did, rev in results]
-        }), 200
+            print("submit-batch error:", e)
+            return jsonify({"success": False, "message": "Internal Server Error"}), 500
 
     except Exception as e:
         print("submit-batch error:", e)
@@ -2194,49 +2257,49 @@ def requests_creator(emp_id):
         - Approved if Decision == Approve/Approved for that rev
         - Rejected if Decision == Reject/Rejected for that rev
     """
-    conn = connect_to_db()
-    try:
-        with conn.cursor() as c:
-            c.execute("""
-                SELECT drawing_ID, Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date, Drawing_Type
-                  FROM drawings
-                 WHERE Creator_EMP_ID=%s
-                 ORDER BY Date DESC, drawing_ID ASC, Revision_num DESC
-            """, (emp_id,))
-            rows = c.fetchall()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    with g.db.cursor() as c:
+        c.execute("""
+            SELECT drawing_ID, Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date, Drawing_Type
+              FROM drawings
+             WHERE Creator_EMP_ID=%s
+             ORDER BY Date DESC, drawing_ID ASC, Revision_num DESC
+        """, (emp_id,))
+        rows = c.fetchall()
 
-            out = []
-            for drawing_id, rev, reviewer_id, creator_id, created_date, drawing_type in rows:
-                reviewer = get_employee(c, reviewer_id)
+        out = []
+        for drawing_id, rev, reviewer_id, creator_id, created_date, drawing_type in rows:
+            reviewer = get_employee(c, reviewer_id)
 
-                status = 'Pending'
-                if table_exists(c, drawing_id):
-                    dyn = get_dyn_row(c, drawing_id, rev)
-                    if dyn:
-                        decision = (dyn['Decision'] or '').lower()
-                        if decision in ('approve', 'approved'):
-                            status = 'Approved'
-                        elif decision in ('reject', 'rejected'):
-                            status = 'Rejected'
-                        else:
-                            status = 'Pending'
+            status = 'Pending'
+            if table_exists(c, drawing_id):
+                dyn = get_dyn_row(c, drawing_id, rev)
+                if dyn:
+                    decision = (dyn['Decision'] or '').lower()
+                    if decision in ('approve', 'approved'):
+                        status = 'Approved'
+                    elif decision in ('reject', 'rejected'):
+                        status = 'Rejected'
                     else:
                         status = 'Pending'
                 else:
                     status = 'Pending'
+            else:
+                status = 'Pending'
 
-                out.append({
-                    "drawingNo": drawing_id,
-                    "revisionNo": int(rev),
-                    "createdDate": created_date.strftime("%Y-%m-%d") if created_date else "",
-                    "reviewerId": reviewer_id,
-                    "reviewerName": reviewer["name"],
-                    "reviewerEmail": reviewer["email"],
-                    "status": status
-                })
-        return jsonify(out), 200
-    finally:
-        conn.close()
+            out.append({
+                "drawingNo": drawing_id,
+                "revisionNo": int(rev),
+                "createdDate": created_date.strftime("%Y-%m-%d") if created_date else "",
+                "reviewerId": reviewer_id,
+                "reviewerName": reviewer["name"],
+                "reviewerEmail": reviewer["email"],
+                "status": status
+            })
+    return jsonify(out), 200
 
 @app.route('/requests/reviewer/<emp_id>', methods=['GET'])
 def requests_reviewer(emp_id):
@@ -2246,43 +2309,43 @@ def requests_reviewer(emp_id):
         - 'Reviewed' if per-drawing table HAS a row for the same Revision_num
         - 'Review'   otherwise
     """
-    conn = connect_to_db()
-    try:
-        with conn.cursor() as c:
-            c.execute("""
-                SELECT drawing_ID, Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date
-                  FROM drawings
-                 WHERE Reviewer_EMP_ID=%s
-                 ORDER BY Date DESC, drawing_ID ASC, Revision_num DESC
-            """, (emp_id,))
-            rows = c.fetchall()
+    # Use g.db instead of creating a new connection
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({'error': 'Database connection error'}), 500
+    
+    with g.db.cursor() as c:
+        c.execute("""
+            SELECT drawing_ID, Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date
+              FROM drawings
+             WHERE Reviewer_EMP_ID=%s
+             ORDER BY Date DESC, drawing_ID ASC, Revision_num DESC
+        """, (emp_id,))
+        rows = c.fetchall()
 
-            out = []
-            for drawing_id, rev, reviewer_id, creator_id, created_date in rows:
-                creator = get_employee(c, creator_id)
+        out = []
+        for drawing_id, rev, reviewer_id, creator_id, created_date in rows:
+            creator = get_employee(c, creator_id)
 
-                status = 'Review'
-                last_reviewed = None
-                if table_exists(c, drawing_id):
-                    dyn = get_dyn_row(c, drawing_id, rev)
-                    if dyn:
-                        status = 'Reviewed'
-                        if dyn['Date']:
-                            last_reviewed = dyn['Date'].strftime("%Y-%m-%d")
+            status = 'Review'
+            last_reviewed = None
+            if table_exists(c, drawing_id):
+                dyn = get_dyn_row(c, drawing_id, rev)
+                if dyn:
+                    status = 'Reviewed'
+                    if dyn['Date']:
+                        last_reviewed = dyn['Date'].strftime("%Y-%m-%d")
 
-                out.append({
-                    "drawingNo": drawing_id,
-                    "revisionNo": int(rev),
-                    "createdDate": created_date.strftime("%Y-%m-%d") if created_date else "",
-                    "creatorId": creator_id,
-                    "creatorName": creator["name"],
-                    "creatorEmail": creator["email"],
-                    "lastReviewedDate": last_reviewed,
-                    "status": status
-                })
-        return jsonify(out), 200
-    finally:
-        conn.close()
+            out.append({
+                "drawingNo": drawing_id,
+                "revisionNo": int(rev),
+                "createdDate": created_date.strftime("%Y-%m-%d") if created_date else "",
+                "creatorId": creator_id,
+                "creatorName": creator["name"],
+                "creatorEmail": creator["email"],
+                "lastReviewedDate": last_reviewed,
+                "status": status
+            })
+    return jsonify(out), 200
 
 @app.route('/requests/delete/<drawing_id>/<int:revision>', methods=['DELETE'])
 def delete_request(drawing_id, revision):
@@ -2443,21 +2506,98 @@ def download_pdf(drawing_id, revision):
 # Requests PDF downloads and seeing PDF ends
 
 
+# @app.route("/drawings/<drawing_id>/<int:revision>/pdf/annotated/download", methods=["POST"])
+# def download_annotated_pdf(drawing_id, revision):
+#     """
+#     Return a *temporary* PDF with additional annotations baked in as real
+#     PDF annotation objects (so page.annots() in fitz can see them),
+#     without modifying what is stored in the database.
+
+#     Expects JSON body:
+#       {
+#         "annotations": [
+#           { "page": 1, "x": 0.5, "y": 0.2, "text": "..." },
+#           ...
+#         ]
+#       }
+#     where x,y are normalized (0–1) relative to the page width/height.
+#     """
+#     payload = request.get_json(silent=True) or {}
+#     annotations = payload.get("annotations") or []
+
+#     print(f"📝 Generating annotated PDF for {drawing_id} Rev {revision}")
+#     print(f"📝 Received {len(annotations)} annotations")
+
+#     conn = connect_to_db()
+#     if conn is None:
+#         return dbg_fail("annotated-pdf-db", "Database connection is not established", code=500)
+
+#     try:
+#         blob = _fetch_pdf_blob(conn, drawing_id, revision)
+#         if not blob:
+#             return jsonify({"error": "PDF not found"}), 404
+
+#         # Open original PDF from DB
+#         doc = fitz.open(stream=blob, filetype="pdf")
+#         print(f"📄 Opened PDF with {len(doc)} pages")
+
+#         annotations_added = 0
+#         for ann in annotations:
+#             try:
+#                 page_index = int(ann.get("page", 1)) - 1
+#                 if page_index < 0 or page_index >= len(doc):
+#                     print(f"⚠️ Skipping annotation - page {page_index+1} out of range")
+#                     continue
+#                 page = doc[page_index]
+#                 rect = page.rect
+
+#                 # Normalized coordinates → page coordinates
+#                 x_norm = float(ann.get("x", 0.0))
+#                 y_norm = float(ann.get("y", 0.0))
+#                 x = rect.x0 + x_norm * rect.width
+#                 y = rect.y0 + y_norm * rect.height
+
+#                 text = str(ann.get("text") or "").strip()
+#                 if not text:
+#                     print(f"⚠️ Skipping annotation - empty text")
+#                     continue
+
+#                 # Add a standard text annotation icon at that point.
+#                 # fitz will store the text in annot.info["content"],
+#                 # which is exactly what extract_annotations(...) expects.
+#                 page.add_text_annot(fitz.Point(x, y), text)
+#                 annotations_added += 1
+#                 print(f"✅ Added annotation on page {page_index+1}: '{text[:50]}...'")
+#             except Exception as e:
+#                 # Don't fail the whole export for a single bad annotation
+#                 print(f"❌ Failed to add annotation: {e}, data: {ann}")
+#                 continue
+
+#         print(f"✅ Successfully added {annotations_added}/{len(annotations)} annotations")
+
+#         out_bytes = doc.write()
+#         doc.close()
+
+#         download_name = f"{drawing_id}_Rev{str(revision).zfill(2)}_annotated.pdf"
+#         print(f"📦 Sending annotated PDF: {download_name} ({len(out_bytes)} bytes)")
+        
+#         return send_file(
+#             io.BytesIO(out_bytes),
+#             mimetype="application/pdf",
+#             as_attachment=True,
+#             download_name=download_name
+#         )
+#     except Exception as e:
+#         print(f"❌ Error generating annotated PDF: {e}")
+#         return dbg_fail("annotated-pdf-generate", e)
+#     finally:
+#         conn.close()
+
 @app.route("/drawings/<drawing_id>/<int:revision>/pdf/annotated/download", methods=["POST"])
 def download_annotated_pdf(drawing_id, revision):
     """
-    Return a *temporary* PDF with additional annotations baked in as real
-    PDF annotation objects (so page.annots() in fitz can see them),
+    Return a *temporary* PDF with additional annotations (text + stamps) baked in,
     without modifying what is stored in the database.
-
-    Expects JSON body:
-      {
-        "annotations": [
-          { "page": 1, "x": 0.5, "y": 0.2, "text": "..." },
-          ...
-        ]
-      }
-    where x,y are normalized (0–1) relative to the page width/height.
     """
     payload = request.get_json(silent=True) or {}
     annotations = payload.get("annotations") or []
@@ -2465,9 +2605,11 @@ def download_annotated_pdf(drawing_id, revision):
     print(f"📝 Generating annotated PDF for {drawing_id} Rev {revision}")
     print(f"📝 Received {len(annotations)} annotations")
 
-    conn = connect_to_db()
-    if conn is None:
-        return dbg_fail("annotated-pdf-db", "Database connection is not established", code=500)
+    # ✅ g.db safety check
+    if not hasattr(g, "db") or g.db is None:
+        return dbg_fail("db-check", "Database connection is not established", code=500)
+
+    conn = g.db
 
     try:
         blob = _fetch_pdf_blob(conn, drawing_id, revision)
@@ -2479,12 +2621,15 @@ def download_annotated_pdf(drawing_id, revision):
         print(f"📄 Opened PDF with {len(doc)} pages")
 
         annotations_added = 0
+        stamps_added = 0
+        
         for ann in annotations:
             try:
                 page_index = int(ann.get("page", 1)) - 1
                 if page_index < 0 or page_index >= len(doc):
                     print(f"⚠️ Skipping annotation - page {page_index+1} out of range")
                     continue
+                
                 page = doc[page_index]
                 rect = page.rect
 
@@ -2494,23 +2639,104 @@ def download_annotated_pdf(drawing_id, revision):
                 x = rect.x0 + x_norm * rect.width
                 y = rect.y0 + y_norm * rect.height
 
-                text = str(ann.get("text") or "").strip()
-                if not text:
-                    print(f"⚠️ Skipping annotation - empty text")
-                    continue
+                # Check annotation type
+                ann_type = ann.get("type", "text")
+                
+                if ann_type == "stamp":
+                    # Render stamp annotation
+                    stamp_type = ann.get("stampType", "reviewed")
+                    reviewer_name = ann.get("reviewerName", "Unknown")
+                    review_date = ann.get("reviewDate", "")
+                    
+                    # Define stamp dimensions
+                    stamp_width = 200
+                    stamp_height = 45
+                    stamp_rect = fitz.Rect(x, y, x + stamp_width, y + stamp_height)
+                    
+                    # Choose color based on stamp type
+                    if stamp_type == "approved":
+                        border_color = (16/255, 185/255, 129/255)  # Green
+                        text_color = (16/255, 185/255, 129/255)
+                        # Light green background
+                        bg_color = (16/255 + (1 - 16/255) * 0.95, 
+                                   185/255 + (1 - 185/255) * 0.95, 
+                                   129/255 + (1 - 129/255) * 0.95)
+                    elif stamp_type == "rejected":
+                        border_color = (239/255, 68/255, 68/255)  # Red
+                        text_color = (239/255, 68/255, 68/255)
+                        # Light red background
+                        bg_color = (239/255 + (1 - 239/255) * 0.95, 
+                                   68/255 + (1 - 68/255) * 0.95, 
+                                   68/255 + (1 - 68/255) * 0.95)
+                    else:  # reviewed
+                        border_color = (59/255, 130/255, 246/255)  # Blue
+                        text_color = (59/255, 130/255, 246/255)
+                        # Light blue background
+                        bg_color = (59/255 + (1 - 59/255) * 0.95, 
+                                   130/255 + (1 - 130/255) * 0.95, 
+                                   246/255 + (1 - 246/255) * 0.95)
+                    
+                    # Draw light background first
+                    page.draw_rect(
+                        stamp_rect,
+                        color=None,
+                        fill=bg_color,
+                        width=0
+                    )
+                    
+                    # Draw border on top
+                    page.draw_rect(
+                        stamp_rect, 
+                        color=border_color, 
+                        fill=None,
+                        width=2
+                    )
+                    
+                    # Add stamp header text (e.g., "REVIEWED")
+                    header_text = stamp_type.upper()
+                    header_point = fitz.Point(x + 10, y + 22)
+                    page.insert_text(
+                        header_point,
+                        header_text,
+                        fontsize=14,
+                        fontname="helv",  # Standard Helvetica
+                        color=text_color
+                    )
+                    
+                    # Add reviewer details text (e.g., "By Anuj Khande at Feb 7, 2026, 6:22 PM")
+                    details_text = f"By {reviewer_name} at {review_date}"
+                    details_point = fitz.Point(x + 10, y + 37)
+                    page.insert_text(
+                        details_point,
+                        details_text,
+                        fontsize=9,
+                        fontname="helv",  # Standard Helvetica
+                        color=(75/255, 83/255, 99/255)  # Gray color
+                    )
+                    
+                    stamps_added += 1
+                    print(f"✅ Added {stamp_type} stamp on page {page_index+1}")
+                    
+                else:
+                    # Handle text annotation (existing code)
+                    text = str(ann.get("text") or "").strip()
+                    if not text:
+                        print(f"⚠️ Skipping annotation - empty text")
+                        continue
 
-                # Add a standard text annotation icon at that point.
-                # fitz will store the text in annot.info["content"],
-                # which is exactly what extract_annotations(...) expects.
-                page.add_text_annot(fitz.Point(x, y), text)
-                annotations_added += 1
-                print(f"✅ Added annotation on page {page_index+1}: '{text[:50]}...'")
+                    # Add a standard text annotation icon at that point
+                    page.add_text_annot(fitz.Point(x, y), text)
+                    annotations_added += 1
+                    print(f"✅ Added text annotation on page {page_index+1}: '{text[:50]}...'")
+                    
             except Exception as e:
                 # Don't fail the whole export for a single bad annotation
-                print(f"❌ Failed to add annotation: {e}, data: {ann}")
+                print(f"❌ Failed to add annotation: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
 
-        print(f"✅ Successfully added {annotations_added}/{len(annotations)} annotations")
+        print(f"✅ Successfully added {annotations_added} text annotations and {stamps_added} stamps")
 
         out_bytes = doc.write()
         doc.close()
@@ -2525,10 +2751,11 @@ def download_annotated_pdf(drawing_id, revision):
             download_name=download_name
         )
     except Exception as e:
-        print(f"❌ Error generating annotated PDF: {e}")
-        return dbg_fail("annotated-pdf-generate", e)
-    finally:
-        conn.close()
+        print(f"❌ FULL ERROR generating annotated PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
 
 # Autofill uploads page
 

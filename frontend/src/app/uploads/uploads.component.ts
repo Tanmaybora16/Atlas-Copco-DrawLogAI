@@ -470,4 +470,55 @@ export class UploadsComponent {
     this.editedIndex = null;
     this.selectedError = '';
   }
+
+  // Newly Added Part ofr deleting the comment in uploads page
+  deleteRow(index: number) {
+    if (confirm('Are you sure you want to delete this comment and its error code?')) {
+      // Remove from both arrays
+      this.extractedComments.splice(index, 1);
+      this.predictedErrors.splice(index, 1);
+      
+      // Update error counts
+      this.errorCounts = this.countErrorOccurrences(this.predictedErrors);
+      
+      // Clean up edit tracking for this row
+      this.editedRows.delete(index);
+      delete this.originalErrors[index];
+      
+      // Reindex edit tracking (shift down indices after deleted row)
+      const newEditedRows = new Set<number>();
+      const newOriginalErrors: { [key: number]: string } = {};
+      
+      this.editedRows.forEach(rowIndex => {
+        if (rowIndex > index) {
+          newEditedRows.add(rowIndex - 1);
+        } else if (rowIndex < index) {
+          newEditedRows.add(rowIndex);
+        }
+      });
+      
+      Object.keys(this.originalErrors).forEach(key => {
+        const rowIndex = parseInt(key);
+        if (rowIndex > index) {
+          newOriginalErrors[rowIndex - 1] = this.originalErrors[rowIndex];
+        } else if (rowIndex < index) {
+          newOriginalErrors[rowIndex] = this.originalErrors[rowIndex];
+        }
+      });
+      
+      this.editedRows = newEditedRows;
+      this.originalErrors = newOriginalErrors;
+      
+      // Reset edit mode if we were editing this or a later row
+      if (this.editedIndex !== null && this.editedIndex >= index) {
+        this.editedIndex = null;
+        this.selectedError = '';
+      }
+      
+      // Auto-approve if no errors left
+      if (this.predictedErrors.length === 0) {
+        this.decision = 'approve';
+      }
+    }
+  }
 }
