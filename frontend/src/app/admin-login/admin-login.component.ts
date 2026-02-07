@@ -66,7 +66,7 @@ export class AdminLoginComponent {
         this.authService.login(this.UserName.trim(), response.access_type);
 
         // Route by role (HR → /employee, Employee → /uploads)
-        const targetRoute = response.access_type === 'HR' ? '/employee' : '/uploads';
+        const targetRoute = response.access_type === 'HR' ? '/employee' : '/submission';
 
         Swal.fire({
           title: 'Success!',

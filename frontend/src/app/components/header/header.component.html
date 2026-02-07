@@ -3,15 +3,23 @@
     <img src="assets/logo.png" alt="Logo">
 
     <div class="headerLinks">
+
+      <!-- HR-only -->
+      <a *ngIf="isLoggedIn() && userRole === 'HR'"
+         routerLink="/employee"
+         routerLinkActive="active-link">Employee</a>
+
       <!-- Employee-only -->
+      
+      <a *ngIf="isLoggedIn() && userRole === 'Employee'"
+      routerLink="/submission"
+      routerLinkActive="active-link"
+      [routerLinkActiveOptions]="{ exact: true }">Submission</a>
+
       <a *ngIf="isLoggedIn() && userRole === 'Employee'"
          routerLink="/uploads"
          routerLinkActive="active-link"
-         [routerLinkActiveOptions]="{ exact: true }">Uploads</a>
-
-      <a *ngIf="isLoggedIn() && userRole === 'Employee'"
-         routerLink="/submission"
-         routerLinkActive="active-link">Submission</a>
+         >Uploads</a>
 
       <a *ngIf="isLoggedIn() && userRole === 'Employee'"
          routerLink="/requests"
@@ -26,10 +34,7 @@
          routerLink="/canvas"
          routerLinkActive="active-link">Canvas</a>
 
-      <!-- HR-only -->
-      <a *ngIf="isLoggedIn() && userRole === 'HR'"
-         routerLink="/employee"
-         routerLinkActive="active-link">Employee</a>
+      
     </div>
 
     <div class="profile" *ngIf="authService.isLoggedIn(); else guestBlock">
