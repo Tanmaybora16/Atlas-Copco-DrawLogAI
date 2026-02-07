@@ -1,0 +1,400 @@
+.container{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.input-container{
+  display: flex;
+  flex-direction: column;
+  height: 65px;
+  width: 100%;
+  justify-content: space-between;
+  padding: 5px 0px;
+}
+
+.input-container label {
+margin: 0px;
+color: #6C6C6C;
+transition: color 0.3s ease;
+}
+
+.input-container:focus-within label {
+color: #252525;
+font-weight: 500;
+}
+
+input{
+height: 55%;
+border: 1px solid #BABABA;
+background-color: #F9F9F9;
+border-radius: 4px;
+padding: 2px 10px;
+font-size: 16px;
+}
+
+.input-container input:focus {
+border-color: #6C6C6C; /* Darker border color on focus */
+background-color: #f4f4f4; /* Lighter background color on focus */
+outline: none; /* Removes default outline */
+}
+
+input:hover {
+  border-color: #6C6C6C; /* Darker border color on hover */
+}
+
+select {
+  appearance: none; /* Hides the default arrow in modern browsers */
+  -webkit-appearance: none; /* Hides the default arrow in WebKit browsers */
+  -moz-appearance: none; /* Hides the default arrow in Firefox */
+  position: relative;
+  height: 64%;
+  border: 1px solid #BABABA;
+  background-color: #F9F9F9;
+  border-radius: 4px;
+  padding: 2px 10px;
+  font-size: 16px;
+  cursor: pointer;
+  background-image: url('/assets/down-arrow.svg'); /* Replace with the correct path to the custom arrow */
+  background-repeat: no-repeat;
+  background-position: right 10px center; /* Position the arrow */
+  background-size: 12px; /* Adjust the size of the arrow */
+  transition: border-color 0.3s ease; /* Smooth transition for border color */
+}
+
+select:hover {
+  border-color: #6C6C6C; /* Darker border color on hover */
+}
+
+select:focus {
+  border-color: #565656; /* Highlight border on focus */
+  outline: none; /* Remove default outline */
+}
+
+select::after {
+  content: ''; /* Custom arrow */
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background-image: url('/assets/down-arrow.svg'); /* Replace with the correct path */
+  background-repeat: no-repeat;
+  background-size: contain;
+  transform: translateY(-50%);
+  transition: transform 0.3s ease; /* Smooth rotation */
+}
+
+select:focus::after {
+  transform: translateY(-50%) rotate(180deg); /* Rotate the arrow when dropdown is open */
+}
+
+.sub-container{
+  // width: 1350px; /* Take full width within the wrapper */
+  display: flex;
+  gap: 20px;
+  padding-top: 30px;
+  // border: 1px solid #252525; /* Border for the container */
+}
+
+.form-container {
+  // margin-top: 6vh;
+  width: 15vw;
+  padding: 20px 30px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(196, 196, 196, 0.406);  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  // gap: 25px;
+}
+
+.add-btn {
+  display: flex;
+  align-items: end;
+}
+.add-employee-button {
+  display: inline-flex; /* Use flexbox for icon and text alignment */
+  align-items: center; /* Vertically align icon and text */
+  padding: 11px 16px; /* Adjust padding as needed */
+  font-size: 16px;
+  background-color: #0087CB;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500; /* Adjust font weight for better match */
+  margin-top: 10px; /* Add some spacing from the top */
+}
+
+.button-icon {
+  width: 20px; /* Adjust icon size as needed */
+  height: 20px; /* Adjust icon size as needed */
+  margin-right: 8px; /* Add spacing between icon and text */
+  filter: brightness(0) invert(1); /* Turns black icons into white */
+}
+
+
+
+.table-container {
+  // margin-top: 6vh;
+  width: 65vw;
+  height: 75vh; /* Adjust height as needed */
+  overflow-y: auto; /* Enable vertical scrolling */
+  position: relative; /* Required for sticky header */
+  // border: 2px solid #efefef;
+  padding: 0px 30px 20px 30px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(196, 196, 196, 0.406);
+
+
+  /* Custom Scrollbar */
+  &::-webkit-scrollbar {
+    width: 6px; /* Narrow scrollbar */
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #bcbcbc; /* Darker color for scrollbar */
+    border-radius: 10px; /* Rounded edges */
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f4f4f4; /* Light background */
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: #848484; /* Slightly darker on hover */
+  }
+}
+
+.styled-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th, td {
+    vertical-align: top;
+    padding: 10px;
+    text-align: left;
+  }
+
+  th {
+      padding: 18px 10px 14px 10px;
+    background-color: rgb(255, 255, 255); /* Ensure visibility */
+    color: #545454;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 2; /* Prevent overlap issues */
+
+  }
+
+  tr {
+    border-bottom: 1px solid #ccc; /* Horizontal lines */
+    color: #6C6C6C;
+  }
+
+  thead tr {
+    border-bottom: 1.5px solid #777777; /* Darker border for header */
+  }
+}
+
+/* Row hover effect */
+tbody tr {
+  transition: background 0.3s ease;
+}
+
+tbody tr:hover {
+  background-color: #f8f9fa; /* Light gray on hover */
+}
+
+/* Actions Column */
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  opacity: 0; /* Hide by default */
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Show icons only when row is hovered */
+tbody tr:hover .actions {
+  opacity: 1;
+}
+
+/* Icon styling */
+.action-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Hover effects */
+.action-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Delete icon red */
+.delete-icon:hover {
+  filter: brightness(0) saturate(100%) invert(21%) sepia(93%) saturate(7271%) hue-rotate(354deg) brightness(88%) contrast(119%);
+}
+
+/* Edit icon blue */
+.edit-icon:hover {
+  filter: brightness(0) saturate(100%) invert(30%) sepia(82%) saturate(1084%) hue-rotate(200deg) brightness(90%) contrast(92%);
+}
+
+th:last-child, td:last-child {
+  width: 20px; /* Adjust as needed */
+  text-align: center; /* Center align icons */
+  min-width: 60px; /* Prevents shrinking too much */
+}
+
+.error {
+  color: red;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+// select {
+//   appearance: none;
+//   -webkit-appearance: none; /* Chrome, Safari, Opera */
+//   -moz-appearance: none;    /* Firefox */
+//   background-image: none !important; /* Remove any default arrow image */
+// }
+
+
+
+// new scss
+/* === Custom Multi-select Dropdown (Styled like other inputs) === */
+.custom-multi-select {
+position: relative;
+width: 270px;
+height: 65px;
+display: flex;
+flex-direction: column;
+justify-content: space-between;
+}
+
+.dropdown-box {
+  appearance: none; /* Hides the default arrow in modern browsers */
+  -webkit-appearance: none; /* Hides the default arrow in WebKit browsers */
+  -moz-appearance: none; /* Hides the default arrow in Firefox */
+  position: relative; /* Ensure custom arrow positioning works */
+height: 64%;
+border: 1px solid #BABABA;
+background-color: #F9F9F9;
+border-radius: 4px;
+padding: 2px 10px;
+font-size: 16px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+cursor: pointer;
+user-select: none;
+}
+
+.dropdown-box:hover {
+border-color: #6C6C6C;
+}
+
+.dropdown-box.open {
+border-color: #0087CB;
+}
+
+.dropdown-box.disabled {
+  cursor: not-allowed;
+  opacity: 0.6; /* Dim the dropdown to indicate it's disabled */
+  pointer-events: none; /* Prevent interaction */
+}
+
+.arrow {
+  width: 12px; /* Adjust size to match division/team dropdown */
+  height: 12px;
+  background-image: url('/assets/down-arrow.svg'); /* Replace with the correct path to the new icon */
+  background-repeat: no-repeat;
+  background-size: contain;
+  display: inline-block;
+  transition: transform 0.3s ease;
+  content: ''; /* Ensure no additional content is displayed */
+  position: absolute; /* Position the custom arrow */
+  right: 10px; /* Adjust spacing from the right */
+  top: 50%; /* Center vertically */
+  transform: translateY(-50%); /* Center vertically */
+}
+
+
+.dropdown-list {
+position: absolute;
+top: 100%;
+left: 0;
+z-index: 10;
+width: 92%;
+max-height: 180px;
+overflow-y: auto;
+background: #ffffff;
+border: 1px solid #BABABA;
+border-top: none;
+border-radius: 0 0 4px 4px;
+box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+padding: 6px 10px;
+}
+
+.dropdown-list label {
+display: flex;
+align-items: center;
+gap: 10px;
+padding: 6px 2px;
+font-size: 14px;
+cursor: pointer;
+transition: background 0.2s;
+}
+
+.dropdown-list label:hover {
+background-color: #f4f4f4;
+}
+
+.dropdown-list input[type="checkbox"] {
+width: 16px;
+height: 16px;
+cursor: pointer;
+}
+
+.table-title {
+   /* Slightly bold for emphasis */
+  color: #5f5f5f; /* Neutral color for better readability */
+  // text-align: left; /* Align the titles to the left */
+  margin: 0;
+  display: flex;
+  align-items: center;
+  padding-top: 20px;
+  background-color: white;
+  position: sticky;
+    top: 0;
+    z-index: 2; 
+}
+
+.table-title h2{
+  margin: 0px 10px 0px 5px;
+  font-size: 16px; /* Slightly smaller font size */
+  font-weight: 600;
+}
+
+.table-title .icon {
+  width: 19px; /* Adjust icon size as needed */
+  height: 19px; /* Adjust icon size as needed */
+  margin-right: 8px; /* Add spacing between icon and text */
+  filter: grayscale(100%);
+}
+
+.employee-count {
+  margin-left: auto;
+  font-size: 18px;
+}
+
+.action-icon.disabled { opacity: .5; pointer-events: none; }
+button[disabled] { opacity: .7; cursor: not-allowed; }
+input[disabled], select[disabled] { background: #f7f7f7; }
+.dropdown-box.disabled { pointer-events: none; opacity: .6; }

@@ -1,0 +1,389 @@
+.main-container{
+    margin-top: 20px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+.top-panel {
+  position: absolute;
+  left: 79vw;
+  top: 4vh;
+  // width: 80vw;
+  padding: 12px 0px;
+  z-index: 5;
+}
+
+.tabs {
+  display: inline-flex;
+  background-color: #f7f7f7;
+  border-radius: 25px;
+  padding: 4px;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.tabs button {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  color: #555;
+  transition: all 0.25s ease;
+}
+
+.tabs button:hover {
+  background-color: rgba(224, 224, 224, 0.08);
+}
+
+.tabs button.active {
+  background-color: #ffffff;
+  color: #3c3c3c;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+
+
+
+
+
+.table-title {
+   /* Slightly bold for emphasis */
+  color: #5f5f5f; /* Neutral color for better readability */
+  // text-align: left; /* Align the titles to the left */
+  margin: 0;
+  display: flex;
+  align-items: center;
+  padding-top: 20px;
+  background-color: white;
+  position: sticky;
+    top: 0;
+    z-index: 2; 
+}
+
+.table-title h2{
+  margin: 0px 10px 0px 5px;
+  font-size: 18px; /* Slightly smaller font size */
+  font-weight: 600;
+  color: #7e7d7d;
+}
+
+.table-title .icon {
+  width: 20px; /* Adjust icon size as needed */
+  height: 20px; /* Adjust icon size as needed */
+  margin-right: 8px; /* Add spacing between icon and text */
+  filter: grayscale(100%);
+}
+
+
+
+.employee-count {
+  margin-left: auto;
+  font-size: 18px;
+}
+
+.refresh-btn {
+  background-color: transparent;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-left: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #f5f5f5;
+    border-color: #0087CB;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  img {
+    transition: transform 0.3s ease;
+  }
+
+  &:hover img {
+    transform: rotate(180deg);
+  }
+}
+
+
+
+.table-container {
+
+  width: 80vw;
+  height: 70vh; /* Adjust height as needed */
+  overflow-y: auto; /* Enable vertical scrolling */
+  position: relative; /* Required for sticky header */
+  // border: 2px solid #efefef;
+  padding: 0px 30px 20px 30px;
+  margin-top: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(196, 196, 196, 0.406);
+
+
+  /* Custom Scrollbar */
+  &::-webkit-scrollbar {
+    width: 6px; /* Narrow scrollbar */
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #bcbcbc; /* Darker color for scrollbar */
+    border-radius: 10px; /* Rounded edges */
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f4f4f4; /* Light background */
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: #848484; /* Slightly darker on hover */
+  }
+}
+
+.styled-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th, td {
+    padding: 10px;
+    text-align: left;
+    margin: 0;
+    vertical-align: middle;
+  }
+
+  th {
+      padding: 30px 10px 14px 10px;
+    background-color: rgb(255, 255, 255); /* Ensure visibility */
+    color: #545454;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 2; /* Prevent overlap issues */
+
+  }
+
+  tr {
+    border-bottom: 1px solid #ccc; /* Horizontal lines */
+    color: #6C6C6C;
+  }
+
+  thead tr {
+    border-bottom: 1.5px solid #777777; /* Darker border for header */
+  }
+}
+
+/* Row hover effect */
+tbody tr {
+  transition: background 0.3s ease;
+}
+
+tbody tr:hover {
+  background-color: #f8f9fa; /* Light gray on hover */
+}
+
+/* Actions Column */
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+//   gap: 20px;
+//   align-items: center;
+//   opacity: 0; /* Hide by default */
+  transition: opacity 0.3s ease-in-out;
+}
+
+.actions button {
+  display: inline-flex; /* Use flexbox for icon and text alignment */
+  align-items: center; /* Vertically align icon and text */
+  padding: 8px 16px; /* Adjust padding as needed */
+  font-size: 16px;
+  background-color: #0087CB;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500; /* Adjust font weight for better match */
+  font-size: 14px;
+}
+
+.status-pending {
+  color:#0087CB;
+    font-weight: bold;
+    background-color: #a9e2fe96;
+    border-radius: 4px;
+    padding: 4px 10px;
+    width: fit-content;
+    margin: 0;
+}
+
+.status-review {
+  color: #ff8c00;
+  font-weight: bold;
+  background-color: #fff3cd;
+  border-radius: 4px;
+  padding: 4px 10px;
+  width: fit-content;
+  margin: 0;
+}
+
+.status-approved {
+    color: rgb(12, 162, 12);
+    font-weight: bold;
+    background-color: #d4edda;
+    border-radius: 4px;
+    padding: 4px 10px;
+    width: fit-content;
+    margin: 0;
+}
+
+.status-rejected {
+  color: rgb(195, 9, 9);
+  font-weight: bold;
+  background-color: #f8d7da;
+  border-radius: 4px;
+  padding: 4px 10px;
+  width: fit-content;
+  margin: 0;
+}
+
+.action-icon{
+    width: 21px;
+    height: 21px;
+    opacity: 0.5; /* Slightly transparent */
+}
+.actions button:hover {
+  background-color: #0074a5; /* lighter shade on hover */
+  transform: translateY(-1px); /* subtle lift */
+}
+
+.action-icon:hover {
+  transform: scale(1.15); /* slight zoom */
+  filter: brightness(1.2); /* make icon pop */
+  opacity: 1;
+  cursor: pointer;
+}
+
+.delete-icon {
+  filter: brightness(0) saturate(100%) invert(24%) sepia(95%) saturate(3447%) hue-rotate(350deg) brightness(95%) contrast(98%);
+}
+
+.delete-icon:hover {
+  transform: scale(1.2);
+  filter: brightness(0) saturate(100%) invert(13%) sepia(95%) saturate(6847%) hue-rotate(357deg) brightness(95%) contrast(114%);
+}
+
+
+
+
+
+
+.search-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 20px;
+
+  img {
+  position: absolute;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+    filter: brightness(0.8); /* Make icon pop on focus */
+
+}
+  input{
+  height: 30px;
+  width: 400px;
+  border: 1px solid #e1e1e1;
+  background-color: #fafafa;
+  border-radius: 6px;
+  padding: 2px 10px 2px 35px;
+  font-size: 14px;
+} 
+
+input:focus {
+  border-color: #b3b1b1; 
+  background-color: #f8f8f8; 
+  outline: none; 
+}
+
+input::placeholder {
+  color: #c1c1c1; /* Placeholder text color */
+  font-size: 14px; /* Placeholder text size */
+}
+
+input:focus::placeholder {
+  color: #6c6c6c; /* Darker placeholder text on focus */
+}
+
+}
+
+
+
+
+th {
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+}
+
+.sort-arrow {
+  margin-left: 4px;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+th:hover .sort-arrow {
+  color: #000;
+}
+
+.pdf-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.pdf-modal {
+  width: min(1000px, 95vw); height: min(85vh, 95vh); background: #fff;
+  border-radius: 10px; overflow: hidden; display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+.pdf-header, .pdf-footer {
+  padding: 10px 12px; display: flex; align-items: center;
+  justify-content: space-between; background: #f6f7f9;
+}
+.close-btn { border: none; background: transparent; font-size: 18px; cursor: pointer; }
+iframe { border: none; }
+
+
+.icon-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  line-height: 0;
+
+  .action-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+  }
+
+  &[disabled] {
+    cursor: not-allowed;
+
+    .action-icon {
+      opacity: 0.2;
+      filter: grayscale(100%);
+    }
+  }
+}

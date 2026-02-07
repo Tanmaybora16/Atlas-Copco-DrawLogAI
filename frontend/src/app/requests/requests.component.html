@@ -1,0 +1,255 @@
+<div class="main-container">
+  <div class="top-panel">
+    <div class="tabs">
+      <button
+        [class.active]="selectedTab === 'outgoing'"
+        (click)="selectedTab = 'outgoing'"
+      >
+        Creator
+      </button>
+      <button
+        [class.active]="selectedTab === 'incoming'"
+        (click)="selectedTab = 'incoming'"
+      >
+        Reviewer
+      </button>
+    </div>
+  </div>
+
+  <!-- Reviewer (Incoming) -->
+  <div class="table-container" *ngIf="selectedTab === 'incoming'">
+    <div class="table-title">
+      <img class="icon" src="assets/incoming.svg" alt="" />
+      <h2>Incoming Requests</h2>
+      <h2 class="employee-count">{{ filteredIncoming.length }}</h2>
+
+      <div class="search-container">
+        <img src="/assets/search-icon.svg" alt="search" />
+        <input
+          type="text"
+          placeholder="Search for requests"
+          [(ngModel)]="searchTerm"
+          (input)="onSearch()"
+        />
+      </div>
+
+      <button class="refresh-btn" (click)="refreshRequests()" title="Refresh data">
+        <img src="/assets/reload.png" alt="Refresh" style="width: 20px; height: 20px;" />
+      </button>
+    </div>
+
+    <table class="styled-table">
+      <thead>
+        <tr>
+          <th (click)="sortData('creatorName')">
+            Creator Name
+            <span class="sort-arrow" *ngIf="sortColumn === 'creatorName'">
+              {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
+            </span>
+          </th>
+          <th (click)="sortData('id')">
+            Creator ID
+            <span class="sort-arrow" *ngIf="sortColumn === 'id'">
+              {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
+            </span>
+          </th>
+          <th (click)="sortData('drawingNo')">
+            Drawing No
+            <span class="sort-arrow" *ngIf="sortColumn === 'drawingNo'">
+              {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
+            </span>
+          </th>
+          <th>Revision No</th>
+          <th>Creator Email</th>
+          <th (click)="sortData('createdDate')">
+            Created Date
+            <span class="sort-arrow" *ngIf="sortColumn === 'createdDate'">
+              {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
+            </span>
+          </th>
+          <th>Last Reviewed</th>
+          <th (click)="sortData('status')">
+            Status
+            <span class="sort-arrow" *ngIf="sortColumn === 'status'">
+              {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
+            </span>
+          </th>
+          <th>View</th>
+          <th>Edit</th>
+          <th>Download</th>
+          <th>Delete</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let req of filteredIncoming; let i = index">
+          <td>{{ req.creatorName }}</td>
+          <td>{{ req.id }}</td>
+          <td>{{ req.drawingNo }}</td>
+          <td>{{ req.revisionNo }}</td>
+          <td>{{ req.creatorEmail }}</td>
+          <td>{{ req.createdDate }}</td>
+          <td>{{ req.lastReviewedDate || 'N/A' }}</td>
+          <td class="actions">
+            <p class="status-review">{{ req.status }}</p>
+          </td>
+          <td>
+            <img
+              src="assets/eye.svg"
+              alt="View"
+              class="action-icon"
+              (click)="viewDrawing(i)"
+            />
+          </td>
+          <!-- ...within the INCOMING table row... -->
+          <td>
+            <button
+              class="icon-btn"
+              [disabled]="req.status === 'Reviewed'"
+              [attr.aria-disabled]="req.status === 'Reviewed'"
+              (click)="onEditClick(i)"
+              title="Edit"
+            >
+              <img src="assets/edit-2.svg" alt="Edit" class="action-icon" />
+            </button>
+          </td>
+
+          <td>
+            <img
+              src="assets/download.svg"
+              alt="Download"
+              class="action-icon"
+              (click)="downloadDrawing(i)"
+            />
+          </td>
+          <td>
+            <img
+              src="assets/delete.svg"
+              alt="Delete"
+              class="action-icon delete-icon"
+              (click)="deleteRequest(i, 'incoming')"
+              title="Delete request"
+            />
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Creator (Outgoing) -->
+  <div class="table-container" *ngIf="selectedTab === 'outgoing'">
+    <div class="table-title">
+      <img class="icon" src="assets/outgoing.svg" alt="" />
+      <h2>Outgoing Requests</h2>
+      <h2 class="employee-count">{{ filteredOutgoing.length }}</h2>
+
+      <div class="search-container">
+        <img src="/assets/search-icon.svg" alt="search" />
+        <input
+          type="text"
+          placeholder="Search for requests"
+          [(ngModel)]="searchTerm"
+          (input)="onSearch()"
+        />
+      </div>
+
+      <button class="refresh-btn" (click)="refreshRequests()" title="Refresh data">
+        <img src="/assets/reload.png" alt="Refresh" style="width: 20px; height: 20px;" />
+      </button>
+    </div>
+
+    <table class="styled-table">
+      <thead>
+        <tr>
+          <th (click)="sortData('reviewerName')">
+            Reviewer Name
+            <span class="sort-arrow" *ngIf="sortColumn === 'reviewerName'">
+              {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
+            </span>
+          </th>
+          <th (click)="sortData('id')">
+            Reviewer ID
+            <span class="sort-arrow" *ngIf="sortColumn === 'id'">
+              {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
+            </span>
+          </th>
+          <th>Drawing No</th>
+          <th>Revision No</th>
+          <th>Reviewer Email</th>
+          <th (click)="sortData('createdDate')">
+            Created Date
+            <span class="sort-arrow" *ngIf="sortColumn === 'createdDate'">
+              {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
+            </span>
+          </th>
+          <th>Status</th>
+          <th>View</th>
+          <th>Download</th>
+          <th>Delete</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let req of filteredOutgoing; let i = index">
+          <td>{{ req.reviewerName }}</td>
+          <td>{{ req.id }}</td>
+          <td>{{ req.drawingNo }}</td>
+          <td>{{ req.revisionNo }}</td>
+          <td>{{ req.reviewerEmail }}</td>
+          <td>{{ req.createdDate }}</td>
+          <td>
+            <p
+              [ngClass]="{
+                'status-pending': req.status === 'Pending',
+                'status-approved': req.status === 'Approved',
+                'status-rejected': req.status === 'Rejected'
+              }"
+            >
+              {{ req.status }}
+            </p>
+          </td>
+          <td>
+            <img
+              src="assets/eye.svg"
+              alt="View"
+              class="action-icon"
+              (click)="viewDrawing(i)"
+            />
+          </td>
+          <td>
+            <img
+              src="assets/download.svg"
+              alt="Download"
+              class="action-icon"
+              (click)="downloadDrawing(i)"
+            />
+          </td>
+          <td>
+            <img
+              src="assets/delete.svg"
+              alt="Delete"
+              class="action-icon delete-icon"
+              (click)="deleteRequest(i, 'outgoing')"
+              title="Delete request"
+            />
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PDF Viewer Modal -->
+<div class="pdf-backdrop" *ngIf="pdfOpen" (click)="closePdf()">
+  <div class="pdf-modal" (click)="$event.stopPropagation()">
+    <div class="pdf-header">
+      <span>{{ pdfTitle || 'Preview' }}</span>
+      <button class="close-btn" (click)="closePdf()">✕</button>
+    </div>
+    <iframe [src]="pdfSafeUrl" width="100%" height="100%" title="PDF Preview"></iframe>
+    <div class="pdf-footer">
+      <button (click)="downloadCurrent()">Download</button>
+      <button (click)="closePdf()">Close</button>
+    </div>
+  </div>
+</div>

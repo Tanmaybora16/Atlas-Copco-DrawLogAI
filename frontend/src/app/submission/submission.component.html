@@ -1,0 +1,1258 @@
+<form (ngSubmit)="onSubmit(myForm)" #myForm="ngForm">
+  <div class="body">
+    <div class="container-wrapper">
+      <div class="container">
+        <div class="form-container">
+
+          <!-- Creator (Emp ID – Name) -->
+          <div class="input-container">
+  <label>Creator (Emp ID – Name)</label>
+  <input type="text" [value]="selectedCreatorDisplay || selectedCreatorId" readonly />
+</div>
+
+
+          <!-- PC (from selected Creator) -->
+          <div class="input-container">
+            <label for="pc">PC</label>
+            <input *ngIf="displaySinglePC" type="text" [value]="selectedPC" readonly />
+            <select
+              *ngIf="!displaySinglePC"
+              [(ngModel)]="selectedPC"
+              name="empPC"
+              required
+              [disabled]="isBusy"
+            >
+              <option *ngFor="let pc of pcList" [value]="pc">{{ pc }}</option>
+            </select>
+          </div>
+
+          <!-- Division -->
+          <div class="input-container">
+            <label for="division">Division</label>
+            <input
+              type="text"
+              [(ngModel)]="selectedCreator.emp_division"
+              name="empDivision"
+              [ngModelOptions]="{ standalone: true }"
+              readonly
+            />
+          </div>
+
+          <!-- Team -->
+          <div class="input-container">
+            <label for="team">Team</label>
+            <input
+              type="text"
+              [(ngModel)]="selectedCreator.emp_team"
+              name="empTeam"
+              [ngModelOptions]="{ standalone: true }"
+              readonly
+            />
+          </div>
+
+          <!-- Creator Email (readonly, fetched) -->
+          <div class="input-container">
+            <label for="creatorEmail">Creator Email</label>
+            <input
+              type="text"
+              [(ngModel)]="selectedCreator.emp_email"
+              name="empEmail"
+              [ngModelOptions]="{ standalone: true }"
+              readonly
+            />
+          </div>
+
+          <!-- Reviewer (Emp ID – Name) -->
+          <div class="input-container">
+            <label for="reviewerName">Reviewer (Emp ID – Name)</label>
+            <div class="custom-dropdown" [class.active]="reviewerDropdownOpen">
+              <div class="selected-option" (click)="toggleReviewerDropdown()">
+                {{ selectedReviewerDisplay || "Select Reviewer" }}
+              </div>
+              <div class="dropdown-list" *ngIf="reviewerDropdownOpen">
+                <input
+                  class="search-box"
+                  type="text"
+                  [(ngModel)]="reviewerSearch"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="onReviewerSearchChange($event)"
+                  placeholder="Search Reviewer"
+                />
+                <ul>
+                  <li
+                    *ngFor="let emp of filteredReviewers"
+                    (click)="selectReviewer(emp, $event)"
+                  >
+                    {{ emp.display }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <input type="hidden" name="reviewerName" [ngModel]="selectedReviewerId" />
+          </div>
+
+          <!-- Reviewer Email (required so we can notify) -->
+          <div class="input-container">
+            <label for="reviewerEmail">Reviewer Email</label>
+            <input
+              type="email"
+              [(ngModel)]="selectedReviewerEmail"
+              name="reviewerEmail"
+              [ngModelOptions]="{ standalone: true }"
+              readonly
+            />
+          </div>
+
+
+          <!-- Drawing No. (you can keep this if you need it elsewhere) -->
+          <!-- <div class="input-container">
+            <label for="designNo">Drawing No.</label>
+            <input type="text" name="designNo" [ngModel]="designNo" [disabled]="isBusy" required />
+          </div> -->
+
+          <!-- Revision No. (ignored server-side; server computes next rev) -->
+          <!-- <div class="input-container">
+            <label for="revisionNo">Revision No.</label>
+            <input type="text" name="revisionNo" ngModel [disabled]="isBusy" />
+          </div> -->
+
+          <!-- Drawing Type -->
+          <div class="input-container">
+            <label for="drawingType">Drawing Type</label>
+            <div
+              class="custom-dropdown"
+              (click)="toggleDrawingDropdown()"
+              [class.active]="drawingDropdownOpen"
+            >
+              <div class="selected-option">
+                {{ selectedDrawingType || "Select Drawing Type" }}
+              </div>
+              <ul class="dropdown-list" *ngIf="drawingDropdownOpen">
+                <li
+                  *ngFor="let type of drawingTypes"
+                  (click)="selectDrawingType(type, $event)"
+                >
+                  {{ type }}
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- PDF Upload -->
+          <div class="file-upload-container input-container">
+          <label class="file-label">Design files</label>
+          <div class="upload-sub-container">
+            <textarea
+              [value]="fileNamesDisplay"
+              placeholder="No files selected"
+              readonly
+              class="file-name-field"
+              rows="2"
+            ></textarea>
+
+            <input
+              type="file"
+              (change)="onFilesSelected($event)"
+              accept=".pdf"
+              id="pdf-upload"
+              hidden
+              [disabled]="isBusy"
+              multiple
+            />
+            <label for="pdf-upload" id="upload-button" [class.disabled]="isBusy">
+              Upload PDF(s)
+            </label>
+          </div>
+        </div>
+
+
+        </div>
+
+        <div class="ref-table">
+        <label for="checkList">Confirm all the applicable points checked as per check list</label>
+          <header class="ref-table-header">
+            <div>
+              <div class="table-title">
+                  <h3>CADQ Checklist - Mechanical Design</h3>
+                  <p>
+                    M = Mandatory, O = Optional, Blank = Not relevant. Edition
+                    checklist: 06
+                  </p>
+              </div>
+            </div>
+          </header>
+
+          <div class="table-wrapper">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Seq. Nr.</th>
+                    <th>Atlas Copco Standard Ref.</th>
+                    <th>Part</th>
+                    <th>Piping</th>
+                    <th>Welded</th>
+                    <th>Other</th>
+                    <th>Ferro</th>
+                    <th>Non Ferro</th>
+                    <th>Casted & Machined</th>
+                    <th>Machined (Non Casted)</th>
+                    <th>Sheet Metal</th>
+                    <th>Foam/Decals</th>
+                    <th>Assembly</th>
+                    <th>Instruction</th>
+                    <th>Information</th>
+                    <th>Safety Labels</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="seq-nr">1.0</td>
+                    <td>1254 K Criteria for surface roughness</td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">2.0</td>
+                    <td>
+                      1350 K-f,m,c or v as required General tolerances and
+                      standard references
+                    </td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">3.0</td>
+                    <td>
+                      1356 K Indirectly stated tolerances for fusion welding
+                    </td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">4.0</td>
+                    <td>4366 K Threaded blind holes</td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">4a</td>
+                    <td>4366:01 K Threaded blind holes_ASME</td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">5.0</td>
+                    <td>
+                      6131 K Dimensional tolerances and machining allowances for
+                      castings
+                    </td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">6.0</td>
+                    <td>
+                      6134 K Specifications for steel and iron casting
+                      requirements
+                    </td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">7.0</td>
+                    <td>
+                      6136 K Specifications of aluminium casting requirements
+                    </td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">8.0</td>
+                    <td>6785 AIR Paint specifications</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">9.0</td>
+                    <td>6891 K Indication of welding data on drawings</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr class="category-header">
+                    <td colspan="16">General Requirements</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">11.0</td>
+                    <td>
+                      Confidentiality note. It should contain "This document is
+                      property of Atlas Copco AB and shall not without our
+                      permission be altered, copied, used for manufacturing or
+                      communicated to any other person or company".
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">12.0</td>
+                    <td>Prohibited substances note</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">13.0</td>
+                    <td>Sharp edges note</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">14.0</td>
+                    <td>
+                      Check drawing & document edition, vault edition and BPCS
+                      edition are same
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">15.0</td>
+                    <td>Part or assy linked to document</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">16.0</td>
+                    <td>All parts latest revision</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">17.0</td>
+                    <td>
+                      Material assigned. Should be given in title block of the
+                      drawing. Exception for tabular drawing
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">18.0</td>
+                    <td>
+                      Material comment added (T for thickness) if not
+                      dimensioned
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">19.0</td>
+                    <td>
+                      Treatment assigned, or not applicable. Should be given in
+                      title block of the drawing. Exception for tabular drawing
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">20.0</td>
+                    <td>Treatment see drawing</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">22.0</td>
+                    <td>
+                      Latest edition of Atlas Copco template used Exception US:
+                      Latest edition of ANSI templates used
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">23.0</td>
+                    <td>Check for spelling mistake</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">24.0</td>
+                    <td>Page numbering if applicable</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">26.0</td>
+                    <td>
+                      Standard scale used Exception US: Scales to be used 1/1;
+                      1/2; 1/4; 2/1; 3/1; 4/1; 5/1; 10/1
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">27.0</td>
+                    <td>Are section/detail views nominated</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">28.0</td>
+                    <td>All basic dimensions available</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">29.0</td>
+                    <td>Tolerances deviating from general tolerance</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">30.0</td>
+                    <td>Geometrical tolerances stated correctly</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">31.0</td>
+                    <td>Revision note and symbol(s) available and equal</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">32.0</td>
+                    <td>Welding symbols all available</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">33.0</td>
+                    <td>Surface roughness symbols and indicators</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">34.0</td>
+                    <td>
+                      All centermarks and centerlines drawn for holes /
+                      symmetric parts
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">35.0</td>
+                    <td>Ten digit numbers</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">36.0</td>
+                    <td>Confidentiality class: Confidential</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">37.0</td>
+                    <td>Confidentiality class: Internal</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">38.0</td>
+                    <td>
+                      Text on drawing acc.Atlas Copco standard 1212 K . -
+                      English & Portugese text should have font "Arial" -
+                      Chinese text should have font "Simsun"
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">39.0</td>
+                    <td>Is the drawing unambigously</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">40.0</td>
+                    <td>Approval notification if needeed (PED, ASME,….)</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">41.0</td>
+                    <td>Symbol(s) of quantity Atlas Copco standard 1420 K</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">46.0</td>
+                    <td>Check that no dimensions are manually changed</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">47.0</td>
+                    <td>Check that at least english language is used</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">50.0</td>
+                    <td>Check weight on drawing</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">51.0</td>
+                    <td>
+                      In case of tabular drawing, all mentioned 3D's should be
+                      linked to the tabular drawing
+                    </td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">57.0</td>
+                    <td>
+                      Check edition is available for all item numbers of a
+                      tabular drawing
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">58.0</td>
+                    <td>
+                      Check supplier information is not given on bought out
+                      parts except for situations referenced in AC Standard
+                      1015K
+                    </td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">59.0</td>
+                    <td>
+                      Check brand logo in template - supplier
+                      parts/Manufacturing parts - AC logo. For dimension
+                      drawing, installation drawing, ASL, AIB -de-brand or owned
+                      brand
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr class="category-header">
+                    <td colspan="16">Parts list on drawings</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">42.0</td>
+                    <td>All R/S or - markings correct</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">43.0</td>
+                    <td>No material on standard parts</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">44.0</td>
+                    <td>Material and comment complete if applicable</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">48.0</td>
+                    <td>
+                      Check that Part numbers and Qty are not manually
+                      overwritten
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                  <tr class="category-header">
+                    <td colspan="16">Check for standard parts</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">49.0</td>
+                    <td>
+                      Check that the drawing does not relates to a standard part
+                    </td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="optional">O</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr class="category-header">
+                    <td colspan="16">Engineering Change Order</td>
+                  </tr>
+                  <tr>
+                    <td class="seq-nr">70.0</td>
+                    <td>
+                      Check 'All files are "For Approval" or "Approved' during
+                      ECO
+                    </td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td></td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                    <td class="mandatory">M</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <div class="yes-no">
+                <label style="margin-right: 10px;">
+                    <input type="radio" name="choice" value="yes"> Yes
+                </label>
+                <label>
+                    <input type="radio" name="choice" value="no"> No
+                </label>
+            </div>
+  
+    
+          </div>
+
+          
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="submit-container">
+  <button
+    type="submit"
+    [disabled]="isBusy"
+    [class.disabled-btn]="isBusy"
+    [attr.aria-disabled]="isBusy ? true : null"
+    [attr.aria-busy]="isBusy ? true : null"
+  >
+    <ng-container *ngIf="!isBusy; else busyTpl">Submit for Review</ng-container>
+  </button>
+  <ng-template #busyTpl>Processing…</ng-template>
+</div>
+</form>

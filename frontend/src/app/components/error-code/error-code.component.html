@@ -1,0 +1,11 @@
+<!-- <div class="error-code-container" (mouseenter)="showDelete = true" (mouseleave)="showDelete = false">
+  <span class="error-code">{{ errorCode }}</span>
+  <span class="count-bubble" *ngIf="errorCount > 1">{{ errorCount }}</span>
+  <button *ngIf="showDelete" class="delete-btn" (click)="deleteError()">×</button>
+</div> -->
+
+<div class="error-code-container" (mouseenter)="hover = true" (mouseleave)="hover = false">
+  <span class="error-code">{{ errorCode }}</span>
+  <span class="count-bubble" *ngIf="errorCount > 1">{{ errorCount }}</span>
+  <span class="close-btn" *ngIf="hover" (click)="closeError()">×</span>
+</div>

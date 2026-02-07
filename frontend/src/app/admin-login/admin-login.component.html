@@ -1,0 +1,55 @@
+<div class="container">
+  <div class="sub-container">
+    <form #loginForm="ngForm" (ngSubmit)="onSubmit(loginForm)">
+      <h1>Login</h1>
+      <p class="guide">Welcome to AtlasCopco AI Error Logging System.</p>
+
+      <div class="input-container">
+        <label for="UserName">User Name </label>
+        <input
+          type="text"
+          name="UserName"
+          [(ngModel)]="UserName"
+          required
+          [disabled]="isBusy"
+        />
+      </div>
+
+      <div class="input-container">
+        <label for="password">Password</label>
+        <div class="password-wrapper">
+          <input
+            [type]="passwordVisible ? 'text' : 'password'"
+            name="password"
+            [(ngModel)]="password"
+            required
+            [disabled]="isBusy"
+          />
+          <img
+            [src]="passwordVisible ? '/assets/eye.svg' : '/assets/eye-off.svg'"
+            (click)="!isBusy && togglePasswordVisibility()"
+            class="eye-icon"
+            alt="Toggle Password"
+          />
+        </div>
+      </div>
+
+      <div class="forgot-password">
+        <a
+          href="#"
+          [class.disabled]="isBusy"
+          (click)="onForgotPassword($event)"
+          >Forgot Password?</a
+        >
+      </div>
+
+      <button type="submit" [disabled]="isBusy || !loginForm.valid">
+        <ng-container *ngIf="!isBusy; else loadingTpl">Login</ng-container>
+      </button>
+
+      <ng-template #loadingTpl>
+        Processing…
+      </ng-template>
+    </form>
+  </div>
+</div>

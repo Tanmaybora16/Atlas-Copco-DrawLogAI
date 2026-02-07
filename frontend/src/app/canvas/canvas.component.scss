@@ -1,0 +1,374 @@
+/* ====== Toolbar Layout ====== */
+/* Add to canvas.component.scss */
+.canvas-title {
+  font-size: 1rem;
+  font-weight: 400;
+  // text-align: center;
+  margin: 10px 0px 0px 20px;
+  color: #2a2a2a;
+}
+
+.pdf-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: #f7f7f8;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.toolbar {
+  position: sticky; /* stays visible when page scrolls */
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;    /* <-- vertical centering for everything inside */
+
+  gap: 12px;
+  padding: 10px 26px;
+  background: #ffffff;
+  border-bottom: 1px solid #e6e6e9;
+  box-shadow: 0 1px 0 rgba(16, 24, 40, 0.04);
+}
+
+/* Grouping blocks */
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: #fafafb;
+  border: 1px solid #ececf1;
+  border-radius: 10px;
+}
+
+/* ====== Buttons & Controls ====== */
+.tool-group button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  min-width: 36px;
+  height: 36px;
+  background: #ffffff;
+  border: 1px solid #d7d7dc;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1;
+  color: #1f2328;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+
+.tool-group button:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #cfd2d8;
+}
+
+.tool-group button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.tool-group button.active img {
+  filter: brightness(0) invert(1); /* make the icon white */
+}
+.tool-group button img {
+  transition: filter 0.2s ease;
+}
+
+
+.tool-group button.active {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+  color: #ffffff;
+}
+
+.tool-group button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Icon inside buttons */
+.tool-group button img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* Text-only action buttons (Save/Load/Clear) can be a bit tighter */
+.tool-group:last-child button {
+  padding: 8px 12px;
+  font-weight: 500;
+}
+
+/* ====== Inputs (color & select) ====== */
+.tool-group input[type="color"] {
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #d7d7dc;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.tool-group input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 4px;
+}
+.tool-group input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 6px;
+}
+
+.tool-group select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #d7d7dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2328;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Readouts between buttons (e.g., zoom %, page X of Y) */
+.tool-group span {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 8px;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+
+.pagination-floating {
+  position: fixed;          /* stays in place */
+  bottom: 20px;             /* distance from bottom */
+  right: 20px;              /* distance from right */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #d7d7dc;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  z-index: 100;             /* above canvas */
+}
+.pagination-floating button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #fafafb;
+  border: 1px solid #ececf1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pagination-floating span {
+  font-size: 14px;
+  color: #4b5563;
+}
+
+
+/* ====== Canvas Area ====== */
+.canvas-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  justify-content: center; /* center canvases horizontally */
+  align-items: flex-start;
+  padding: 16px;
+  background: #f2f3f5;
+  overflow: auto;
+}
+
+.page-wrapper {
+  position: relative;
+}
+
+.pdf-canvas {
+  display: block;
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(16, 24, 40, 0.06);
+}
+
+.annotation-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: auto;
+}
+
+.annotation {
+  position: absolute;
+  padding: 4px 6px;
+  background: rgba(255, 255, 0, 0.15);
+  border-radius: 4px;
+  cursor: pointer;
+  max-width: 240px;
+  word-wrap: break-word;
+  border: 1px solid transparent;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.annotation:hover {
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
+}
+
+.annotation.selected {
+  background: rgba(14, 165, 233, 0.08);
+  border-color: #0ea5e9;
+}
+
+.canvas-container.select-mode .annotation {
+  cursor: move;
+}
+
+.canvas-container.add-text-mode .annotation {
+  cursor: text;
+}
+
+/* Floating textarea for in-place text editing */
+.text-input {
+  position: absolute;
+  z-index: 10;
+  padding: 6px 8px;
+  min-width: 160px;
+  max-width: 80vw;
+  border: 1px dashed #0ea5e9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+}
+
+/* Status message */
+.status-message {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);    /* for top-right corner */
+  margin: 0;       /* remove margins so it doesn’t shift layout */
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #ecfeff;
+  color: #075985;
+  border: 1px solid #a5f3fc;
+  font-size: 14px;
+  z-index: 100; /* higher than toolbar */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.next-step {
+  margin-left: auto;              /* push it to the far right if toolbar uses flex */
+}
+
+.next-step button {
+  display: flex;                  /* align text + icon nicely */
+  align-items: center;            /* vertically center text and icon */
+  gap: 8px;                       /* space between text and icon */
+  background-color: #0ea5e9;      /* blue background */
+  color: #ffffff;                 /* white text */
+  border: none;                   /* remove default border */
+  padding: 10px 14px;              /* padding for click area */
+  border-radius: 4px;             /* slight rounded corners */
+  cursor: pointer;                /* pointer cursor */
+  transition: background 0.2s ease;
+}
+
+.next-step button:hover {
+  background-color: #0284c7;      /* slightly darker on hover */
+}
+
+.next-step span {
+  font-weight: 500;               /* make text slightly bold */
+}
+
+.next-step button img {
+  width: 16px;                    /* set a consistent size */
+  height: 16px;
+  filter: brightness(0) invert(1);/* turn dark icon to white */
+  display: block;                 /* remove inline gap */
+}
+
+
+/* ====== Small screens ====== */
+@media (max-width: 680px) {
+  .toolbar {
+    gap: 8px;
+    padding: 8px;
+  }
+  .tool-group {
+    gap: 6px;
+    padding: 4px;
+  }
+  .tool-group button {
+    padding: 6px 8px;
+    height: 34px;
+  }
+  .tool-group input[type="color"],
+  .tool-group select {
+    height: 34px;
+  }
+}
+
+.meta-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 8px 0 14px;
+  background: #f8fafc; /* slate-50 */
+  border: 1px solid #e5e7eb; /* gray-200 */
+  border-radius: 12px;
+  width: max-content;       /* or fit-content */
+  margin: 8px auto 14px;    /* center the bar itself */
+  justify-content: center;
+}
+
+.meta-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb; /* gray-200 */
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  min-width: 180px;
+  align-items: center;
+  // padding-left: 1000px;
+}
+
+.meta-label {
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280; /* gray-500 */
+}
+
+.meta-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827; /* gray-900 */
+}
+
+@media (max-width: 640px) {
+  .meta-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .meta-pill {
+    min-width: unset;
+    flex: 1 1 auto;
+  }
+}

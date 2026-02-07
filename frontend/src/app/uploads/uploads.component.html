@@ -1,0 +1,181 @@
+<form (ngSubmit)="onSubmit(myForm)" #myForm="ngForm">
+  <div class="body">
+    <div class="container-wrapper">
+      <div class="container">
+        <div class="form-container">
+
+          <!-- Creator (autofilled, read-only) -->
+          <div class="input-container">
+            <label>Creator (EMP_ID)</label>
+            <input type="text" [value]="selectedEmpId" readonly />
+          </div>
+
+          <!-- PC (autofilled, read-only) -->
+          <div class="input-container">
+            <label>PC</label>
+            <input type="text" [value]="selectedPC" readonly />
+          </div>
+
+          <!-- Division (autofilled, read-only) -->
+          <div class="input-container">
+            <label>Division</label>
+            <input type="text" [value]="selectedEmployee.emp_division" readonly />
+          </div>
+
+          <!-- Team (autofilled, read-only) -->
+          <div class="input-container">
+            <label>Team</label>
+            <input type="text" [value]="selectedEmployee.emp_team" readonly />
+          </div>
+
+          <!-- Reviewer (autofilled, read-only) -->
+          <div class="input-container">
+            <label>Reviewer (EMP_ID)</label>
+            <input type="text" name="reviewerName" [(ngModel)]="reviewerId" readonly />
+          </div>
+
+          <!-- Drawing No. (autofilled, read-only) -->
+          <div class="input-container">
+            <label>Drawing No.</label>
+            <input type="text" name="designNo" [(ngModel)]="designNo" readonly />
+          </div>
+
+          <!-- Revision No. (autofilled, read-only) -->
+          <div class="input-container">
+            <label>Revision No.</label>
+            <input type="text" name="revisionNo" [(ngModel)]="revisionNo" [readonly]="isRevisionReadonly" />
+          </div>
+
+          <!-- Drawing Type (autofilled, read-only) -->
+          <div class="input-container">
+            <label>Drawing Type</label>
+            <input type="text" name="drawingType" [(ngModel)]="drawing_type" readonly />
+          </div>
+
+          <!-- Reviewed Date (autofilled, read-only) -->
+          <div class="input-container">
+            <label>Reviewed Date</label>
+            <input type="date" name="reviewedDate" [(ngModel)]="reviewedDate" readonly />
+          </div>
+
+          <!-- File upload -->
+          <div class="file-upload-container input-container">
+            <label class="file-label">Design file</label>
+            <div class="upload-sub-container">
+              <input type="text" [value]="fileName || 'No file selected'" readonly class="file-name-field" />
+              <input
+                type="file"
+                (change)="onFileSelected($event)"
+                accept=".pdf"
+                id="pdf-upload"
+                [disabled]="isUploading || isSubmitting"
+                hidden
+              />
+              <label
+                  for="pdf-upload"
+                  id="upload-button"
+                  [class.disabled]="isUploading || isSubmitting"
+                  [attr.aria-disabled]="isUploading || isSubmitting ? true : null"
+                >
+                  {{ isUploading ? 'Uploading…' : 'Upload PDF' }}
+                </label>
+            </div>
+
+            <!-- ⚠ Removed the old existing-PDF download block as requested -->
+          </div>
+        </div>
+
+        <!-- Errors section (unchanged) -->
+        <div class="error-container">
+          <div class="error-header">
+            <div class="header">Error Codes</div>
+            <button type="button" class="toggleBtn" (click)="toggleCodeList()">
+              <img [src]="toggleIcon" alt="" class="toggle-icon">
+            </button>
+          </div>
+
+          <div class="code-list-container" *ngIf="showCodeList">
+            <div class="table-container">
+              <table class="styled-table">
+                <thead>
+                  <tr>
+                    <th>Sr. No.</th>
+                    <th>Actual Comment</th>
+                    <th>Predicted Code</th>
+                    <th>Code description</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let comment of extractedComments; let i = index">
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ comment }}</td>
+
+                    <td class="p-codes" [ngClass]="{'edited-error': editedRows.has(i)}"
+                        [attr.title]="editedRows.has(i) ? 'Original: ' + originalErrors[i] : null">
+                      <ng-container *ngIf="editedIndex === i; else showText">
+                        <div (keydown.enter)="saveEditedValue(i, $event); $event.preventDefault()">
+                          <input class="edit-code-input" type="text" [value]="selectedError"
+                                 (blur)="saveEditedValue(i, $event)"
+                                 (keydown.enter)="saveEditedValue(i, $event); $event.preventDefault()" autofocus />
+                        </div>
+                      </ng-container>
+                      <ng-template #showText>{{ predictedErrors[i] || 'N/A' }}</ng-template>
+                    </td>
+
+                    <td [ngClass]="{'edited-error-desc': editedRows.has(i)}">
+                      {{ getErrorDescription(predictedErrors[i]) }}
+                    </td>
+
+                    <td class="edit-cell">
+                      <img class="edit-icon" src="/assets/edit.svg" (click)="editRow(i)">
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="code-container" *ngIf="!showCodeList">
+            <ng-container *ngIf="!submitted">
+              <ng-container *ngIf="hasErrors; else noErrors">
+                <ng-container *ngFor="let error of errorCounts; let i = index">
+                  <app-error-code [errorCode]="error.code" [errorCount]="error.count"
+                                  (errorRemoved)="removeError(error.code)">
+                  </app-error-code>
+                </ng-container>
+              </ng-container>
+              <ng-template #noErrors>
+                <p class="no-errors-message">No errors found!</p>
+              </ng-template>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <!-- Decision + Submit -->
+      <div class="submit-container">
+        <div class="status">
+          <fieldset>
+            <div class="radio-block">
+              <input type="radio" name="decision" id="reject-option" value="reject" [(ngModel)]="decision" required />
+              <label for="reject-option">Reject</label>
+              <input type="radio" name="decision" id="approve-option" value="approve" [(ngModel)]="decision" required />
+              <label for="approve-option" class="off-label">Approve</label>
+              <span class="selected" aria-hidden="true"></span>
+            </div>
+          </fieldset>
+        </div>
+
+        <button
+          type="submit"
+          [disabled]="isUploading || isSubmitting"
+          [class.disabled-btn]="isUploading || isSubmitting"
+        >
+          {{ isSubmitting ? 'Submitting…' : 'Submit' }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+</form>

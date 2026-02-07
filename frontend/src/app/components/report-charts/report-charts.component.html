@@ -1,0 +1,40 @@
+<div class="charts-container">
+  <!-- ✅ Top Errors Chart -->
+  <div id="error-chart">
+    <apx-chart
+      *ngIf="(chartOptionsErrors?.series || []).length > 0"
+      [title]="chartOptionsErrors.title!"
+      [series]="chartOptionsErrors.series!"
+      [chart]="chartOptionsErrors.chart!"
+      [dataLabels]="chartOptionsErrors.dataLabels!"
+      [plotOptions]="chartOptionsErrors.plotOptions!"
+      [xaxis]="chartOptionsErrors.xaxis!"
+      
+    ></apx-chart>
+    <p class="no-data" *ngIf="(chartOptionsErrors?.series || []).length === 0">
+      No error data to display.
+    </p>
+    
+  </div>
+
+  <!-- ✅ Approved vs Rejected Drawings Chart (Only for Employee Report) -->
+  <div id="drawings-chart" *ngIf="reportType === 'employeeReport'">
+    <apx-chart
+      *ngIf="(chartOptionsDrawings?.series || []).length > 0"
+      [title]="chartOptionsDrawings.title!"
+      [series]="chartOptionsDrawings.series!"
+      [chart]="chartOptionsDrawings.chart!"
+      [dataLabels]="chartOptionsDrawings.dataLabels!"
+      [plotOptions]="chartOptionsDrawings.plotOptions!"
+      [xaxis]="chartOptionsDrawings.xaxis!"
+      [colors]="chartOptionsErrors.colors!"
+    ></apx-chart>
+    <p class="no-data" *ngIf="(chartOptionsDrawings?.series || []).length === 0">
+      No drawing data to display.
+    </p>
+  </div>
+
+  <p class="no-data" *ngIf="loading">Loading…</p>
+<p class="no-data" *ngIf="!loading && error">{{ error }}</p>
+
+</div>

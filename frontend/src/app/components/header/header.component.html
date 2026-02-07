@@ -1,0 +1,58 @@
+<header>
+  <nav>
+    <img src="assets/logo.png" alt="Logo">
+
+    <div class="headerLinks">
+      <!-- Employee-only -->
+      <a *ngIf="isLoggedIn() && userRole === 'Employee'"
+         routerLink="/uploads"
+         routerLinkActive="active-link"
+         [routerLinkActiveOptions]="{ exact: true }">Uploads</a>
+
+      <a *ngIf="isLoggedIn() && userRole === 'Employee'"
+         routerLink="/submission"
+         routerLinkActive="active-link">Submission</a>
+
+      <a *ngIf="isLoggedIn() && userRole === 'Employee'"
+         routerLink="/requests"
+         routerLinkActive="active-link">Requests</a>
+
+      <!-- Both roles -->
+      <a *ngIf="isLoggedIn()"
+         routerLink="/reports"
+         routerLinkActive="active-link">Reports</a>
+
+         <a *ngIf="isLoggedIn() && userRole === 'Employee'"
+         routerLink="/canvas"
+         routerLinkActive="active-link">Canvas</a>
+
+      <!-- HR-only -->
+      <a *ngIf="isLoggedIn() && userRole === 'HR'"
+         routerLink="/employee"
+         routerLinkActive="active-link">Employee</a>
+    </div>
+
+    <div class="profile" *ngIf="authService.isLoggedIn(); else guestBlock">
+      <div class="profile-toggle" (click)="toggleProfileDropdown()">
+        <img class="profile-icon" src="/assets/user.svg" alt="User Icon">
+        <p>{{ loggedInUser }}</p>
+        <span class="role" [ngClass]="userRole">{{ userRole }}</span>
+      </div>
+
+      <div class="dropdown" *ngIf="showDropdown">
+        <div class="list-container">
+          <a (click)="changePassword()">Change Password</a>
+          <a (click)="logout()">
+            <img class="list-icon" src="/assets/log-out.svg" alt=""> Logout
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #guestBlock>
+      <div class="profile">
+        <button type="button" (click)="navigateToAdmin()">Login</button>
+      </div>
+    </ng-template>
+  </nav>
+</header>

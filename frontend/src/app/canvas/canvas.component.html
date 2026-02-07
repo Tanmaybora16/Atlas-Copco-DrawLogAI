@@ -1,0 +1,188 @@
+<!-- <div class="canvas-title">
+  Drawing Number: {{ drawingNumber }} &nbsp; | &nbsp;
+  Revision: {{ revisionNumber }} &nbsp; | &nbsp;
+
+</div> -->
+
+<!-- Pretty header -->
+<div class="meta-bar">
+  <div class="meta-pill">
+    <div class="meta-label">Drawing ID</div>
+    <div class="meta-value">{{ drawingNumber || '—' }}</div>
+  </div>
+
+  <div class="meta-pill">
+    <div class="meta-label">Revision</div>
+    <div class="meta-value">
+      Rev {{ revisionNumber == null ? '—' : (('0' + revisionNumber).slice(-2)) }}
+    </div>
+  </div>
+</div>
+
+<!-- canvas.component.html -->
+<div class="pdf-container">
+  <div class="toolbar">
+    <!-- File operations group -->
+    <div class="tool-group">
+      <button (click)="openFileSelector()" title="Upload PDF">
+        <img src="assets/upload.svg" alt="" />
+      </button>
+      <input
+        #fileInput
+        type="file"
+        accept=".pdf"
+        (change)="onFileSelected($event)"
+        style="display: none"
+      />
+    </div>
+
+    <!-- Annotation mode -->
+    <div class="tool-group">
+      <button
+        (click)="setMode('view')"
+        [class.active]="mode === 'view'"
+        title="View"
+      >
+        <img src="assets/mouse-pointer.svg" alt="" />
+      </button>
+      <button
+        (click)="setMode('add-text')"
+        [class.active]="mode === 'add-text'"
+        title="Add text comment"
+      >
+        <img src="assets/type.svg" alt="" />
+      </button>
+      <button
+        (click)="setMode('select')"
+        [class.active]="mode === 'select'"
+        title="Select"
+      >
+        <img src="assets/selection.svg" alt="" />
+      </button>
+      <button
+        (click)="deleteSelected()"
+        title="Delete selected"
+      >
+        <img src="assets/delete.svg" alt="" />
+      </button>
+    </div>
+
+    <!-- Text style -->
+    <div class="tool-group">
+      <input
+        type="color"
+        [value]="textColor"
+        (change)="setColor($event)"
+        title="Text Color"
+      />
+      <select
+        [value]="fontSize"
+        (change)="setFontSize($event)"
+        title="Font Size"
+      >
+        <option value="12">12px</option>
+        <option value="14">14px</option>
+        <option value="16">16px</option>
+        <option value="18">18px</option>
+        <option value="20">20px</option>
+        <option value="24">24px</option>
+      </select>
+    </div>
+
+    <!-- Zoom -->
+    <div class="tool-group">
+      <button (click)="zoomOut()" title="Zoom Out">
+        <img src="assets/minus.svg" alt="" />
+      </button>
+      <span>{{ scale * 100 | number : "1.0-0" }}%</span>
+      <button (click)="zoomIn()" title="Zoom In">
+        <img src="assets/plus.svg" alt="" />
+      </button>
+    </div>
+
+    <!-- Persistence -->
+    <div class="tool-group">
+      <button (click)="saveAnnotations()" title="Save Annotations">
+        <img src="assets/save.svg" alt="" />
+      </button>
+      <button (click)="downloadAnnotatedImage()" title="Download annotated PDF">
+        <img src="assets/download.svg" alt="" />
+      </button>
+      <button (click)="loadAnnotations()" title="Load Annotations">
+        <img src="assets/reload.png" alt="" />
+      </button>
+      <button (click)="clearAnnotations()" title="Clear Annotations">
+        <img src="assets/broom.png" alt="" />
+      </button>
+    </div>
+
+    <div class="next-step">
+      <button
+        (click)="goToErrorMapping()"
+        [disabled]="!drawingNumber || !revisionNumber"
+        [title]="(!drawingNumber || !revisionNumber) ? 'Drawing ID and revision are required' : 'Submit PDF'"
+      >
+        <span>Submit PDF</span>
+        <img src="assets/arrow-right.svg" alt="" />
+      </button>
+    </div>
+  </div>
+
+  <div class="pagination-floating">
+    <button
+      (click)="previousPage()"
+      [disabled]="pageNum <= 1"
+      title="Previous Page"
+    >
+      <img src="assets/skip-back.svg" alt="" />
+    </button>
+    <span>Page {{ pageNum }} of {{ totalPages }}</span>
+    <button
+      (click)="nextPage()"
+      [disabled]="pageNum >= totalPages"
+      title="Next Page"
+    >
+      <img src="assets/skip-forward.svg" alt="" />
+    </button>
+  </div>
+
+  <div class="status-message" *ngIf="showStatusMessage">
+    {{ statusMessage }}
+  </div>
+
+  <div class="canvas-container" [ngClass]="{'select-mode': mode === 'select', 'add-text-mode': mode === 'add-text'}">
+    <div class="page-wrapper">
+      <canvas #pdfCanvas class="pdf-canvas"></canvas>
+      <div
+        #annotationLayer
+        class="annotation-layer"
+        (click)="onPdfClick($event)"
+      >
+        <div
+          *ngFor="let a of pageAnnotations"
+          class="annotation"
+          [ngClass]="{'selected': a.id === selectedAnnotationId}"
+          [ngStyle]="getAnnotationStyle(a)"
+          (click)="onAnnotationClick(a, $event)"
+          (mousedown)="onAnnotationMouseDown(a, $event)"
+        >
+          {{ a.text }}
+        </div>
+      </div>
+
+      <textarea
+        #textInput
+        class="text-input"
+        *ngIf="isEditingText"
+        [style.left.px]="textInputPosition.x"
+        [style.top.px]="textInputPosition.y"
+        [(ngModel)]="textInputValue"
+        (input)="onTextInputChange()"
+        (blur)="finishTextEditing()"
+        (keydown.enter)="$event.preventDefault(); finishTextEditing()"
+        (keydown.escape)="finishTextEditing()"
+        placeholder="Type your comment..."
+      ></textarea>
+    </div>
+  </div>
+</div>

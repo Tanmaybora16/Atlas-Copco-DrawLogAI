@@ -1,0 +1,106 @@
+<div class="container">
+  <!-- Employee Summary Section -->
+  <div
+    *ngIf="reportType === 'employeeReport' && employeeId"
+    class="employee-summary"
+  >
+    <div class="employee-row">
+      <div><strong>Employee ID:</strong> {{ employeeSummary.id || "-" }}</div>
+      <div><strong>Name:</strong> {{ employeeSummary.name || "-" }}</div>
+      <div><strong>PC:</strong> {{ employeeSummary.pc || "-" }}</div>
+      <div>
+        <strong>Division:</strong> {{ employeeSummary.division || "-" }}
+      </div>
+    </div>
+
+    <div class="employee-metrics">
+      <div class="metric-box accepted">
+        <h4>Total Accepted</h4>
+        <p>{{ employeeSummary.totalAccepted ?? 0 }}</p>
+      </div>
+      <div class="metric-box rejected">
+        <h4>Total Rejected</h4>
+        <p>{{ employeeSummary.totalRejected ?? 0 }}</p>
+      </div>
+      <div class="metric-box ratio">
+        <h4>Pass Ratio</h4>
+        <p>{{ employeeSummary.passRatio ?? "0%" }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-container">
+    <button class="download-button" (click)="exportToExcel()">
+      <img class="button-icon" src="/assets/download.svg" alt="" /> Excel
+    </button>
+    <button class="download-button" (click)="exportToPDF()">
+      <img class="button-icon" src="/assets/download.svg" alt="" /> PDF
+    </button>
+  </div>
+
+  <div class="table-container">
+    <div
+      *ngIf="reportType === 'employeeReport' && !employeeId"
+      class="warning-message"
+    >
+      Please select Employee ID
+    </div>
+    <div
+      *ngIf="reportType === 'drawingReport' && !drawingId"
+      class="warning-message"
+    >
+      Please select Drawing ID
+    </div>
+
+    <table
+      class="styled-table"
+      *ngIf="
+        (reportType === 'employeeReport' && employeeId) ||
+        (reportType === 'drawingReport' && drawingId)
+      "
+    >
+      <thead>
+        <tr>
+          <th *ngFor="let header of tableHeaders">{{ header }}</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of tableData; let i = index">
+          <td
+            *ngFor="let header of tableHeaders"
+            [class.approved]="
+              header === 'Decision' &&
+              row[getColumnKey(header)]?.toLowerCase() === 'approve'
+            "
+            [class.rejected]="
+              header === 'Decision' &&
+              row[getColumnKey(header)]?.toLowerCase() === 'reject'
+            "
+          >
+            {{
+              header === "Error Codes"
+                ? row["Error_codes"]?.join(", ") || "-"
+                : row[getColumnKey(header)] || "-"
+            }}
+          </td>
+          <td>
+            <img
+              src="assets/download.svg"
+              alt="Download"
+              class="action-icon"
+              (click)="downloadDrawing(i)"
+            />
+          </td>
+        </tr>
+        
+      </tbody>
+    </table>
+
+    <ng-template #noData>
+      <p class="no-data-message">No records found for the selected criteria.</p>
+    </ng-template>
+  </div>
+</div>
+
+<!-- <pre>{{ tableData | json }}</pre> -->
