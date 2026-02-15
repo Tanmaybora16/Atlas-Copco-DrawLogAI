@@ -227,10 +227,20 @@ tbody tr:hover {
     margin: 0;
 }
 
-.status-review {
+.status-reviewed {
   color: #ff8c00;
   font-weight: bold;
   background-color: #fff3cd;
+  border-radius: 4px;
+  padding: 4px 10px;
+  width: fit-content;
+  margin: 0;
+}
+
+.status-review {
+  color: #00a2ff;
+  font-weight: bold;
+  background-color: #b7e5ff;
   border-radius: 4px;
   padding: 4px 10px;
   width: fit-content;

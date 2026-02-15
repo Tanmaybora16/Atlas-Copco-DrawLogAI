@@ -2,182 +2,193 @@
   <div class="body">
     <div class="container-wrapper">
       <div class="container">
-        <div class="form-container">
-
-          <!-- Creator (Emp ID – Name) -->
-          <div class="input-container">
-  <label>Creator (Emp ID – Name)</label>
-  <input type="text" [value]="selectedCreatorDisplay || selectedCreatorId" readonly />
-</div>
-
-
-          <!-- PC (from selected Creator) -->
-          <div class="input-container">
-            <label for="pc">PC</label>
-            <input *ngIf="displaySinglePC" type="text" [value]="selectedPC" readonly />
-            <select
-              *ngIf="!displaySinglePC"
-              [(ngModel)]="selectedPC"
-              name="empPC"
-              required
-              [disabled]="isBusy"
-            >
-              <option *ngFor="let pc of pcList" [value]="pc">{{ pc }}</option>
-            </select>
-          </div>
-
-          <!-- Division -->
-          <div class="input-container">
-            <label for="division">Division</label>
-            <input
-              type="text"
-              [(ngModel)]="selectedCreator.emp_division"
-              name="empDivision"
-              [ngModelOptions]="{ standalone: true }"
-              readonly
-            />
-          </div>
-
-          <!-- Team -->
-          <div class="input-container">
-            <label for="team">Team</label>
-            <input
-              type="text"
-              [(ngModel)]="selectedCreator.emp_team"
-              name="empTeam"
-              [ngModelOptions]="{ standalone: true }"
-              readonly
-            />
-          </div>
-
-          <!-- Creator Email (readonly, fetched) -->
-          <div class="input-container">
-            <label for="creatorEmail">Creator Email</label>
-            <input
-              type="text"
-              [(ngModel)]="selectedCreator.emp_email"
-              name="empEmail"
-              [ngModelOptions]="{ standalone: true }"
-              readonly
-            />
-          </div>
-
-          <!-- Reviewer (Emp ID – Name) -->
-          <div class="input-container">
-            <label for="reviewerName">Reviewer (Emp ID – Name)</label>
-            <div class="custom-dropdown" [class.active]="reviewerDropdownOpen">
-              <div class="selected-option" (click)="toggleReviewerDropdown()">
-                {{ selectedReviewerDisplay || "Select Reviewer" }}
+        
+        <!-- Creator Details Header -->
+        <div class="details-header">
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Creator (Emp ID – Name)</label>
+              <div class="detail-value">{{ selectedCreatorDisplay || selectedCreatorId || '—' }}</div>
+            </div>
+            
+            <div class="detail-item">
+              <label>PC</label>
+              <!-- Single PC: Show text -->
+              <div class="detail-value" *ngIf="displaySinglePC">{{ selectedPC || '—' }}</div>
+              <!-- Multiple PCs: Show dropdown -->
+              <div class="detail-value" *ngIf="!displaySinglePC" style="padding: 0; background: transparent;">
+                <select [(ngModel)]="selectedPC" name="selectedPC" style="width: 100%; height: 100%; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
+                  <option value="" disabled selected>Select PC</option>
+                  <option *ngFor="let pc of pcList" [value]="pc">{{ pc }}</option>
+                </select>
               </div>
-              <div class="dropdown-list" *ngIf="reviewerDropdownOpen">
-                <input
-                  class="search-box"
-                  type="text"
-                  [(ngModel)]="reviewerSearch"
-                  [ngModelOptions]="{ standalone: true }"
-                  (ngModelChange)="onReviewerSearchChange($event)"
-                  placeholder="Search Reviewer"
-                />
-                <ul>
+            </div>
+            
+            <div class="detail-item">
+              <label>Division</label>
+              <div class="detail-value">{{ selectedCreator.emp_division || '—' }}</div>
+            </div>
+            
+            <div class="detail-item">
+              <label>Team</label>
+              <div class="detail-value">{{ selectedCreator.emp_team || '—' }}</div>
+            </div>
+            
+            <div class="detail-item">
+              <label>Creator Email</label>
+              <div class="detail-value">{{ selectedCreator.emp_email || '—' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Inputs Section -->
+        <div class="form-section">
+          <h3 class="section-title">Submission Information</h3>
+          
+          <div class="form-container">
+            
+            <!-- Row 1: Task Number, Reviewer, Reviewer Email -->
+            <div class="input-container">
+              <label for="taskNumber">Task Number</label>
+              <input
+                type="text"
+                id="taskNumber"
+                name="taskNumber"
+                ngModel
+                placeholder="Enter task number"
+                [disabled]="isBusy"
+              />
+            </div>
+
+            <div class="input-container">
+              <label for="reviewerName">Reviewer (Emp ID – Name)</label>
+              <div class="custom-dropdown" [class.active]="reviewerDropdownOpen">
+                <div class="selected-option" (click)="toggleReviewerDropdown()">
+                  {{ selectedReviewerDisplay || "Select Reviewer" }}
+                </div>
+                <div class="dropdown-list" *ngIf="reviewerDropdownOpen">
+                  <input
+                    class="search-box"
+                    type="text"
+                    [(ngModel)]="reviewerSearch"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="onReviewerSearchChange($event)"
+                    placeholder="Search Reviewer"
+                  />
+                  <ul>
+                    <li
+                      *ngFor="let emp of filteredReviewers"
+                      (click)="selectReviewer(emp, $event)"
+                    >
+                      {{ emp.display }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <input type="hidden" name="reviewerName" [ngModel]="selectedReviewerId" />
+            </div>
+
+            <div class="input-container">
+              <label for="reviewerEmail">Reviewer Email</label>
+              <input
+                type="email"
+                [(ngModel)]="selectedReviewerEmail"
+                name="reviewerEmail"
+                [ngModelOptions]="{ standalone: true }"
+                readonly
+              />
+            </div>
+
+            <div class="input-container">
+              <label for="drawingType">Drawing Type</label>
+              <div
+                class="custom-dropdown"
+                (click)="toggleDrawingDropdown()"
+                [class.active]="drawingDropdownOpen"
+              >
+                <div class="selected-option">
+                  {{ selectedDrawingType || "Select Drawing Type" }}
+                </div>
+                <ul class="dropdown-list" *ngIf="drawingDropdownOpen">
                   <li
-                    *ngFor="let emp of filteredReviewers"
-                    (click)="selectReviewer(emp, $event)"
+                    *ngFor="let type of drawingTypes"
+                    (click)="selectDrawingType(type, $event)"
                   >
-                    {{ emp.display }}
+                    {{ type }}
                   </li>
                 </ul>
               </div>
             </div>
-            <input type="hidden" name="reviewerName" [ngModel]="selectedReviewerId" />
-          </div>
 
-          <!-- Reviewer Email (required so we can notify) -->
-          <div class="input-container">
-            <label for="reviewerEmail">Reviewer Email</label>
-            <input
-              type="email"
-              [(ngModel)]="selectedReviewerEmail"
-              name="reviewerEmail"
-              [ngModelOptions]="{ standalone: true }"
-              readonly
-            />
-          </div>
-
-
-          <!-- Drawing No. (you can keep this if you need it elsewhere) -->
-          <!-- <div class="input-container">
-            <label for="designNo">Drawing No.</label>
-            <input type="text" name="designNo" [ngModel]="designNo" [disabled]="isBusy" required />
-          </div> -->
-
-          <!-- Revision No. (ignored server-side; server computes next rev) -->
-          <!-- <div class="input-container">
-            <label for="revisionNo">Revision No.</label>
-            <input type="text" name="revisionNo" ngModel [disabled]="isBusy" />
-          </div> -->
-
-          <!-- Drawing Type -->
-          <div class="input-container">
-            <label for="drawingType">Drawing Type</label>
-            <div
-              class="custom-dropdown"
-              (click)="toggleDrawingDropdown()"
-              [class.active]="drawingDropdownOpen"
-            >
-              <div class="selected-option">
-                {{ selectedDrawingType || "Select Drawing Type" }}
+            <!-- Row 2: Design Files (2fr), Drawing Type (1fr) -->
+            <div class="input-container file-upload-grid">
+              <label class="file-label">Design files</label>
+              <div class="upload-button-wrapper">
+                <input
+                  type="file"
+                  (change)="onFilesSelected($event)"
+                  accept=".pdf"
+                  id="pdf-upload"
+                  hidden
+                  [disabled]="isBusy"
+                  multiple
+                />
+                <label for="pdf-upload" id="upload-button" [class.disabled]="isBusy">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                    <path d="M14 10V12.6667C14 13.0203 13.8595 13.3594 13.6095 13.6095C13.3594 13.8595 13.0203 14 12.6667 14H3.33333C2.97971 14 2.64057 13.8595 2.39052 13.6095C2.14048 13.3594 2 13.0203 2 12.6667V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M11.3333 5.33333L8 2L4.66667 5.33333" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M8 2V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  Upload PDF(s)
+                </label>
               </div>
-              <ul class="dropdown-list" *ngIf="drawingDropdownOpen">
-                <li
-                  *ngFor="let type of drawingTypes"
-                  (click)="selectDrawingType(type, $event)"
-                >
-                  {{ type }}
-                </li>
-              </ul>
+              
+              <!-- File Pills -->
+              <div class="file-pills" *ngIf="selectedFiles.length > 0">
+                <div class="file-pill" *ngFor="let file of selectedFiles; let i = index">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="file-icon">
+                    <path d="M9.33333 1.33334H4C3.64638 1.33334 3.30724 1.47381 3.05719 1.72386C2.80714 1.97391 2.66667 2.31305 2.66667 2.66668V13.3333C2.66667 13.687 2.80714 14.0261 3.05719 14.2761C3.30724 14.5262 3.64638 14.6667 4 14.6667H12C12.3536 14.6667 12.6928 14.5262 12.9428 14.2761C13.1929 14.0261 13.3333 13.687 13.3333 13.3333V5.33334L9.33333 1.33334Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M9.33333 1.33334V5.33334H13.3333" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span class="file-name">{{ file.name }}</span>
+                  <button type="button" class="remove-file" (click)="removeFile(i)" [disabled]="isBusy">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <!-- PDF Upload -->
-          <div class="file-upload-container input-container">
-          <label class="file-label">Design files</label>
-          <div class="upload-sub-container">
-            <textarea
-              [value]="fileNamesDisplay"
-              placeholder="No files selected"
-              readonly
-              class="file-name-field"
-              rows="2"
-            ></textarea>
+           
+            <!-- Row 3: Comments (Full Width) -->
+            <div class="input-container comments-full-width">
+              <label for="comments">Comments</label>
+              <textarea
+                id="comments"
+                name="comments"
+                ngModel
+                placeholder="Enter any additional comments or notes..."
+                rows="4"
+                class="comments-textarea"
+                [disabled]="isBusy"
+              ></textarea>
+            </div>
 
-            <input
-              type="file"
-              (change)="onFilesSelected($event)"
-              accept=".pdf"
-              id="pdf-upload"
-              hidden
-              [disabled]="isBusy"
-              multiple
-            />
-            <label for="pdf-upload" id="upload-button" [class.disabled]="isBusy">
-              Upload PDF(s)
-            </label>
           </div>
         </div>
 
-
-        </div>
-
+        <!-- Checklist Table -->
         <div class="ref-table">
-        <label for="checkList">Confirm all the applicable points checked as per check list</label>
+          <!-- <label for="checkList">Confirm all the applicable points checked as per check list</label> -->
           <header class="ref-table-header">
             <div>
               <div class="table-title">
-                  <h3>CADQ Checklist - Mechanical Design</h3>
-                  <p>
-                    M = Mandatory, O = Optional, Blank = Not relevant. Edition
-                    checklist: 06
-                  </p>
+                <h3>CADQ Checklist - Mechanical Design</h3>
+                <p>
+                  M = Mandatory, O = Optional, Blank = Not relevant. Edition
+                  checklist: 06
+                </p>
               </div>
             </div>
           </header>
@@ -1223,36 +1234,38 @@
                 </tbody>
               </table>
             </div>
-            
-            <div class="yes-no">
-                <label style="margin-right: 10px;">
-                    <input type="radio" name="choice" value="yes"> Yes
-                </label>
-                <label>
-                    <input type="radio" name="choice" value="no"> No
-                </label>
-            </div>
-  
-    
-          </div>
 
-          
+            <!-- Improved Radio Buttons -->
+            <div class="checklist-confirmation">
+              <label class="radio-label">
+                <input type="radio" name="checklistChoice" value="yes" required />
+                <span class="radio-custom"></span>
+                <span class="radio-text">Yes, all applicable points are checked</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="checklistChoice" value="no" required />
+                <span class="radio-custom"></span>
+                <span class="radio-text">No, some points need attention</span>
+              </label>
+            </div>
+          </div>
         </div>
 
       </div>
     </div>
   </div>
 
+  <!-- Submit Button -->
   <div class="submit-container">
-  <button
-    type="submit"
-    [disabled]="isBusy"
-    [class.disabled-btn]="isBusy"
-    [attr.aria-disabled]="isBusy ? true : null"
-    [attr.aria-busy]="isBusy ? true : null"
-  >
-    <ng-container *ngIf="!isBusy; else busyTpl">Submit for Review</ng-container>
-  </button>
-  <ng-template #busyTpl>Processing…</ng-template>
-</div>
+    <button
+      type="submit"
+      [disabled]="isBusy"
+      [class.disabled-btn]="isBusy"
+      [attr.aria-disabled]="isBusy ? true : null"
+      [attr.aria-busy]="isBusy ? true : null"
+    >
+      <ng-container *ngIf="!isBusy; else busyTpl">Submit for Review</ng-container>
+    </button>
+    <ng-template #busyTpl>Processing…</ng-template>
+  </div>
 </form>

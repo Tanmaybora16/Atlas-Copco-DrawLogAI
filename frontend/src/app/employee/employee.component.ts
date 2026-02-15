@@ -20,7 +20,7 @@ export class EmployeeComponent implements OnInit {
     'VIN': ['Edwards India (IPG)', 'UWH', 'PNE', 'ESF', 'UVC', 'WUX', 'BQR']
   };
   pcs: string[] = [];
-  teams = ['CPI 1', 'TSG 1', 'TSG 2', 'TSG 3'];
+  teams = ['CPI 1', 'CPI 2', 'CPI 3', 'CPI 4', 'TSG 1', 'TSG 2', 'TSG 3', 'TSG 4'];
 
   employees: any[] = [];
   employeeId: string = '';
@@ -35,7 +35,7 @@ export class EmployeeComponent implements OnInit {
 
   isBusy = false;  // <-- in-flight guard for all API calls
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   ngOnInit() {
     this.fetchEmployees();
@@ -68,21 +68,21 @@ export class EmployeeComponent implements OnInit {
   }
 
   onDivisionChange() {
-  // Build the new PC list for the chosen division
-  this.pcs = this.selectedDivision ? (this.divisionToPCMap[this.selectedDivision] || []) : [];
+    // Build the new PC list for the chosen division
+    this.pcs = this.selectedDivision ? (this.divisionToPCMap[this.selectedDivision] || []) : [];
 
-  // Drop any PCs that belonged to the previous division
-  this.selectedPCs = this.selectedPCs.filter(pc => this.pcs.includes(pc));
+    // Drop any PCs that belonged to the previous division
+    this.selectedPCs = this.selectedPCs.filter(pc => this.pcs.includes(pc));
 
-  // If you want to fully clear the selection whenever division changes, use this instead:
-  // this.selectedPCs = [];
+    // If you want to fully clear the selection whenever division changes, use this instead:
+    // this.selectedPCs = [];
 
-  // Reset single-select fallback (if you use selectedPC elsewhere)
-  this.selectedPC = '';
+    // Reset single-select fallback (if you use selectedPC elsewhere)
+    this.selectedPC = '';
 
-  // Close the PC dropdown so the user re-opens with the fresh list
-  this.dropdownOpen = false;
-}
+    // Close the PC dropdown so the user re-opens with the fresh list
+    this.dropdownOpen = false;
+  }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event): void {

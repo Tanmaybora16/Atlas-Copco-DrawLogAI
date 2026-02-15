@@ -4,36 +4,32 @@
   align-items: center;
   margin-top: 40px;
   gap: 35px;
+  padding: 0px 40px;
   position: relative;
 }
 
 .container-wrapper { 
   width: 1350px;
   display: flex;
-  //   align-items: flex-end;  
-//   border: 1px solid #252525; 
 }
 
 .container {
     width: 100%; 
     display: flex;
-
   gap: 50px;
   align-items: center;
   flex-direction: column;
 }
 
 .form-container{
-  width: 84%;
-  height: 400px;
-  display: flex;
-  // justify-content: space-between;
-  gap: 30px;
-  flex-wrap: wrap;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px 30px;
 }
 
 select{
-  height: 90px;
+  height: 45px;
   border: 1px solid #BABABA;
   background-color: #F9F9F9;
   border-radius: 4px;
@@ -133,29 +129,35 @@ white-space: nowrap !important;
 .input-container{
   display: flex;
   flex-direction: column;
-  height: 65px;
-  width: 350px;
-  justify-content: space-between;
+  gap: 8px;
+  
+  &.file-upload-full {
+    grid-column: 1 / -1;
+  }
+  
+  
 }
 
 label {
   margin: 0px;
   color: #6C6C6C;
+  font-size: 14px;
+  font-weight: 500;
   transition: color 0.3s ease;
 }
 
 .input-container:focus-within label {
   color: #252525;
-  font-weight: 500;
 }
 
 input{
-  height: 55%;
+  height: 45px;
   border: 1px solid #BABABA;
   background-color: #F9F9F9;
   border-radius: 4px;
-  padding: 2px 10px;
-  font-size: 16px;
+  padding: 0 12px;
+  font-size: 15px;
+  transition: all 0.2s ease;
 }
 
 .input-container input:focus {
@@ -165,12 +167,12 @@ input{
 }
 
 .custom-dropdown {
-  height: 56%;
+  height: 45px;
   border: 1px solid #BABABA;
   background-color: #F9F9F9;
   border-radius: 4px;
-  padding: 2px 10px;
-  font-size: 16px;
+  padding: 0 12px;
+  font-size: 15px;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -211,50 +213,98 @@ input{
   background: #f0f0f0;
 }
 
-.file-upload-container {
-display: flex;
-width: 743px;
+.upload-button-wrapper {
+  display: flex;
+  align-items: center;
 }
 
-.file-label{
-padding-bottom: 3px;
+// File Pills Styling
+.file-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
 
-.file-name-field {
-  padding: 6px 10px;
-  width: 580px;
-  min-height: 32px;       /* match single-line input height */
-  max-height: 90px;       /* allow up to ~4 lines before scrolling */
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  background-color: #f9f9f9;
-  color: #333;
+.file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #f0f7fb;
+  border: 1px solid #d0e7f5;
+  border-radius: 20px;
   font-size: 14px;
-  line-height: 1.4;
-
-  cursor: not-allowed;    /* keeps readonly look */
-  resize: none;           /* prevent manual resizing */
-  overflow-y: auto;       /* scroll if too many filenames */
-  white-space: pre-wrap;  /* wrap long file names */
-  word-break: break-word; /* break very long words/paths */
+  color: #252525;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: #e6f2f9;
+    border-color: #b8ddf0;
+  }
+  
+  .file-icon {
+    flex-shrink: 0;
+    color: #0087CB;
+  }
+  
+  .file-name {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .remove-file {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #6C6C6C;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    
+    &:hover:not(:disabled) {
+      background-color: #ff4444;
+      color: white;
+    }
+    
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+  }
 }
 
 
 
 textarea {
-  height: 45px;              /* initial height (relative to container) */
-  max-height: 135px; /* allow growth up to 3× the initial height */
-  width: 80%;
+  min-height: 80px;
+  width: 100%;
   
-  overflow-y: auto;         /* enable scrolling when max-height is reached */
-  resize: vertical;         /* allow user resizing vertically (optional) */
+  overflow-y: auto;
+  resize: vertical;
   
   border: 1px solid #BABABA;
   background-color: #F9F9F9;
   border-radius: 4px;
-  padding: 11px 15px;
-  font-size: 16px;
-  box-sizing: border-box;   /* so padding/border don’t mess up width/height */
+  padding: 12px;
+  font-size: 15px;
+  box-sizing: border-box;
+  line-height: 1.5;
+  font-family: inherit;
+  transition: all 0.2s ease;
 }
 
 
@@ -269,25 +319,29 @@ textarea {
 
 
 #upload-button {
-background-color: #0087CB;
-color: white; 
-height: 45px;
-padding: 0px 16px;
-border-radius: 5px;
-cursor: pointer;
-text-align: center;
-display: flex;              /* make it a flex container */
-  align-items: center;        /* vertically center content */
+  background-color: #0087CB;
+  color: white; 
+  height: 45px;
+  padding: 0px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  align-items: center;
   justify-content: center;
-}
-
-#upload-button:hover {
-background-color: rgb(10, 158, 232);
-}
-
-.upload-sub-container{
-display: flex;
-gap: 15px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  
+  &:hover:not(.disabled) {
+    background-color: rgb(10, 158, 232);
+  }
+  
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
 }
 
 
@@ -520,16 +574,316 @@ td {
   box-shadow: none;
 }
 
-/* Faint & block the upload label while busy */
-#upload-button.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
 /* Optional: keep visual consistency if you use focus rings */
 .submit-container button.disabled-btn:focus,
 .submit-container button:disabled:focus {
   outline: none;
   box-shadow: none;
+}
+
+
+// ===================================
+// NEW: Details Header Section (Minimal Design)
+// ===================================
+.details-header {
+  width: 70%;
+  background: white;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+  
+  .details-header-title {
+    display: none; // Hide title for minimal design
+  }
+  
+  .details-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr 1.5fr;
+    gap: 0;
+    border-collapse: collapse;
+  }
+  
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+    border-right: 1px solid #e8e8e8;
+    
+    &:last-child {
+      border-right: none;
+    }
+    
+    &.full-width {
+      grid-column: 1 / -1;
+      border-right: none;
+      border-top: 1px solid #e8e8e8;
+    }
+    
+    label {
+      font-size: 13px;
+      font-weight: 400;
+      color: #6C6C6C;
+      margin: 0;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    
+    .detail-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #252525;
+      padding: 0;
+      background: transparent;
+      border: none;
+      min-height: auto;
+      display: flex;
+      align-items: center;
+    }
+  }
+}
+
+// ===================================
+// NEW: Form Section Title
+// ===================================
+.form-section {
+  width: 70%;
+  
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #252525;
+    margin: 0 0 20px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e8eef3;
+  }
+}
+
+// ===================================
+// NEW: Comments Textarea Styling
+// ===================================
+.comments-textarea {
+  min-height: 80px !important;
+  height: auto !important;
+  width: 100% !important;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+// ===================================
+// NEW: Improved Radio Buttons
+// ===================================
+.checklist-confirmation {
+  display: flex;
+  gap: 30px;
+  padding: 30px 0;
+  flex-wrap: wrap;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  position: relative;
+  padding: 16px 24px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  background: white;
+  
+  &:hover {
+    border-color: #0087CB;
+    background-color: #f8fbfd;
+  }
+  
+  input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    
+    &:checked + .radio-custom {
+      border-color: #0087CB;
+      background-color: #0087CB;
+      
+      &::after {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+    }
+    
+    &:checked ~ .radio-text {
+      color: #0087CB;
+      font-weight: 600;
+    }
+  }
+  
+  .radio-custom {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    border: 2px solid #BABABA;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    background: white;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: white;
+      opacity: 0;
+      transition: all 0.2s ease;
+    }
+  }
+  
+  .radio-text {
+    font-size: 15px;
+    color: #252525;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+}
+
+// ===================================
+// NEW: Responsive Styles
+// ===================================
+@media (max-width: 1400px) {
+  .container-wrapper {
+    width: 95%;
+  }
+}
+
+@media (max-width: 1200px) {
+  .container-wrapper {
+    width: 100%;
+    padding: 0 20px;
+  }
+  
+  .details-header,
+  .form-section,
+  .form-container,
+  .ref-table {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .body {
+    margin-top: 20px;
+    padding: 0 12px;
+    gap: 20px;
+  }
+  
+  .container {
+    gap: 30px;
+  }
+  
+  .details-header {
+    .details-grid {
+      grid-template-columns: 1fr;
+      
+      .detail-item {
+        border-right: none;
+        border-bottom: 1px solid #e8e8e8;
+        
+        &:last-child {
+          border-bottom: none;
+        }
+        
+        &.full-width {
+          border-top: none;
+        }
+      }
+    }
+  }
+  
+  .form-section {
+    .section-title {
+      font-size: 16px;
+    }
+  }
+  
+  .form-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    
+    .input-container.file-upload-full,
+    .input-container.comments-full-width {
+      grid-column: 1;
+    }
+  }
+  
+  .input-container {
+    width: 100%;
+  }
+  
+  .file-pill {
+    .file-name {
+      max-width: 150px;
+    }
+  }
+  
+  .table-container {
+    max-height: 400px;
+  }
+  
+  .table-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    
+    h3 {
+      font-size: 16px;
+    }
+    
+    p {
+      font-size: 12px;
+    }
+  }
+  
+  .checklist-confirmation {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .submit-container {
+    padding-bottom: 60px;
+    
+    button {
+      width: 100%;
+      margin: 0;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .body {
+    padding: 0 8px;
+  }
+  
+  .details-header {
+    .detail-item {
+      padding: 16px;
+      
+      .detail-value {
+        font-size: 14px;
+      }
+    }
+  }
+  
+  .form-section .section-title {
+    font-size: 15px;
+  }
+  
+  .radio-label {
+    padding: 12px 16px;
+  }
 }

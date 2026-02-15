@@ -91,7 +91,15 @@
           <td>{{ req.createdDate }}</td>
           <td>{{ req.lastReviewedDate || 'N/A' }}</td>
           <td class="actions">
-            <p class="status-review">{{ req.status }}</p>
+            <!-- <p class="status-review">{{ req.status }}</p> -->
+             <p
+              [ngClass]="{
+                'status-pending': req.status === 'Review',
+                'status-reviewed': req.status === 'Reviewed',
+              }"
+            >
+              {{ req.status }}
+            </p>
           </td>
           <td>
             <img

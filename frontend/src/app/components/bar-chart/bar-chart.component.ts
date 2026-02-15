@@ -29,7 +29,7 @@
 //   @Input() selectedPC!: string;
 //   @Input() startDate!: string;
 //   @Input() endDate!: string;
-  
+
 //   public chartOptions!: Partial<ChartOptions>;
 
 //   constructor(private http: HttpClient) {}
@@ -51,7 +51,7 @@
 //       this.reportType === 'monthly'
 //         ? `${environment.apiUrl}/api/monthly-error-report`
 //         : `${environment.apiUrl}/api/trend-error-report`;
-    
+
 //     let params = new HttpParams();
 //     if (this.startDate) params = params.set('start_date', this.startDate);
 //     if (this.endDate) params = params.set('end_date', this.endDate);
@@ -77,10 +77,10 @@
 //         const [m2, y2] = b.month.split('-');
 //         return new Date(`${y1}-${m1}-01`).getTime() - new Date(`${y2}-${m2}-01`).getTime();
 //       });
-  
+
 //       let data: number[] = [];
 //       let categories: string[] = [];
-  
+
 //       reports.forEach((report) => {
 //         const [month, year] = report.month.split('-');
 //         const date = new Date(`${year}-${month}-01`);
@@ -88,7 +88,7 @@
 //         categories.push(formatted);
 //         data.push(report.total_errors);
 //       });
-  
+
 //       this.chartOptions = {
 //         series: [{ name: 'Total Errors', data }],
 //         chart: { type: 'bar', height: 350 },
@@ -104,12 +104,12 @@
 //                                   .slice(0, 10);
 //       let data: number[] = [];
 //       let categories: string[] = [];
-  
+
 //       filteredReports.forEach((report) => {
 //         categories.push(report.error_code);
 //         data.push(report.count);
 //       });
-  
+
 //       this.chartOptions = {
 //         series: [{ name: 'Error Code Count', data }],
 //         chart: { type: 'bar', height: 350 },
@@ -123,7 +123,7 @@
 //       };
 //     }
 //   }
-  
+
 // }
 
 import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
@@ -155,11 +155,11 @@ export type ChartOptions = {
 })
 export class BarChartComponent implements OnChanges {
   @Input() reportType!: string;
-  @Input() selectedDivision!: string;
+  @Input() selectedTeam!: string;
   @Input() selectedPC!: string;
   @Input() startDate!: string;
   @Input() endDate!: string;
-  
+
   public chartOptions!: Partial<ChartOptions>;
 
   // Error code descriptions
@@ -218,14 +218,14 @@ export class BarChartComponent implements OnChanges {
     P70: 'Check \'All files are "For Approval" or "Approved" during ECO',
   };
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   ngOnChanges(changes: SimpleChanges) {
     if (
-      changes['reportType'] || 
-      changes['selectedDivision'] || 
-      changes['selectedPC'] || 
-      changes['startDate'] || 
+      changes['reportType'] ||
+      changes['selectedTeam'] ||
+      changes['selectedPC'] ||
+      changes['startDate'] ||
       changes['endDate']
     ) {
       this.fetchReportData();
@@ -237,11 +237,11 @@ export class BarChartComponent implements OnChanges {
       this.reportType === 'monthly'
         ? `${environment.apiUrl}/api/monthly-error-report`
         : `${environment.apiUrl}/api/trend-error-report`;
-    
+
     let params = new HttpParams();
     if (this.startDate) params = params.set('start_date', this.startDate);
     if (this.endDate) params = params.set('end_date', this.endDate);
-    if (this.selectedDivision) params = params.set('division', this.selectedDivision);
+    if (this.selectedTeam) params = params.set('team', this.selectedTeam);
     if (this.selectedPC) params = params.set('pc', this.selectedPC);
 
     this.http.get<any[]>(apiUrl, { params }).subscribe(
@@ -263,10 +263,10 @@ export class BarChartComponent implements OnChanges {
         const [m2, y2] = b.month.split('-');
         return new Date(`${y1}-${m1}-01`).getTime() - new Date(`${y2}-${m2}-01`).getTime();
       });
-  
+
       let data: number[] = [];
       let categories: string[] = [];
-  
+
       reports.forEach((report) => {
         const [month, year] = report.month.split('-');
         const date = new Date(`${year}-${month}-01`);
@@ -274,7 +274,7 @@ export class BarChartComponent implements OnChanges {
         categories.push(formatted);
         data.push(report.total_errors);
       });
-  
+
       this.chartOptions = {
         series: [{ name: 'Total Errors', data }],
         chart: { type: 'bar', height: 350 },
@@ -284,7 +284,7 @@ export class BarChartComponent implements OnChanges {
         xaxis: { categories },
         tooltip: {
           y: {
-            formatter: function(value: number, { seriesIndex, dataPointIndex, w }: any) {
+            formatter: function (value: number, { seriesIndex, dataPointIndex, w }: any) {
               const category = w.globals.labels[dataPointIndex];
               return `${value} error${value !== 1 ? 's' : ''} in ${category}`;
             }
@@ -293,12 +293,12 @@ export class BarChartComponent implements OnChanges {
       };
     } else {
       // Top 10 error codes
-      let filteredReports = reports.filter(report => report.count > 1)
-                                  .sort((a, b) => b.count - a.count)
-                                  .slice(0, 10);
+      let filteredReports = reports.filter(report => report.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
       let data: number[] = [];
       let categories: string[] = [];
-  
+
       filteredReports.forEach((report) => {
         categories.push(report.error_code);
         data.push(report.count);
@@ -306,7 +306,7 @@ export class BarChartComponent implements OnChanges {
 
       // Create reference to errorDescriptions for use in tooltip
       const errorDescriptions = this.errorDescriptions;
-  
+
       this.chartOptions = {
         series: [{ name: 'Error Code Count', data }],
         chart: { type: 'bar', height: 350 },
@@ -318,15 +318,15 @@ export class BarChartComponent implements OnChanges {
           labels: { rotate: -45, hideOverlappingLabels: true, trim: true },
         },
         // Alternative compact tooltip design
-// Replace the tooltip section in the Top 10 Error Codes chart with this:
+        // Replace the tooltip section in the Top 10 Error Codes chart with this:
         tooltip: {
-          custom: function({ series, seriesIndex, dataPointIndex, w }: any) {
+          custom: function ({ series, seriesIndex, dataPointIndex, w }: any) {
             const errorCode = w.globals.labels[dataPointIndex];
             const count = series[seriesIndex][dataPointIndex];
             const total = series[0].reduce((a: number, b: number) => a + b, 0);
             const percentage = ((count / total) * 100).toFixed(1);
             const description = errorDescriptions[errorCode] || 'No description available';
-            
+
             return `
               <div style="
                 padding: 10px 14px;
@@ -376,5 +376,5 @@ export class BarChartComponent implements OnChanges {
       };
     }
   }
-  
+
 }

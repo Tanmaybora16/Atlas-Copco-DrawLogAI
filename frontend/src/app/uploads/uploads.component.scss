@@ -5,13 +5,14 @@
   margin-top: 40px;
   gap: 35px;
   position: relative;
+  padding: 0 20px;
 }
 
 .container-wrapper { 
-  width: 1350px;
+  width: 100%;
+  max-width: 1350px;
   display: flex;
-  flex-direction: column; 
-  align-items: flex-end;   
+  flex-direction: column;
 }
 
 .container {
@@ -23,10 +24,11 @@
 
 .form-container{
   width: 44%;
-  height: 490px;
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
+  row-gap: 12px;
+  align-content: flex-start;
 }
 
 select{
@@ -38,8 +40,6 @@ select{
   font-size: 16px;
 }
 
-
-
 .header{
   font-weight: 600;
 }
@@ -50,11 +50,23 @@ select{
   align-items: center;
 }
 
+.error-container {
+  width: 85%;
+  min-width: 0;
+}
+.right-side{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 .toggleBtn {
   padding: 7px 7px 3px 7px;
   background-color:rgba(9, 59, 84, 0);
   border: none;
   border-radius: 50%;
+  transition: all 0.2s ease;
 }
 
 .toggleBtn:hover{
@@ -74,40 +86,66 @@ select{
   filter: brightness(0.7) contrast(130%);
 }
 
+// Radio buttons
+.status {
+  height: 50px;
+  border-radius: 10px;
+  background-color: #FFF;
+}
+
+.radio-block {
+  position: relative;
+  display: flex;
+  min-width: 280px;
+  border-radius: 20px;
+  background-color: #e9e8e7;
+}
+
+.selected {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: calc(50% - 1px);
+  height: calc(100% - 2px);
+  border-radius: 20px;
+  transition: transform 0.2s, background-color 0.2s;
+  background-color: #ed5c5a; 
+}
+
+#approve-option:checked + label + .selected {
+  transform: translateX(100%);
+  background-color: #00cb51;
+}
 
 input[type=radio]:checked + label {
   color: #FFF;
 }
 
 .status label {
-position: relative;
-z-index: 100;
-width: 50%;
-padding: 18px !important;
-transition: color 0.2s;
-text-align: center;
-cursor: pointer;
-}
-
-input[type=radio]:checked + label {
-color: #FFF;
+  position: relative;
+  z-index: 100;
+  width: 50%;
+  padding: 18px !important;
+  transition: color 0.2s;
+  text-align: center;
+  cursor: pointer;
 }
 
 input[type=radio]:checked + .off-label + .selected {
-transform: translateX(100%);
+  transform: translateX(100%);
 }
 
 .sr-only, .status input[type=radio] {
-position: absolute !important;
-width: 1px !important;
-height: 1px !important;
-margin: -1px !important;
-padding: 0 !important;
-overflow: hidden !important;
-clip: rect(1px, 1px, 1px, 1px) !important;
-border: 0 !important;
-clip-path: inset(50%) !important;
-white-space: nowrap !important;
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(1px, 1px, 1px, 1px) !important;
+  border: 0 !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
 }
 
 .input-container{
@@ -116,6 +154,12 @@ white-space: nowrap !important;
   height: 65px;
   width: 270px;
   justify-content: space-between;
+  
+  &.comments-full-width {
+    width: 100%;
+    height: auto;
+    margin-top: 10px;
+  }
 }
 
 .input-container label {
@@ -136,6 +180,7 @@ input{
   border-radius: 4px;
   padding: 2px 10px;
   font-size: 16px;
+  transition: all 0.2s ease;
 }
 
 .input-container input:focus {
@@ -192,39 +237,76 @@ input{
 }
 
 .file-upload-container {
-display: flex;
-width: 600px;
+  display: flex;
+  width: 100%;
 }
 
 .file-label{
-padding-bottom: 8px;
+  padding-bottom: 8px;
 }
 
 .file-name-field {
-padding: 8px;
-width: 450px;
-height: 32px;
-border: 1px solid #ccc;
-border-radius: 5px;
-background-color: #f9f9f9;
-cursor: not-allowed;
+  padding: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+  cursor: not-allowed;
 }
 
 #upload-button {
-background-color: #0087CB;
-color: white; 
-padding: 14px 16px;
-border-radius: 5px;
-cursor: pointer;
-}
-
-#upload-button:hover {
-background-color: rgb(10, 158, 232);
+  background-color: #0087CB;
+  color: white; 
+  padding: 14px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  
+  &:hover:not(.disabled) {
+    background-color: rgb(10, 158, 232);
+  }
+  
+  &.disabled {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 .upload-sub-container{
-display: flex;
-gap: 15px;
+  display: flex;
+  gap: 15px;
+  width: 100%;
+}
+
+// Textarea styling
+textarea {
+  width: 100%;
+  min-height: 80px;
+  border: 1px solid #BABABA;
+  background-color: #F9F9F9;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 16px;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  line-height: 1.5;
+}
+
+textarea:focus {
+  border-color: #6C6C6C; 
+  background-color: #f4f4f4; 
+  outline: none; 
+}
+
+.comments-textarea {
+  min-height: 80px !important;
+  width: 100% !important;
 }
 
 .no-errors-message{
@@ -234,8 +316,6 @@ gap: 15px;
 .custom-dropdown {
   position: relative;
 }
-
-
 
 .table-container {
   max-height: 360px; 
@@ -287,6 +367,10 @@ gap: 15px;
   thead tr {
     border-bottom: 1.5px solid #777777; 
   }
+  
+  tbody tr:hover {
+    background-color: #f8f8f8;
+  }
 }
 
 .p-codes {
@@ -327,7 +411,6 @@ gap: 15px;
   width: 90%;
 }
 
-/* Updated action cell styles */
 .action-cell {
   text-align: center;
   width: 80px;
@@ -372,17 +455,178 @@ select {
   font-size: 16px;
 }
 
-
-/* For the Upload label */
-#upload-button.disabled {
-  pointer-events: none;     /* disable clicks */
-  opacity: 0.5;             /* faint look */
-  cursor: not-allowed;
+// Submit container
+.submit-container {
+  width: 100%;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: flex-end;
+  // margin-top: 30px;
+  // padding: 20px 0 60px 0;
 }
 
-/* For Submit button */
-button.disabled-btn {
-  pointer-events: none;     /* block clicks */
-  opacity: 0.6;             /* faint look */
-  cursor: not-allowed;
+.submit-container button {
+  height: 50px;
+  padding: 0 32px;
+  font-size: 16px;
+  font-weight: 500;
+  background-color: #0087CB;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover:not(.disabled-btn) {
+    background-color: rgb(10, 158, 232);
+  }
+  
+  &.disabled-btn {
+    pointer-events: none;
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// ===================================
+// Responsive Styles
+// ===================================
+@media (max-width: 1400px) {
+  .container-wrapper {
+    width: 95%;
+  }
+}
+
+@media (max-width: 1200px) {
+  .body {
+    padding: 0 16px;
+  }
+  
+  .container {
+    flex-direction: column;
+    gap: 40px;
+  }
+  
+  .form-container,
+  .error-container {
+    width: 100%;
+  }
+  
+  .file-upload-container {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .body {
+    margin-top: 20px;
+    padding: 0 12px;
+    gap: 20px;
+  }
+  
+  .container {
+    gap: 30px;
+  }
+  
+  .form-container {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .input-container {
+    width: 100% !important;
+    
+    &.comments-full-width {
+      margin-top: 0;
+    }
+  }
+  
+  .file-upload-container {
+    flex-direction: column;
+  }
+  
+  .upload-sub-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .file-name-field {
+    width: 100%;
+  }
+  
+  #upload-button {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .submit-container {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 16px;
+    padding: 20px 0 40px 0;
+    
+    .status {
+      width: 100%;
+    }
+    
+    button {
+      width: 100%;
+    }
+  }
+  
+  .radio-block {
+    min-width: 100%;
+  }
+  
+  .table-container {
+    max-height: 300px;
+  }
+  
+  .styled-table {
+    th, td {
+      padding: 8px;
+      font-size: 13px;
+    }
+  }
+  
+  .edit-icon,
+  .delete-icon {
+    visibility: visible !important;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .body {
+    padding: 0 8px;
+  }
+  
+  .container {
+    gap: 20px;
+  }
+  
+  .input-container label {
+    font-size: 14px;
+  }
+  
+  input, textarea {
+    font-size: 14px;
+  }
+  
+  .styled-table {
+    th, td {
+      padding: 6px;
+      font-size: 12px;
+    }
+  }
+  
+  .action-buttons {
+    gap: 4px;
+  }
+  
+  .submit-container button {
+    padding: 0 20px;
+  }
 }

@@ -4,21 +4,21 @@
         <button class="download-button" (click)="downloadExcel()">
             <img class="button-icon" src="/assets/download.svg" alt=""> Excel
         </button>
-    
+
         <!-- ✅ PDF Download Button -->
         <button class="download-button" (click)="downloadPDF()">
             <img class="button-icon" src="/assets/download.svg" alt=""> PDF
         </button>
     </div>
-    
+
     <div class="table-container">
         <table class="styled-table">
             <thead>
                 <tr>
                     <th>Year</th>
                     <th>Month</th>
-                    <th *ngIf="showDivisionPC">Division</th>
-                    <th *ngIf="showDivisionPC">PC</th>
+                    <th *ngIf="showTeamPC">Team</th>
+                    <th *ngIf="showTeamPC">PC</th>
                     <th>No of drawing</th>
                     <th>Pass Ratio</th>
                     <th>Count</th>
@@ -28,14 +28,14 @@
                 <tr *ngFor="let row of passRatioData">
                     <td>{{ row.year }}</td>
                     <td>{{ row.month }}</td>
-                    <td *ngIf="showDivisionPC">{{ selectedDivision }}</td>
-                    <td *ngIf="showDivisionPC">{{ selectedPC }}</td>
+                    <td *ngIf="showTeamPC">{{ selectedTeam }}</td>
+                    <td *ngIf="showTeamPC">{{ selectedPC }}</td>
                     <td>{{ row.total_drawings }}</td>
-                     <!-- ✅ Apply Dynamic Color for Pass Ratio -->
-    <td [ngClass]="getPassRatioClass(row.pass_ratio)">{{ row.pass_ratio }}</td>
-    
-    <!-- ✅ Apply Dynamic Color for Count -->
-    <td [ngClass]="getPassRatioClass(row.pass_ratio)">{{ row.accepted_drawings }}</td>
+                    <!-- ✅ Apply Dynamic Color for Pass Ratio -->
+                    <td [ngClass]="getPassRatioClass(row.pass_ratio)">{{ row.pass_ratio }}</td>
+
+                    <!-- ✅ Apply Dynamic Color for Count -->
+                    <td [ngClass]="getPassRatioClass(row.pass_ratio)">{{ row.accepted_drawings }}</td>
                 </tr>
             </tbody>
         </table>

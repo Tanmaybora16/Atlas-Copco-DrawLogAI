@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { NgForm } from '@angular/forms';
 import { debounceTime } from 'rxjs/operators';
 import { Subject } from 'rxjs';
-import { AuthService } from '../auth.service'; // ⬅️ NEW
+import { AuthService } from '../auth.service';
 import { environment } from 'src/environments/environment';
 
 declare const Swal: any;
@@ -33,7 +33,7 @@ export class SubmissionComponent implements OnInit {
   employees: EmployeeOption[] = [];
 
   // CREATOR (now autofilled from login)
-  creatorDropdownOpen = false; // kept for compatibility; not used if you hide the UI
+  creatorDropdownOpen = false;
   creatorSearch = '';
   filteredCreators: EmployeeOption[] = [];
   selectedCreatorId = '';
@@ -47,7 +47,7 @@ export class SubmissionComponent implements OnInit {
   selectedReviewerId = '';
   selectedReviewerDisplay = '';
   selectedFiles: File[] = [];
-  fileNamesDisplay = '';  // shows all names
+  fileNamesDisplay = '';
 
   selectedReviewer: any = { emp_email: '' };
   selectedReviewerEmail = '';
@@ -71,6 +71,8 @@ export class SubmissionComponent implements OnInit {
   designNo = '';
   decision: 'approve' | 'reject' = 'approve';
   creatorEmail = '';
+  taskNumber = ''; // NEW
+  comments = ''; // NEW
 
   // debouncers
   creatorSearch$ = new Subject<string>();
@@ -79,8 +81,8 @@ export class SubmissionComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private cdRef: ChangeDetectorRef,
-    private auth: AuthService // ⬅️ NEW
-  ) {}
+    private auth: AuthService
+  ) { }
 
   ngOnInit() {
     // Debounced search (for Reviewer dropdown only)
@@ -102,9 +104,8 @@ export class SubmissionComponent implements OnInit {
     this.fetchEmployees();
   }
 
-  // Dropdown toggles (kept for Reviewer & Drawing type; you can ignore Creator toggle)
+  // Dropdown toggles
   toggleCreatorDropdown() {
-    // If you keep creator dropdown in HTML, this will preselect the current user
     this.creatorDropdownOpen = !this.creatorDropdownOpen;
     if (this.creatorDropdownOpen) this.filteredCreators = [...this.employees];
   }
@@ -125,7 +126,7 @@ export class SubmissionComponent implements OnInit {
     }
   }
 
-  // Fetch employees once (id+name) — used mainly for reviewer list
+  // Fetch employees once (id+name)
   fetchEmployees() {
     this.http.get<any[]>(`${this.API}/get-employees`).subscribe(
       (data) => {
@@ -162,7 +163,6 @@ export class SubmissionComponent implements OnInit {
     this.filteredReviewers = this.employees.filter(e => e.display.toLowerCase().includes(q));
   }
 
-  // If you still show a Creator dropdown in the UI, this lets you override (optional)
   selectCreator(emp: EmployeeOption, event: Event) {
     event.stopPropagation();
     this.selectedCreatorId = emp.id;
@@ -179,13 +179,12 @@ export class SubmissionComponent implements OnInit {
     this.fetchReviewerDetails(emp.id);
   }
 
-  // Fetch creator’s full record
+  // Fetch creator's full record
   fetchCreatorDetails(empId: string) {
     if (!empId) return;
 
     this.http.get<any>(`${this.API}/get-employee/${empId}`).subscribe(
       (data) => {
-        // Expecting: { emp_PC, emp_division, emp_team, emp_email, emp_name? }
         this.selectedCreator = data || { emp_PC: '', emp_division: '', emp_team: '', emp_email: '', emp_name: '' };
 
         // Build "ID - Name" label if we have a name
@@ -233,17 +232,29 @@ export class SubmissionComponent implements OnInit {
   onFilesSelected(event: Event) {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) {
-      this.selectedFiles = [];
-      this.fileNamesDisplay = '';
       return;
     }
     // Only PDFs
     const all = Array.from(input.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
-    this.selectedFiles = all;
-    this.fileNamesDisplay = all.map(f => f.name).join(', ');
+    this.selectedFiles = [...this.selectedFiles, ...all];
+    this.updateFileNamesDisplay();
+
+    // Reset input so same file can be selected again
+    input.value = '';
   }
 
-  // Optional helper (kept)
+  // Remove individual file
+  removeFile(index: number) {
+    if (this.isBusy) return;
+    this.selectedFiles.splice(index, 1);
+    this.updateFileNamesDisplay();
+  }
+
+  // Update file names display
+  private updateFileNamesDisplay() {
+    this.fileNamesDisplay = this.selectedFiles.map(f => f.name).join(', ');
+  }
+
   fetchCreatorEmail(creatorId: string) {
     if (!creatorId) return;
     this.http.get<{ email: string }>(`${this.API}/get-creator-email/${creatorId}`)
@@ -259,7 +270,7 @@ export class SubmissionComponent implements OnInit {
     this.drawingDropdownOpen = false;
   }
 
-  // Submit (multipart/form-data with the PDF)
+  // Submit
   onSubmit(form: NgForm) {
     if (this.isBusy) return;
 
@@ -277,6 +288,10 @@ export class SubmissionComponent implements OnInit {
     }
     if (!this.selectedReviewerEmail) {
       Swal.fire({ icon: 'error', title: 'Reviewer Email', text: 'Reviewer email could not be fetched.' });
+      return;
+    }
+    if (!this.selectedPC) {
+      Swal.fire({ icon: 'error', title: 'Missing PC', text: 'Please select a Profit Center (PC).' });
       return;
     }
     if (!this.selectedDrawingType) {
@@ -299,6 +314,10 @@ export class SubmissionComponent implements OnInit {
     fd.append('pc', (this.selectedPC || '').toString());
     fd.append('drawing_type', this.selectedDrawingType);
     fd.append('decision', this.decision);
+
+    // NEW: Add task number and comments
+    fd.append('task_number', (form.value.taskNumber || '').toString());
+    fd.append('comments', (form.value.comments || '').toString());
 
     // optional legacy fields
     fd.append('design_no', (form.value.designNo || '').toString());
@@ -334,7 +353,6 @@ export class SubmissionComponent implements OnInit {
   private resetFormState(): void {
     this.selectedFile = null;
     this.fileName = '';
-    // Keep creator ID sourced from session — do not clear it here
     this.selectedCreatorDisplay = '';
     this.selectedCreator = { emp_PC: '', emp_division: '', emp_team: '', emp_email: '', emp_name: '' };
 
@@ -353,5 +371,9 @@ export class SubmissionComponent implements OnInit {
 
     this.selectedFiles = [];
     this.fileNamesDisplay = '';
+
+    // Reset new fields
+    this.taskNumber = '';
+    this.comments = '';
   }
 }

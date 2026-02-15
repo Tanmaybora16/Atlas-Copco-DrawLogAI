@@ -22,21 +22,67 @@ import re
 import calendar
 import bcrypt
 import secrets
-from werkzeug.utils import safe_join
+from werkzeug.utils import safe_join, secure_filename
 import io
 import time
+import sys
+import os
 
+# FIX: Enable unbuffered output for logging
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 
+# Email Configuration (Placeholders - Update with real values)
+SMTP_SERVER = "output.office365.com"  # Example for Office365
+SMTP_PORT = 587
+EMAIL_SENDER = "admin@atlascopco.com"
+EMAIL_PASSWORD = "change_me"
 
-pyt.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# Upload Configuration
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 app = Flask(__name__)
-CORS(app
-# origins=[
-#     "https://drawlogai.atlascopco.group",
-#     "http://drawlogai.atlascopco.group"
-# ]
-)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Enhanced CORS configuration - allow all origins for development
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": False
+    }
+})
+
+# Request logging middleware
+@app.before_request
+def log_request_info():
+    """Log all incoming requests"""
+    # print(f"\n{'='*80}")
+    # print(f">>> INCOMING REQUEST: {request.method} {request.path}")
+    # print(f"    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    # print(f"    Remote Address: {request.remote_addr}")
+    # print(f"    Origin: {request.headers.get('Origin', 'N/A')}")
+    # if request.args:
+    #     print(f"    Query Params: {dict(request.args)}")
+    # print(f"{'='*80}\n")
+
+@app.after_request
+def log_response_info(response):
+    """Log all outgoing responses and ensure CORS headers"""
+    # Ensure CORS headers are always present
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    
+    # print(f"\n{'='*80}")
+    # print(f"<<< RESPONSE: {request.method} {request.path}")
+    # print(f"    Status: {response.status_code} {response.status}")
+    # print(f"    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    # print(f"{'='*80}\n")
+    return response
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -69,19 +115,19 @@ def connect_to_db():
                 host=os.getenv("DB_HOST", "localhost"),
                 user=os.getenv("DB_USER", "root"),
                 password=os.getenv("DB_PASSWORD", "root"),
-                database=os.getenv("DB_NAME", "error_db"),
+                database=os.getenv("DB_NAME", "atlascopco_drawing_db"),
                 connect_timeout=5,
                 autocommit=False,
                 charset='utf8mb4',
                 init_command="SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'",
             )
-            print("✅ Database connected")
+            print("[SUCCESS] Database connected")
             return db
         except Exception as e:
-            print("⏳ Waiting for DB...", e)
+            print("[WAITING] Connecting to database...", e)
             time.sleep(3)
 
-    print("❌ Database connection failed after retries")
+    print("[ERROR] Database connection failed after retries")
     return None
 
 
@@ -109,14 +155,40 @@ model = joblib.load(MODEL_PATH)
 tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 
 # SMTP Email Configuration (Use your SMTP server details)
-EMAIL_SENDER = "Errorloggingportal@atlascopco.com"
-SMTP_SERVER = "smtp.onevirtualoffice.local"  
-SMTP_PORT = 25  
+# EMAIL_SENDER = "Errorloggingportal@atlascopco.com"
+# SMTP_SERVER = "smtp.onevirtualoffice.local"  
+# SMTP_PORT = 25  
 
-# EMAIL_SENDER = "atlascopcotestmail2025@gmail.com"
-# EMAIL_PASSWORD = "pwbd zgow smzm ywza"
-# SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
-# SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
+EMAIL_SENDER = "atlascopcotestmail2025@gmail.com"
+EMAIL_PASSWORD = "pwbd zgow smzm ywza"
+SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
+SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
+
+
+# ============================================================================
+# HELPER FUNCTIONS FOR SCHEMA MAPPING (NEW DB -> OLD API FORMAT)
+# ============================================================================
+
+def map_user_to_employee_response(user_dict):
+    """
+    Map users table row to old employees API format for backward compatibility.
+    Input: dict with keys from users table (id, emp_id, name, email, etc.)
+    Output: dict with old API format (Emp_ID, Emp_Name, EMP_Email, etc.)
+    """
+    return {
+        "emp_id": user_dict.get("emp_id", ""),
+        "emp_name": user_dict.get("name", ""),
+        "EMP_Email": user_dict.get("email", ""),
+        "emp_PC": user_dict.get("pc", ""),
+        "emp_division": user_dict.get("division", ""),
+        "emp_team": user_dict.get("team", "")
+    }
+
+def get_user_id_by_emp_id(cursor, emp_id):
+    """Get internal user ID from emp_id"""
+    cursor.execute("SELECT id FROM users WHERE emp_id = %s", (emp_id,))
+    row = cursor.fetchone()
+    return row[0] if row else None
 
 
 def extract_annotations(pdf_path):
@@ -196,26 +268,22 @@ def submit_data():
         # normalize / parse
         try:
             design_no_raw = str(form_data["designNo"]).strip()
-            drawing_id = f"DR_{design_no_raw}"
-            creator_id = str(form_data["creatorId"]).strip()
-            reviewerName = str(form_data["reviewerName"]).strip()
-            if not reviewerName.upper().startswith("EMP_"):
-                reviewerName = f"EMP_{reviewerName}"
+            drawing_no = f"DR_{design_no_raw}" if not design_no_raw.startswith("DR_") else design_no_raw
+            creator_emp_id = str(form_data["creatorId"]).strip()
+            reviewer_emp_id = str(form_data["reviewerName"]).strip()
+            if not reviewer_emp_id.upper().startswith("EMP_"):
+                reviewer_emp_id = f"EMP_{reviewer_emp_id}"
 
             revision_no_int = int(str(form_data["revisionNo"]).strip())
-            revision_no_txt = f"{revision_no_int:02d}"
 
             from datetime import datetime
             from pytz import timezone
 
             IST = timezone('Asia/Kolkata')
-
-            def get_current_ist_date():
-                return datetime.now(IST).date()
-            # Use this instead of datetime.today()
-            reviewed_date = get_current_ist_date()
-            drawing_Type = str(form_data["drawingType"]).strip()
+            reviewed_date = datetime.now(IST).date()
+            drawing_type = str(form_data["drawingType"]).strip()
             decision = (str(form_data.get("decision", "")).strip() or "approve").lower()
+            approved = (decision == "approve")
             division = str(form_data["division"]).strip()
             pc = str(form_data["pc"]).strip()
 
@@ -227,7 +295,7 @@ def submit_data():
 
         # PDF bytes
         pdf_bytes = None
-        pdf_filename = f"{drawing_id}-{revision_no_txt}.pdf"
+        pdf_filename = f"{drawing_no}-{revision_no_int:02d}.pdf"
         try:
             if payload.get("file_bytes_b64"):
                 pdf_bytes = base64.b64decode(payload["file_bytes_b64"])
@@ -239,238 +307,202 @@ def submit_data():
         except Exception as e:
             return dbg_fail("pdf-load", e, extra={"have_b64": bool(payload.get("file_bytes_b64")), "file_path": payload.get("file_path")}, code=400)
 
-        # -------- DB work --------
+        # -------- DB work with NEW SCHEMA --------
         try:
             cursor = g.db.cursor()
         except Exception as e:
             return dbg_fail("cursor", e)
 
-        # 0) ensure a row in drawings (⚠ if your drawings table has NOT NULL columns without defaults, this will fail)
+        # Get user IDs from emp_ids
         try:
-            cursor.execute("SELECT 1 FROM drawings WHERE drawing_ID = %s", (drawing_id,))
-            if not cursor.fetchone():
-                # If your schema requires more fields, add them explicitly here.
-                cursor.execute("INSERT INTO drawings (drawing_ID) VALUES (%s)", (drawing_id,))
-        # except pymysql.MySQLError as e:
-        #     return dbg_fail("drawings-upsert", e, extra={"drawing_id": drawing_id})
+            cursor.execute("SELECT id FROM users WHERE emp_id = %s", (creator_emp_id,))
+            creator_row = cursor.fetchone()
+            if not creator_row:
+                return dbg_fail("creator-lookup", "Creator not found", extra={"creator_emp_id": creator_emp_id}, code=404)
+            creator_id = creator_row[0]
+
+            cursor.execute("SELECT id FROM users WHERE emp_id = %s", (reviewer_emp_id,))
+            reviewer_row = cursor.fetchone()
+            if not reviewer_row:
+                return dbg_fail("reviewer-lookup", "Reviewer not found", extra={"reviewer_emp_id": reviewer_emp_id}, code=404)
+            reviewer_id = reviewer_row[0]
         except Exception as e:
-          import traceback
-          print("ERROR TYPE:", type(e))
-          print("ERROR ARGS:", e.args)
-          traceback.print_exc()
-          raise
+            return dbg_fail("user-lookup", e)
 
-        # 1) ensure creator table exists with correct columns
+        # 1) Insert or get drawing
         try:
-            cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS `{creator_id}` (
-                    Drawing_ID VARCHAR(255) NOT NULL,
-                    Revision_num INT NOT NULL,
-                    Error_codes VARCHAR(255),
-                    Reviewer_EMP_ID VARCHAR(255),
-                    Review_Date DATE,
-                    Decision VARCHAR(255),
-                    PRIMARY KEY (Drawing_ID, Revision_num)
-                )
-            """)
-        except pymysql.MySQLError as e:
-            return dbg_fail("creator-table-create", e, extra={"creator_id": creator_id})
-
-        # 2) prevent dup for (Drawing_ID, Revision_num) in creator table
-        try:
-            cursor.execute(f"SELECT 1 FROM `{creator_id}` WHERE Drawing_ID = %s AND Revision_num = %s",
-                           (drawing_id, revision_no_int))
-            if cursor.fetchone():
-                return dbg_fail("creator-dup-check", "Duplicate Revision Number for the same Drawing ID",
-                                extra={"creator_id": creator_id, "drawing_id": drawing_id, "rev": revision_no_int}, code=409)
-        except pymysql.MySQLError as e:
-            return dbg_fail("creator-dup-query", e, extra={"creator_id": creator_id})
-
-        # 3) insert into creator table
-        try:
-           cursor.execute(
-            f"""
-            INSERT INTO `{creator_id}`
-                (Drawing_ID, Revision_num, Error_codes, Reviewer_EMP_ID, Review_Date, Decision)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """,
-            (
-                drawing_id,
-                revision_no_int,
-                ",".join(error_codes) if error_codes else "",
-                reviewerName,
-                reviewed_date,
-                decision,
-            )
-        )
-
-        except pymysql.MySQLError as e:
-            return dbg_fail("creator-insert", e, extra={"creator_id": creator_id})
-
-        # 4) ensure drawing table exists with correct columns (incl. MEDIUMBLOB)
-        try:
-            cursor.execute(f"SHOW TABLES LIKE %s", (drawing_id,))
-            if not cursor.fetchone():
-                cursor.execute(f"""
-                    CREATE TABLE IF NOT EXISTS `{drawing_id}` (
-                        Revision_num INT PRIMARY KEY,
-                        Reviewer_EMP_ID VARCHAR(255),
-                        Creator_EMP_ID VARCHAR(255),
-                        Error_codes VARCHAR(255),
-                        Date DATE,
-                        Drawing_type VARCHAR(255),
-                        Decision VARCHAR(255),
-                        Drawing_PDF MEDIUMBLOB
-                    )
-                """)
-        except pymysql.MySQLError as e:
-            return dbg_fail("drawing-table-create", e, extra={"drawing_id": drawing_id})
-
-        # 5) insert into drawing table
-        try:
-            cursor.execute(
-                f"""
-                INSERT INTO `{drawing_id}`
-                    (Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Error_codes, Date, Drawing_type, Decision, Drawing_PDF)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    revision_no_int,
-                    reviewerName,
-                    creator_id,
-                    ",".join(error_codes) if error_codes else "",
-                    reviewed_date,
-                    drawing_Type,
-                    decision,
-                    pdf_bytes  # may be None → NULL
-                )
-            )
-        except pymysql.MySQLError as e:
-            return dbg_fail("drawing-insert", e, extra={"drawing_id": drawing_id, "rev": revision_no_int})
-
-        # 6) error aggregation table
-        try:
-            reviewed_datetime = datetime.strptime(str(form_data["reviewedDate"]).strip(), "%Y-%m-%d")
-            month_year = reviewed_datetime.strftime("%m_%Y")
-            error_table = f"EC_{month_year}"
-
-            cursor.execute("SHOW TABLES LIKE %s", (error_table,))
-            if not cursor.fetchone():
-                cols = [f'P{i} INT DEFAULT 0' for i in list(range(1, 21)) + [22, 23, 24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 46, 47, 50, 51, 57, 58, 59, 42, 43, 44, 48, 49, 70]]
-                cursor.execute(f"""
-                    CREATE TABLE IF NOT EXISTS `{error_table}` (
-                        Division VARCHAR(50) NOT NULL,
-                        PC VARCHAR(50) NOT NULL,
-                        {', '.join(cols)},
-                        Approved_Drawings INT DEFAULT 0,
-                        Rejected_Drawings INT DEFAULT 0,
-                        PRIMARY KEY (Division, PC)
-                    )
-                """)
-                # seed pairs (shortened for brevity — keep your full list)
-                division_pc_pairs = [
-                    ("IAT", ["BQR", "API", "WUX", "COX", "PNE", "FRJ", "UTY", "TRD", "ITJ", "ITR"]),
-                    ("OFA", ["API", "WUX", "COX", "PNE", "UTY", "TRD", "ITJ", "PNB", "Crepelle", "UTF", "APF", "OFA STD"]),
-                    ("CTS", ["APC"]),
-                    ("VIN", ["Edwards India (IPG)", "UWH", "PNE", "ESF", "UVC", "WUX", "BQR"]),
-                ]
-                for div, pcs in division_pc_pairs:
-                    for pc_name in pcs:
-                        cursor.execute(f"INSERT IGNORE INTO `{error_table}` (Division, PC) VALUES (%s, %s)", (div, pc_name))
-
-            cursor.execute(f"SELECT 1 FROM `{error_table}` WHERE Division=%s AND PC=%s", (division, pc))
-            if not cursor.fetchone():
-                cursor.execute(f"INSERT INTO `{error_table}` (Division, PC) VALUES (%s, %s)", (division, pc))
-
-            if error_codes and error_codes != ["No errors detected"]:
-                for code in error_codes:
-                    cursor.execute(
-                        f"UPDATE `{error_table}` SET `{code}` = `{code}` + 1 WHERE Division=%s AND PC=%s",
-                        (division, pc)
-                    )
-
-            if decision == "reject":
-                cursor.execute(
-                    f"UPDATE `{error_table}` SET Rejected_Drawings = Rejected_Drawings + 1 WHERE Division=%s AND PC=%s",
-                    (division, pc)
-                )
+            cursor.execute("SELECT id FROM drawings WHERE drawing_no = %s", (drawing_no,))
+            drawing_row = cursor.fetchone()
+            
+            if not drawing_row:
+                # Insert new drawing
+                cursor.execute("""
+                    INSERT INTO drawings (drawing_no, creator_id, drawing_type, status)
+                    VALUES (%s, %s, %s, %s)
+                """, (drawing_no, creator_id, drawing_type, 'under_review'))
+                drawing_id = cursor.lastrowid
             else:
-                cursor.execute(
-                    f"UPDATE `{error_table}` SET Approved_Drawings = Approved_Drawings + 1 WHERE Division=%s AND PC=%s",
-                    (division, pc)
-                )
-        except pymysql.MySQLError as e:
-            return dbg_fail("ec-table-update", e, extra={"error_table": error_table, "division": division, "pc": pc})
-
-        # 7) email on reject (kept)
-        try:
-            cursor.execute("SELECT EMP_email, EMP_Name FROM Employees WHERE emp_id = %s", (creator_id,))
-            row = cursor.fetchone()
-            if not row:
-                g.db.rollback()
-                return dbg_fail("creator-lookup", "Creator not found", extra={"creator_id": creator_id}, code=404)
-
-            creator_email, creator_name = row[0], row[1]
-
-            if decision == "reject":
-                try:
-                    send_email(
-                        to_email=creator_email,
-                        drawing_id=drawing_id,
-                        revision_no=revision_no_int,
-                        reviewer_name=reviewerName,
-                        reviewed_date=reviewed_date,
-                        error_codes=error_codes,
-                        extracted_comments=extracted_comments,
-                        decision=decision,
-                        drawing_Type=drawing_Type,
-                        creator_name=creator_name,
-                        pdf_bytes=pdf_bytes,
-                        pdf_filename=pdf_filename
-                    )
-                except TypeError:
-                    # legacy signature fallback
-                    send_email(
-                        to_email=creator_email,
-                        drawing_id=drawing_id,
-                        revision_no=revision_no_int,
-                        reviewer_name=reviewerName,
-                        reviewed_date=reviewed_date,
-                        error_codes=error_codes,
-                        extracted_comments=extracted_comments,
-                        decision=decision,
-                        file_path=(payload.get("file_path") or ""),
-                        drawing_Type=drawing_Type,
-                        creator_name=creator_name
-                    )
+                drawing_id = drawing_row[0]
+                # Update drawing type/creator if needed
+                cursor.execute("UPDATE drawings SET drawing_type = %s, creator_id = %s WHERE id = %s", (drawing_type, creator_id, drawing_id))
         except Exception as e:
-            # Don’t fail the whole transaction because of email
-            print(" email-send failed:", e)
+            return dbg_fail("drawing-upsert", e, extra={"drawing_no": drawing_no})
 
+        # 2) Check for duplicate revision - UPDATE if exists
+        revision_id = None
+        try:
+            cursor.execute("""
+                SELECT id FROM drawing_revisions 
+                WHERE drawing_id = %s AND revision_no = %s
+            """, (drawing_id, revision_no_int))
+            rev_row = cursor.fetchone()
+            
+            if rev_row:
+                # Update existing revision
+                revision_id = rev_row[0]
+                cursor.execute("""
+                    UPDATE drawing_revisions
+                       SET reviewer_id = %s,
+                           reviewed_date = %s,
+                           approved = %s,
+                           review_comments = %s
+                     WHERE id = %s
+                """, (reviewer_id, reviewed_date, approved, 
+                      json.dumps(extracted_comments) if extracted_comments else None, 
+                      revision_id))
+            else:
+                # Insert new revision
+                cursor.execute("""
+                    INSERT INTO drawing_revisions 
+                    (drawing_id, revision_no, reviewer_id, reviewed_date, approved, review_comments)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (drawing_id, revision_no_int, reviewer_id, reviewed_date, approved, 
+                      json.dumps(extracted_comments) if extracted_comments else None))
+                revision_id = cursor.lastrowid
+        except Exception as e:
+             return dbg_fail("revision-upsert", e, extra={"drawing_id": drawing_id, "rev": revision_no_int})
+
+        # 3) Insert or Update PDF file
+        if pdf_bytes:
+            try:
+                # Check if file exists for this revision
+                cursor.execute("SELECT id FROM drawing_files WHERE revision_id=%s", (revision_id,))
+                if cursor.fetchone():
+                    # Update
+                    cursor.execute("""
+                        UPDATE drawing_files 
+                           SET file_data = %s, uploaded_by = %s, uploaded_at = NOW()
+                         WHERE revision_id = %s
+                    """, (pdf_bytes, creator_id, revision_id))
+                else:
+                    # Insert
+                    cursor.execute("""
+                        INSERT INTO drawing_files 
+                        (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
+                        VALUES (%s, %s, %s, %s, NOW())
+                    """, (drawing_id, revision_id, pdf_bytes, creator_id))
+            except Exception as e:
+                return dbg_fail("file-upsert", e, extra={"drawing_id": drawing_id, "revision_id": revision_id})
+
+        # 4) Update error codes (Replace all)
+        # First delete existing for this revision
+        try:
+            cursor.execute("DELETE FROM revision_error_codes WHERE revision_id=%s", (revision_id,))
+        except Exception as e:
+            return dbg_fail("error-codes-clear", e)
+
+        if error_codes and error_codes != ["No errors detected"]:
+            # Deduplicate error codes to prevent 1062 Duplicate entry
+            error_codes = list(set(error_codes))
+            try:
+                for code in error_codes:
+                    # Get or create error code
+                    cursor.execute("SELECT id FROM error_codes WHERE code = %s", (code,))
+                    error_row = cursor.fetchone()
+                    
+                    if not error_row:
+                        cursor.execute("INSERT INTO error_codes (code) VALUES (%s)", (code,))
+                        error_code_id = cursor.lastrowid
+                    else:
+                        error_code_id = error_row[0]
+                    
+                    # Link error code to revision
+                    cursor.execute("""
+                        INSERT INTO revision_error_codes (revision_id, error_code_id)
+                        VALUES (%s, %s)
+                    """, (revision_id, error_code_id))
+            except Exception as e:
+                return dbg_fail("error-codes-insert", e, extra={"revision_id": revision_id})
+
+        # 5) Update drawing status
+        try:
+            new_status = 'approved' if approved else 'rejected'
+            cursor.execute("""
+                UPDATE drawings SET status = %s WHERE id = %s
+            """, (new_status, drawing_id))
+        except Exception as e:
+            return dbg_fail("drawing-status-update", e)
+
+        # 6) Send email on reject (only if rejected)
+        if not approved:
+            try:
+                cursor.execute("SELECT email, name FROM users WHERE id = %s", (creator_id,))
+                creator_row = cursor.fetchone()
+                if creator_row:
+                    creator_email, creator_name = creator_row[0], creator_row[1]
+                    try:
+                        send_email(
+                            to_email=creator_email,
+                            drawing_id=drawing_no,
+                            revision_no=revision_no_int,
+                            reviewer_name=reviewer_emp_id,
+                            reviewed_date=reviewed_date,
+                            error_codes=error_codes,
+                            extracted_comments=extracted_comments,
+                            decision=decision,
+                            drawing_Type=drawing_type,
+                            creator_name=creator_name,
+                            pdf_bytes=pdf_bytes,
+                            pdf_filename=pdf_filename,
+                            file_path=None, # We have bytes, not path
+                            user_comments=form_data.get('comments')
+                        )
+                    except TypeError:
+                         # Fallback if send_email signature is weird, but we matched the definition earlier
+                         pass
+            except Exception as e:
+                # Don't fail the whole transaction because of email
+                print("⚠ email-send failed:", e)
+
+        # Commit all changes
         try:
             g.db.commit()
-        except pymysql.MySQLError as e:
+        except Exception as e:
             return dbg_fail("commit", e)
 
-        return jsonify({"ok": True, "message": "Data saved successfully", "drawing_id": drawing_id, "revision": revision_no_int})
+        return jsonify({"ok": True, "message": "Data saved successfully", "drawing_id": drawing_no, "revision": revision_no_int})
 
     except Exception as e:
-        print(" Uncaught in /submit:", e)
+        print("❌ Uncaught in /submit:", e)
+        import traceback
         traceback.print_exc()
         return dbg_fail("uncaught", e, code=500)
 
     
     
-def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, error_codes, extracted_comments, decision, file_path, drawing_Type, creator_name):
+def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, error_codes, extracted_comments, decision, file_path, drawing_Type, creator_name, user_comments=None):
     try:
         # Set up the SMTP server
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         # Email content
         subject = f"Drawing Review Notification :- {drawing_id} (Revision number :- {revision_no})"
         comments_text = '\n \t\t\t\t\t\t'.join(extracted_comments) if extracted_comments else 'No Comments'
+        
+        # Format user comments
+        user_comments_text = f"Additional Comments: {user_comments}" if user_comments else ""
 
         body = f"""
         Dear {to_email},
@@ -485,11 +517,12 @@ def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, 
         
         Errors: {', '.join(error_codes) if error_codes else 'None'}
         Extracted Comments: {comments_text}
+        {user_comments_text}
         Decision: {decision.upper()}
 
         The reviewed document is attached for your reference.
 
-        Portal Link:- https://drawlogai.atlascopco.group/
+        Portal Link:- https://drawlogai.atlascopco.group
 
         Best regards,  
         Team Error Logging 
@@ -531,13 +564,13 @@ def get_employees():
     
     cursor = g.db.cursor()
 
-    # Fetch both emp_id and emp_name
-    cursor.execute("SELECT emp_id, emp_name FROM employees")
+    # Query users table instead of employees table
+    cursor.execute("SELECT emp_id, name FROM users WHERE is_active = TRUE AND role != 'admin'")
     employees = cursor.fetchall()
 
     cursor.close()
 
-    # Format response with both fields
+    # Format response with both fields (using old naming convention)
     employees_list = [
         {"emp_id": emp[0], "emp_name": emp[1]} for emp in employees
     ]
@@ -554,7 +587,8 @@ def get_employee_details(emp_id):
         return jsonify({"error": "Database connection not available"}), 500
         
     cursor = g.db.cursor()
-    cursor.execute("SELECT emp_PC, emp_division, emp_team, emp_email FROM employees WHERE emp_id = %s", (emp_id,))
+    # Query users table with field mapping
+    cursor.execute("SELECT pc, division, team, email FROM users WHERE emp_id = %s", (emp_id,))
     employee = cursor.fetchone()
     cursor.close()
 
@@ -563,7 +597,7 @@ def get_employee_details(emp_id):
             "emp_PC": employee[0],
             "emp_division": employee[1],
             "emp_team": employee[2],
-            "emp_email" : employee[3]
+            "emp_email": employee[3]
         })
     else:
         return jsonify({})
@@ -591,9 +625,10 @@ def admin_login():
 
         with g.db.cursor() as cursor:
             cursor.execute("""
-                SELECT username, password, access_type
-                  FROM login
-                 WHERE username = %s
+                SELECT emp_id, password_hash, role
+                  FROM users
+                 WHERE emp_id = %s
+                   AND is_active = TRUE
                  LIMIT 1
             """, (username,))
             row = cursor.fetchone()
@@ -601,7 +636,7 @@ def admin_login():
         if not row:
             return jsonify({"success": False, "message": "Invalid Credentials"}), 401
 
-        db_username, db_password_hash, access_type = row
+        db_username, db_password_hash, role = row
 
         import bcrypt
         ok = False
@@ -612,6 +647,9 @@ def admin_login():
 
         if not ok:
             return jsonify({"success": False, "message": "Invalid Credentials"}), 401
+
+        # Map role to access_type for backward compatibility
+        access_type = "HR" if role == "admin" else "Employee"
 
         return jsonify({
             "success": True,
@@ -634,8 +672,8 @@ def send_otp_email(to_email: str, emp_id: str, otp_plain: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Your OTP for Password Reset (valid for 5 minutes)"
         body = f"""Dear User ({emp_id}),
@@ -648,11 +686,13 @@ This code will expire in 5 minutes.
 
 If you did not request this, please ignore this email.
 
-This is a system generated email. Do not reply to this email.
+        This is a system generated email. Do not reply to this email.
 
-Regards,
-Atlas Copco AI Error Logging System
-"""
+        Portal Link:- https://drawlogai.atlascopco.group
+
+        Regards,
+        Atlas Copco AI Error Logging System
+        """
 
         msg = MIMEMultipart()
         msg["From"] = EMAIL_SENDER
@@ -682,8 +722,8 @@ def forgot_password_initiate():
     """
     Input JSON: { "emp_id": "EMP_123", "email": "user@company.com" }
     Flow:
-    - Validate emp_id exists in login
-    - Cross-check email in employees (case-insensitive)
+    - Validate emp_id exists in users
+    - Cross-check email in users (case-insensitive)
     - Generate 4-digit OTP, bcrypt-hash it
     - UPSERT into login_otp with expires_at = NOW() + 5 minutes (IST)
     - Email the OTP
@@ -702,17 +742,17 @@ def forgot_password_initiate():
 
         cleanup_otps(g.db)
 
-        # 1) Check user exists in login
+        # 1) Check user exists in users table and get user_id
         with g.db.cursor() as c:
-            c.execute("SELECT 1 FROM login WHERE username=%s LIMIT 1", (emp_id,))
-            if not c.fetchone():
+            c.execute("SELECT id, email FROM users WHERE emp_id=%s AND is_active=TRUE LIMIT 1", (emp_id,))
+            user_row = c.fetchone()
+            if not user_row:
                 return jsonify({"success": False, "message": "Invalid Emp_ID"}), 404
+            
+            user_id, db_email = user_row[0], user_row[1]
 
-        # 2) Verify email matches employees table
-        with conn.cursor() as c:
-            c.execute("SELECT EMP_Email FROM employees WHERE Emp_ID=%s LIMIT 1", (emp_id,))
-            row = c.fetchone()
-        if not row or not row[0] or row[0].strip().lower() != email.lower():
+        # 2) Verify email matches
+        if not db_email or db_email.strip().lower() != email.lower():
             return jsonify({"success": False, "message": "Email does not match our records"}), 400
 
         # 3) Generate 4-digit OTP
@@ -722,16 +762,16 @@ def forgot_password_initiate():
         # 4) Hash OTP
         otp_hash = bcrypt.hashpw(otp_plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-        # 5) Upsert OTP row, expire in 5 minutes (use MySQL NOW() in IST)
+        # 5) Upsert OTP row with user_id FK, expire in 5 minutes (use MySQL NOW() in IST)
         with g.db.cursor() as c:
             c.execute("""
-                INSERT INTO login_otp (username, purpose, otp, expires_at, consumed)
-                VALUES (%s, 'password_reset', %s, DATE_ADD(NOW(), INTERVAL 5 MINUTE), 0)
+                INSERT INTO login_otp (user_id, otp_hash, expires_at, consumed)
+                VALUES (%s, %s, DATE_ADD(NOW(), INTERVAL 5 MINUTE), 0)
                 ON DUPLICATE KEY UPDATE
-                    otp = VALUES(otp),
+                    otp_hash = VALUES(otp_hash),
                     expires_at = VALUES(expires_at),
                     consumed = 0
-            """, (emp_id, otp_hash))
+            """, (user_id, otp_hash))
         g.db.commit()
 
         # 6) Email the OTP
@@ -770,14 +810,15 @@ def forgot_password_verify():
 
         cleanup_otps(g.db)
 
-        # Fetch active OTP row (not expired)
+        # Fetch active OTP row (not expired) using user_id FK
         with g.db.cursor() as c:
             c.execute("""
-                SELECT otp, consumed
-                  FROM login_otp
-                 WHERE username=%s
-                   AND purpose='password_reset'
-                   AND expires_at > NOW()
+                SELECT lo.otp_hash, lo.consumed
+                  FROM login_otp lo
+                  JOIN users u ON lo.user_id = u.id
+                 WHERE u.emp_id=%s
+                   AND u.is_active=TRUE
+                   AND lo.expires_at > NOW()
                  LIMIT 1
             """, (emp_id,))
             row = c.fetchone()
@@ -785,7 +826,11 @@ def forgot_password_verify():
         if not row:
             # Optional cleanup of expired rows for this user
             with g.db.cursor() as c2:
-                c2.execute("DELETE FROM login_otp WHERE username=%s AND purpose='password_reset' AND expires_at <= NOW()", (emp_id,))
+                c2.execute("""
+                    DELETE lo FROM login_otp lo
+                    JOIN users u ON lo.user_id = u.id
+                    WHERE u.emp_id=%s
+                """, (emp_id,))
                 g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
 
@@ -840,24 +885,29 @@ def forgot_password_reset():
 
         cleanup_otps(g.db)
 
-        # Fetch active OTP row (not expired)
+        # Fetch active OTP row (not expired) using user_id FK
         with g.db.cursor() as c:
             c.execute("""
-                SELECT otp, consumed
-                  FROM login_otp
-                 WHERE username=%s
-                   AND purpose='password_reset'
-                   AND expires_at > NOW()
+                SELECT lo.otp_hash, lo.consumed, u.id, u.password_hash
+                  FROM login_otp lo
+                  JOIN users u ON lo.user_id = u.id
+                 WHERE u.emp_id=%s
+                   AND u.is_active=TRUE
+                   AND lo.expires_at > NOW()
                  LIMIT 1
             """, (emp_id,))
             row = c.fetchone()
         if not row:
             with g.db.cursor() as c2:
-                c2.execute("DELETE FROM login_otp WHERE username=%s AND purpose='password_reset' AND expires_at <= NOW()", (emp_id,))
+                c2.execute("""
+                    DELETE lo FROM login_otp lo
+                    JOIN users u ON lo.user_id = u.id
+                    WHERE u.emp_id=%s
+                """, (emp_id,))
                 g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
 
-        otp_hash, consumed = row
+        otp_hash, consumed, user_id, current_hash = row
         if consumed:
             return jsonify({"success": False, "message": "OTP already used. Please request a new one."}), 400
 
@@ -866,30 +916,23 @@ def forgot_password_reset():
             return jsonify({"success": False, "message": "Invalid OTP"}), 401
 
         # Prevent reusing previous password
-        with conn.cursor() as c:
-            c.execute("SELECT password FROM login WHERE username=%s LIMIT 1", (emp_id,))
-            row2 = c.fetchone()
-        if not row2:
-            return jsonify({"success": False, "message": "Account not found"}), 404
-
-        current_hash = row2[0]
         try:
-            if bcrypt.checkpw(new_password.encode('utf-8'), current_hash.encode('utf-8')):
+            if current_hash and bcrypt.checkpw(new_password.encode('utf-8'), current_hash.encode('utf-8')):
                 return jsonify({"success": False, "message": "New password cannot be the same as the previous password."}), 400
         except Exception:
             pass
 
         # Get user's email for notification
-        with conn.cursor() as c:
-            c.execute("SELECT EMP_Email FROM employees WHERE Emp_ID=%s LIMIT 1", (emp_id,))
+        with g.db.cursor() as c:
+            c.execute("SELECT email FROM users WHERE id=%s LIMIT 1", (user_id,))
             row_email = c.fetchone()
         user_email = row_email[0] if row_email else None
 
-        # Update password in login and delete OTP
+        # Update password in users table and delete OTP
         new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         with g.db.cursor() as c:
-            c.execute("UPDATE login SET password=%s WHERE username=%s", (new_hash, emp_id))
-            c.execute("DELETE FROM login_otp WHERE username=%s AND purpose='password_reset'", (emp_id,))
+            c.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, user_id))
+            c.execute("DELETE FROM login_otp WHERE user_id=%s", (user_id,))
         g.db.commit()
 
         # Send notification (non-blocking for success path)
@@ -914,8 +957,8 @@ def send_password_change_notification(to_email: str, emp_id: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Your Atlas Copco AI Error Logging Portal account password was changed"
         body = f"""Dear User ({emp_id}),
@@ -926,6 +969,7 @@ If you did NOT initiate this change, please contact your HR department immediate
 
 This is a system generated email. Do not reply to this email.
 
+Portal Link:- https://drawlogai.atlascopco.group
 
 Regards,
 Atlas Copco AI Error Logging System
@@ -976,14 +1020,14 @@ def change_password():
         if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
-        # Fetch current hash
+        # Fetch current hash from users table
         with g.db.cursor() as c:
-            c.execute("SELECT password FROM login WHERE username=%s LIMIT 1", (emp_id,))
+            c.execute("SELECT id, password_hash FROM users WHERE emp_id=%s AND is_active=TRUE LIMIT 1", (emp_id,))
             row = c.fetchone()
         if not row:
             return jsonify({"success": False, "message": "Account not found"}), 404
 
-        current_hash = row[0]
+        user_id, current_hash = row
         # Verify current password
         if not bcrypt.checkpw(current_password.encode('utf-8'), current_hash.encode('utf-8')):
             return jsonify({"success": False, "message": "Current password is incorrect"}), 401
@@ -992,15 +1036,15 @@ def change_password():
         if bcrypt.checkpw(new_password.encode('utf-8'), current_hash.encode('utf-8')):
             return jsonify({"success": False, "message": "New password cannot be the same as the previous password."}), 400
 
-        # Update to new hash
+        # Update to new hash in users table
         new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         with g.db.cursor() as c:
-            c.execute("UPDATE login SET password=%s WHERE username=%s", (new_hash, emp_id))
+            c.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, user_id))
         g.db.commit()
 
-        # Email the user (if we can find the email)
+        # Email the user (get email from users table)
         with g.db.cursor() as c:
-            c.execute("SELECT EMP_Email FROM employees WHERE Emp_ID=%s LIMIT 1", (emp_id,))
+            c.execute("SELECT email FROM users WHERE id=%s LIMIT 1", (user_id,))
             row_email = c.fetchone()
         user_email = row_email[0] if row_email else None
         if user_email:
@@ -1017,8 +1061,8 @@ def change_password():
 
 
 # Change password ends
-    
-    
+
+
 # Employee page data handling code..........
 
 
@@ -1029,8 +1073,8 @@ def send_welcome_credentials_email(to_email: str, emp_id: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Welcome to Atlas Copco Error Logging"
         body = f"""Dear User,
@@ -1045,6 +1089,8 @@ Please log in to the portal and change your password immediately after logging i
 If you did not expect this account, please contact your administrator.
 
 This is a system generated email. Do not reply to this email.
+
+Portal Link:- https://drawlogai.atlascopco.group
 
 Regards,
 Atlas Copco AI Error Logging System
@@ -1095,47 +1141,25 @@ def add_employee():
             return jsonify({"success": False, "message": "DB connection failed"}), 500
         cursor = g.db.cursor()
 
-        table_name = f"{emp_id}"
-
-        # Check if employee already exists
-        cursor.execute("SELECT 1 FROM employees WHERE Emp_ID = %s", (table_name,))
+        # Check if employee already exists in users table
+        cursor.execute("SELECT 1 FROM users WHERE emp_id = %s", (emp_id,))
         if cursor.fetchone():
             return jsonify({"success": False, "message": "Employee ID already exists"}), 4003
 
-        # Insert employee row
-        cursor.execute("""
-            INSERT INTO employees (Emp_ID, Emp_Name, EMP_Email, Emp_Division, Emp_PC, Emp_Team)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (table_name, emp_name, emp_email, emp_division, emp_pc, emp_team))
-
-        # Create per-employee table
-        cursor.execute(f"""
-        CREATE TABLE IF NOT EXISTS `{table_name}` (
-            Drawing_ID VARCHAR(255),
-            Revision_num INT,
-            Error_codes VARCHAR(255),
-            Reviewer_EMP_ID VARCHAR(255),
-            Review_Date DATE,
-            Decision VARCHAR(10),
-            PRIMARY KEY (Drawing_ID, Revision_num)
-        );
-        """)
-
-        # Create/refresh login credentials: username=EMP_<id>, password=hash(email), access_type='Employee'
+        # Create password hash from email
         password_hash = bcrypt.hashpw(emp_email.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        # Insert into users table (new schema)
         cursor.execute("""
-            INSERT INTO login (username, password, access_type)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                password = VALUES(password),
-                access_type = VALUES(access_type)
-        """, (table_name, password_hash, 'Employee'))
+            INSERT INTO users (emp_id, name, email, password_hash, role, division, pc, team, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (emp_id, emp_name, emp_email, password_hash, 'user', emp_division, emp_pc, emp_team, True))
 
         g.db.commit()  # ✅ commit DB changes before emailing
 
         # Send welcome email with username (EMP_<id>) and instructions
         try:
-            send_welcome_credentials_email(emp_email, table_name)
+            send_welcome_credentials_email(emp_email, emp_id)
         except Exception as mail_err:
             # Don't fail the API if email sending fails; just log it
             print("Welcome email error:", mail_err)
@@ -1143,7 +1167,7 @@ def add_employee():
         return jsonify({"success": True, "message": "Employee added successfully"}), 201
 
     except Exception as e:
-        if hasattr(g, 'db') and g.db: 
+        if hasattr(g, 'db') and g.db:
             try:
                 g.db.rollback()
             except:
@@ -1162,7 +1186,7 @@ def health():
 @app.route('/edit-employee', methods=['POST','PUT'])
 def edit_employee():
     data = request.json
-    
+
     emp_id = data.get("Emp_ID")
     emp_name = data.get("Emp_Name")
     emp_email = data.get("EMP_Email")
@@ -1170,28 +1194,28 @@ def edit_employee():
     emp_pc = data.get("Emp_PC")
     emp_team = data.get("Emp_Team")
     print("Received data:", data)
-    
+
     if not all([emp_id, emp_name, emp_email, emp_division, emp_pc, emp_team]):
         return jsonify({"error": "All fields are required!"}), 400
-    
+
     try:
         # Use g.db instead of creating a new connection
         if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
         cursor = g.db.cursor()
-        
-        # Ensure Emp_ID is not changed
-        cursor.execute("SELECT * FROM employees WHERE Emp_ID = %s", (emp_id,))
+
+        # Ensure Emp_ID exists in users table
+        cursor.execute("SELECT * FROM users WHERE emp_id = %s", (emp_id,))
         if cursor.rowcount == 0:
             return jsonify({"error": "Invalid Employee ID!"}), 400
-        
-        # Update employee details
+
+        # Update employee details in users table
         cursor.execute("""
-            UPDATE employees
-            SET Emp_Name=%s, EMP_Email=%s, Emp_Division=%s, Emp_PC=%s, Emp_Team=%s
-            WHERE Emp_ID=%s
+            UPDATE users
+            SET name=%s, email=%s, division=%s, pc=%s, team=%s
+            WHERE emp_id=%s
         """, (emp_name, emp_email, emp_division, emp_pc, emp_team, emp_id))
-        
+
         g.db.commit()
         return jsonify({"success": "Employee details updated successfully!"})
     except Exception as e:
@@ -1205,8 +1229,7 @@ def edit_employee():
 def delete_employee(emp_id):
     cursor = None
     try:
-        # Basic whitelist for the per-employee table identifier
-        # (your Emp_IDs look like EMP_123 etc.)
+        # Basic whitelist for the employee identifier
         if not re.fullmatch(r'[A-Za-z0-9_]+', emp_id):
             return jsonify({"error": "Invalid employee id"}), 400
 
@@ -1215,18 +1238,17 @@ def delete_employee(emp_id):
             return jsonify({"success": False, "message": "DB connection failed"}), 500
         cursor = g.db.cursor()
 
-        # 1) Clean up auth artifacts first
-        cursor.execute("DELETE FROM login_otp WHERE username = %s", (emp_id,))
-        cursor.execute("DELETE FROM login WHERE username = %s", (emp_id,))
+        # 1) Clean up OTP records
+        cursor.execute("DELETE FROM login_otp WHERE user_id = (SELECT id FROM users WHERE emp_id = %s)", (emp_id,))
 
-        # 2) Drop the per-employee table
-        cursor.execute(f"DROP TABLE IF EXISTS `{emp_id}`")
+        # 2) Soft delete user (set is_active = FALSE) instead of hard delete
+        cursor.execute("UPDATE users SET is_active = FALSE WHERE emp_id = %s", (emp_id,))
 
-        # 3) Remove from employees
-        cursor.execute("DELETE FROM employees WHERE Emp_ID = %s", (emp_id,))
+        if cursor.rowcount == 0:
+            return jsonify({"error": "Employee not found"}), 404
 
         g.db.commit()
-        return jsonify({"success": True, "message": "Employee, login, and related data deleted successfully!"}), 200
+        return jsonify({"success": True, "message": "Employee deleted successfully!"}), 200
 
     except Exception as e:
         if hasattr(g, 'db') and g.db:
@@ -1248,21 +1270,34 @@ def fetch_all_employees():
         # Use g.db instead of creating a new connection
         if not hasattr(g, 'db') or g.db is None:
             return jsonify({"error": "Database connection not available"}), 500
-        
+
         cursor = g.db.cursor(pymysql.cursors.DictCursor)
-        cursor.execute("SELECT * FROM employees")
+        # Query users table and map fields to match frontend expectations (capitalized names)
+        cursor.execute("""
+            SELECT emp_id as Emp_ID,
+                   name as Emp_Name,
+                   email as Emp_Email,
+                   division as Emp_Division,
+                   pc as Emp_PC,
+                   team as Emp_Team
+            FROM users WHERE is_active = TRUE
+        """)
         employees = cursor.fetchall()
         return jsonify(employees)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
-        
+
 # Employee page code end..............
 
 
 @app.route('/api/monthly-drawing-status', methods=['GET'])
 def monthly_drawing_status():
+    """
+    Returns monthly approved/rejected drawing counts.
+    Now queries drawing_revisions table instead of EC_MM_YYYY tables.
+    """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
@@ -1270,141 +1305,140 @@ def monthly_drawing_status():
     cursor = g.db.cursor()
     try:
         # Extract filters from request
-        division = request.args.get('division')
+        team = request.args.get('team')
         pc = request.args.get('pc')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
-        # Fetch all EC tables
-        cursor.execute("SHOW TABLES LIKE 'EC_%_%'")
-        tables = [table[0] for table in cursor.fetchall()]
+        # Build query to aggregate from drawing_revisions
+        query = """
+            SELECT
+                DATE_FORMAT(dr.reviewed_date, '%%Y-%%m-01') as month_start,
+                SUM(CASE WHEN dr.approved = TRUE THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN dr.approved = FALSE THEN 1 ELSE 0 END) as rejected
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u ON d.creator_id = u.id
+            WHERE dr.reviewed_date IS NOT NULL
+        """
 
-        table_date_map = {}
-        for table in tables:
-            try:
-                # Extract MM and YYYY from table name
-                parts = table.split('_')
-                month = int(parts[1])
-                year = int(parts[2])
-                table_dt = datetime(year, month, 1)
-                table_date_map[table] = table_dt
-            except:
-                continue  # Skip if format is incorrect
+        params = []
 
-        filtered_tables = []
+        # Add date filters
         if start_date and end_date:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-
-            for table, dt in table_date_map.items():
-                if start_dt <= dt <= end_dt:
-                    filtered_tables.append((table, dt))
+            query += " AND dr.reviewed_date >= %s AND dr.reviewed_date <= %s"
+            params.extend([start_date, end_date])
         else:
-            # Default to last 12 months including current month
-            current = datetime.now().replace(day=1)
-            last_12_months = [(current - timedelta(days=calendar.monthrange(current.year, current.month)[1]*i)).replace(day=1) for i in range(12)]
-            last_12_months_set = set(dt.strftime('%m-%Y') for dt in last_12_months)
+            # Default to last 12 months
+            query += " AND dr.reviewed_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)"
 
-            for table, dt in table_date_map.items():
-                if dt.strftime('%m-%Y') in last_12_months_set:
-                    filtered_tables.append((table, dt))
+        # Add team filter
+        if team:
+            query += " AND u.team = %s"
+            params.append(team)
 
-        # Sort tables by date ascending
-        filtered_tables.sort(key=lambda x: x[1])
+        # Add PC filter
+        if pc:
+            query += " AND u.pc LIKE %s"
+            params.append(f"%{pc}%")
 
+        query += " GROUP BY DATE_FORMAT(dr.reviewed_date, '%%Y-%%m-01') ORDER BY month_start"
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+
+        # Format results
         results = {}
-        for table, dt in filtered_tables:
-            query = f"SELECT COALESCE(SUM(Approved_Drawings), 0), COALESCE(SUM(Rejected_Drawings), 0) FROM {table}"
-            filters = []
-            if division:
-                filters.append(f"Division = '{division}'")
-            if pc:
-                filters.append(f"PC = '{pc}'")
-            if filters:
-                query += " WHERE " + " AND ".join(filters)
-
-            cursor.execute(query)
-            row = cursor.fetchone()
-            label = dt.strftime('%b-%Y')  # Format: Apr-2025
+        for row in rows:
+            month_start, approved, rejected = row
+            # Convert to datetime and format as "Apr-2025"
+            dt = datetime.strptime(month_start, '%Y-%m-%d')
+            label = dt.strftime('%b-%Y')
             results[label] = {
-                "approved": row[0] or 0,
-                "rejected": row[1] or 0
+                "approved": approved or 0,
+                "rejected": rejected or 0
             }
 
         return jsonify(results)
+    except Exception as e:
+        print(f"Error in monthly_drawing_status: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
-        
+
+
 # Bar chart code (reports page number 1)
 @app.route('/api/monthly-error-report', methods=['GET'])
 def monthly_error_report():
+    """
+    Returns monthly total error counts.
+    Now queries revision_error_codes table instead of EC_MM_YYYY tables.
+    """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     cursor = g.db.cursor()
     try:
-        selected_divisions = request.args.getlist('division')
+        selected_teams = request.args.getlist('team')
         selected_pcs = request.args.getlist('pc')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
-        cursor.execute("SHOW TABLES LIKE 'EC_%_%'")
-        tables = [row[0] for row in cursor.fetchall()]
-        results = []
+        # Build query to aggregate error counts by month
+        query = """
+            SELECT
+                DATE_FORMAT(dr.reviewed_date, '%%m-%%Y') as month,
+                COUNT(rec.error_code_id) as total_errors
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u ON d.creator_id = u.id
+            LEFT JOIN revision_error_codes rec ON dr.id = rec.revision_id
+            WHERE dr.reviewed_date IS NOT NULL
+        """
 
-        # Handle default: last 12 months including current
-        if not start_date or not end_date:
-            today = datetime.today().replace(day=1)
-            last_12_months = [(today - timedelta(days=30 * i)).strftime('%m-%Y') for i in range(12)]
-            valid_months = set(last_12_months)
+        params = []
+
+        # Add date filters
+        if start_date and end_date:
+            query += " AND dr.reviewed_date >= %s AND dr.reviewed_date <= %s"
+            params.extend([start_date, end_date])
         else:
-            start_fmt = datetime.strptime(start_date, '%Y-%m-%d')
-            end_fmt = datetime.strptime(end_date, '%Y-%m-%d')
-            valid_months = set()
-            while start_fmt <= end_fmt:
-                valid_months.add(start_fmt.strftime('%m-%Y'))
-                # Move to next month
-                start_fmt = (start_fmt.replace(day=28) + timedelta(days=4)).replace(day=1)
+            # Default to last 12 months
+            query += " AND dr.reviewed_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)"
 
-        for table in tables:
-            parts = table.split("_")
-            if len(parts) != 3:
-                continue
-            table_month_year = f"{parts[1]}-{parts[2]}"
-            if table_month_year not in valid_months:
-                continue
+        # Add team filter
+        if selected_teams:
+            placeholders = ','.join(['%s'] * len(selected_teams))
+            query += f" AND u.team IN ({placeholders})"
+            params.extend(selected_teams)
 
-            cursor.execute(f"SHOW COLUMNS FROM {table}")
-            columns = [row[0] for row in cursor.fetchall()]
-            error_columns = [col for col in columns if col.startswith('P')]
+        # Add PC filter
+        if selected_pcs:
+            placeholders = []
+            for _ in selected_pcs:
+                placeholders.append("u.pc LIKE %s")
+            query += " AND (" + " OR ".join(placeholders) + ")"
+            params.extend([f"%{p}%" for p in selected_pcs])
 
-            if not error_columns:
-                continue
+        query += " GROUP BY DATE_FORMAT(dr.reviewed_date, '%%m-%%Y') ORDER BY MIN(dr.reviewed_date)"
 
-            where_clause = ""
-            conditions = []
-            if selected_divisions:
-                conditions.append(f"division IN ({', '.join([repr(div) for div in selected_divisions])})")
-            if selected_pcs:
-                conditions.append(f"pc IN ({', '.join([repr(pc) for pc in selected_pcs])})")
-            if conditions:
-                where_clause = f"WHERE {' AND '.join(conditions)}"
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
 
-            query = f"SELECT SUM({'+'.join(error_columns)}) AS total_errors FROM {table} {where_clause}"
-            cursor.execute(query)
-            total_errors = cursor.fetchone()[0] or 0
-
-            results.append({"month": table_month_year, "total_errors": total_errors})
-
-        # Sort results by date (YYYY-MM)
-        def sort_key(entry):
-            return datetime.strptime(entry['month'], '%m-%Y')
-        results.sort(key=sort_key)
+        # Format results
+        results = []
+        for row in rows:
+            month, total_errors = row
+            results.append({
+                "month": month,
+                "total_errors": total_errors or 0
+            })
 
         return jsonify(results)
 
     except Exception as e:
+        print(f"Error in monthly_error_report: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
@@ -1414,71 +1448,73 @@ from datetime import datetime, timedelta
 
 @app.route('/api/trend-error-report', methods=['GET'])
 def trend_error_report():
+    """
+    Returns top 10 error codes by count.
+    Now queries revision_error_codes and error_codes tables instead of EC_MM_YYYY tables.
+    """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     cursor = g.db.cursor()
     try:
-        selected_divisions = request.args.getlist('division')
+        selected_teams = request.args.getlist('team')
         selected_pcs = request.args.getlist('pc')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
-        print(f"Filters - Divisions: {selected_divisions}, PCs: {selected_pcs}, Start Date: {start_date}, End Date: {end_date}")
+        print(f"Filters - Teams: {selected_teams}, PCs: {selected_pcs}, Start Date: {start_date}, End Date: {end_date}")
 
-        cursor.execute("SHOW TABLES LIKE 'EC_%_%'")
-        tables = [row[0] for row in cursor.fetchall()]
-        error_totals = {}
+        # Build query to aggregate error codes
+        query = """
+            SELECT
+                ec.code as error_code,
+                COUNT(rec.error_code_id) as count
+            FROM revision_error_codes rec
+            JOIN error_codes ec ON rec.error_code_id = ec.id
+            JOIN drawing_revisions dr ON rec.revision_id = dr.id
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u ON d.creator_id = u.id
+            WHERE dr.reviewed_date IS NOT NULL
+        """
 
-        # Create set of valid months based on filter or default to last 12 months
-        if not start_date or not end_date:
-            today = datetime.today().replace(day=1)
-            valid_months = set(
-                (today - timedelta(days=30 * i)).strftime('%m-%Y') for i in range(12)
-            )
+        params = []
+
+        # Add date filters
+        if start_date and end_date:
+            query += " AND dr.reviewed_date >= %s AND dr.reviewed_date <= %s"
+            params.extend([start_date, end_date])
         else:
-            start_fmt = datetime.strptime(start_date, '%Y-%m-%d')
-            end_fmt = datetime.strptime(end_date, '%Y-%m-%d')
-            valid_months = set()
-            while start_fmt <= end_fmt:
-                valid_months.add(start_fmt.strftime('%m-%Y'))
-                start_fmt = (start_fmt.replace(day=28) + timedelta(days=4)).replace(day=1)
+            # Default to last 12 months
+            query += " AND dr.reviewed_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)"
 
-        for table in tables:
-            parts = table.split("_")
-            if len(parts) != 3:
-                continue
-            table_month_year = f"{parts[1]}-{parts[2]}"
-            if table_month_year not in valid_months:
-                continue
+        # Add team filter
+        if selected_teams:
+            placeholders = ','.join(['%s'] * len(selected_teams))
+            query += f" AND u.team IN ({placeholders})"
+            params.extend(selected_teams)
 
-            cursor.execute(f"SHOW COLUMNS FROM {table}")
-            columns = [row[0] for row in cursor.fetchall()]
-            error_columns = [col for col in columns if col.startswith('P')]
+        # Add PC filter
+        if selected_pcs:
+            placeholders = []
+            for _ in selected_pcs:
+                placeholders.append("u.pc LIKE %s")
+            query += " AND (" + " OR ".join(placeholders) + ")"
+            params.extend([f"%{p}%" for p in selected_pcs])
 
-            if not error_columns:
-                continue
+        query += " GROUP BY ec.code ORDER BY count DESC LIMIT 10"
 
-            where_clause = ""
-            conditions = []
-            if selected_divisions:
-                conditions.append(f"division IN ({', '.join([repr(div) for div in selected_divisions])})")
-            if selected_pcs:
-                conditions.append(f"pc IN ({', '.join([repr(pc) for pc in selected_pcs])})")
-            if conditions:
-                where_clause = f"WHERE {' AND '.join(conditions)}"
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
 
-            for col in error_columns:
-                query = f"SELECT SUM({col}) FROM {table} {where_clause}"
-                cursor.execute(query)
-                count = cursor.fetchone()[0] or 0
-                error_totals[col] = error_totals.get(col, 0) + count
-
-        results = sorted(
-            [{"error_code": key, "count": value} for key, value in error_totals.items()],
-            key=lambda x: x["count"], reverse=True
-        )[:10]  # Top 10 error codes
+        # Format results
+        results = []
+        for row in rows:
+            error_code, count = row
+            results.append({
+                "error_code": error_code,
+                "count": count or 0
+            })
 
         return jsonify(results)
 
@@ -1488,11 +1524,15 @@ def trend_error_report():
     finally:
         cursor.close()
 
- 
+
 
 # Line chart code (reports page number 2)
 @app.route('/api/drawings-trend', methods=['GET'])
 def get_drawings_trend():
+    """
+    Returns drawing trend data for line chart.
+    Now queries drawing_revisions table instead of EC_MM_YYYY tables.
+    """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
@@ -1500,7 +1540,7 @@ def get_drawings_trend():
     cursor = g.db.cursor()
     try:
         # Extract filters
-        division = request.args.get('division', '').strip()
+        team = request.args.get('team', '').strip()
         pc = request.args.get('pc', '').strip()
         start_date = request.args.get('start_date', '').strip()
         end_date = request.args.get('end_date', '').strip()
@@ -1514,15 +1554,35 @@ def get_drawings_trend():
             end_dt = datetime.today()
             start_dt = end_dt - timedelta(days=365)
 
-        # Generate month-year table names in the format EC_MM_YYYY
-        month_table_names = []
-        current_dt = start_dt
-        while current_dt <= end_dt:
-            table_name = f"EC_{current_dt.strftime('%m_%Y')}"
-            month_label = current_dt.strftime('%b %Y')  # Example: Mar 2025
-            month_table_names.append((table_name, month_label))
-            current_dt = current_dt.replace(day=1) + timedelta(days=32)
-            current_dt = current_dt.replace(day=1)  # Move to next month start
+        # Build query to aggregate from drawing_revisions
+        query = """
+            SELECT
+                DATE_FORMAT(dr.reviewed_date, '%%b %%Y') as month_label,
+                DATE_FORMAT(dr.reviewed_date, '%%Y-%%m') as month_sort,
+                SUM(CASE WHEN dr.approved = TRUE THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN dr.approved = FALSE THEN 1 ELSE 0 END) as rejected
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u ON d.creator_id = u.id
+            WHERE dr.reviewed_date BETWEEN %s AND %s
+        """
+
+        params = [start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d')]
+
+        # Add team filter
+        if team:
+            query += " AND u.team = %s"
+            params.append(team)
+
+        # Add PC filter
+        if pc:
+            query += " AND u.pc LIKE %s"
+            params.append(f"%{pc}%")
+
+        query += " GROUP BY DATE_FORMAT(dr.reviewed_date, '%%Y-%%m') ORDER BY month_sort"
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
 
         # Initialize results for line chart format
         trend_data = {
@@ -1533,34 +1593,16 @@ def get_drawings_trend():
             ]
         }
 
-        for table, month_label in month_table_names:
-            # Check if table exists
-            cursor.execute("SHOW TABLES LIKE %s", (table,))
-            if not cursor.fetchone():
-                continue  # Skip if table doesn't exist
-
-            # Build the query
-            query = f"SELECT COALESCE(SUM(Approved_Drawings), 0), COALESCE(SUM(Rejected_Drawings), 0) FROM {table}"
-            filters = []
-            if division:
-                filters.append(f"Division = '{division}'")
-            if pc:
-                filters.append(f"PC = '{pc}'")
-
-            if filters:
-                query += " WHERE " + " AND ".join(filters)
-
-            cursor.execute(query)
-            row = cursor.fetchone()
-            approved_count = row[0] or 0
-            rejected_count = row[1] or 0
-
-            # Append data to response
+        for row in rows:
+            month_label, month_sort, approved, rejected = row
             trend_data["categories"].append(month_label)
-            trend_data["series"][0]["data"].append(approved_count)
-            trend_data["series"][1]["data"].append(rejected_count)
+            trend_data["series"][0]["data"].append(approved or 0)
+            trend_data["series"][1]["data"].append(rejected or 0)
 
         return jsonify(trend_data)
+    except Exception as e:
+        print(f"Error in get_drawings_trend: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
 
@@ -1568,7 +1610,7 @@ def get_drawings_trend():
 @app.route('/get-pass-ratio', methods=['POST'])
 def get_pass_ratio():
     data = request.json
-    division = data.get('division', '')
+    team = data.get('team', '')
     pc = data.get('pc', '')
     start_date = data.get('start_date', '')
     end_date = data.get('end_date', '')
@@ -1576,87 +1618,83 @@ def get_pass_ratio():
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     cursor = g.db.cursor()
 
-    cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'error_db' AND TABLE_NAME LIKE 'EC_%'")
-    tables = [row[0] for row in cursor.fetchall()]
+    try:
+        # 1. Determine Date Range
+        if start_date and end_date:
+            s_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            e_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        else:
+            # Default to current year
+            today = datetime.today()
+            s_dt = datetime(today.year, 1, 1)
+            e_dt = datetime(today.year, 12, 31)
 
-    current_year = str(datetime.now().year)
+        # 2. Init result map for every month in range
+        month_abbr = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        months_map = {}
 
-    month_abbr = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    
-    months_map = {str(i+1).zfill(2) + "_" + current_year: {
-        "year": current_year,
-        "month": month_abbr[i],
-        "accepted_drawings": "NA",
-        "total_drawings": "NA",
-        "pass_ratio": "NA"
-    } for i in range(12)}
+        curr = s_dt
+        # Iterate month by month until end_date
+        while curr <= e_dt:
+            # key format "MM_YYYY"
+            key = f"{curr.month:02d}_{curr.year}"
+            months_map[key] = {
+                "year": str(curr.year),
+                "month": month_abbr[curr.month - 1],
+                "accepted_drawings": "NA",
+                "total_drawings": "NA",
+                "pass_ratio": "NA"
+            }
+            # Move to next month
+            # (simple way: add 32 days and set to day 1)
+            next_month = curr + timedelta(days=32)
+            curr = next_month.replace(day=1)
 
-    if start_date and end_date:
-        start_year, start_month = start_date.split("-")[0], start_date.split("-")[1]
-        end_year, end_month = end_date.split("-")[0], end_date.split("-")[1]
-        filtered_months = {}
+        # 3. Query Database
+        query = """
+            SELECT
+                DATE_FORMAT(dr.reviewed_date, '%%m_%%Y') as month_key,
+                SUM(CASE WHEN dr.approved = TRUE THEN 1 ELSE 0 END) as accepted,
+                COUNT(dr.id) as total
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u ON d.creator_id = u.id
+            WHERE dr.reviewed_date BETWEEN %s AND %s
+        """
+        params = [s_dt.strftime('%Y-%m-%d'), e_dt.strftime('%Y-%m-%d')]
 
-        for year in range(int(start_year), int(end_year) + 1):
-            for month in range(1, 13):
-                month_str = str(month).zfill(2)
-                if (year == int(start_year) and month < int(start_month)) or (year == int(end_year) and month > int(end_month)):
-                    continue
-                filtered_months[f"{month_str}_{year}"] = {
-                    "year": str(year),
-                    "month": month_abbr[month - 1],
-                    "accepted_drawings": "NA",
-                    "total_drawings": "NA",
-                    "pass_ratio": "NA"
-                }
-        months_map = filtered_months 
+        if team:
+            query += " AND u.team = %s"
+            params.append(team)
+        if pc:
+            query += " AND u.pc LIKE %s"
+            params.append(f"%{pc}%")
 
-    for table in tables:
-        table_parts = table.split('_')  
-        if len(table_parts) == 3:
-            table_month, table_year = table_parts[1], table_parts[2]
-            table_key = f"{table_month}_{table_year}"
+        query += " GROUP BY month_key"
 
-            # 🔹 Skip tables not in the filtered range (if filters are applied)
-            if start_date and end_date and table_key not in months_map:
-                continue
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
 
-            # 🔹 Construct SQL Query
-            query = f"""
-            SELECT 
-                '{table_year}' AS year,
-                '{month_abbr[int(table_month) - 1]}' AS month,  
-                SUM(Approved_Drawings) AS accepted_drawings,
-                SUM(Approved_Drawings + Rejected_Drawings) AS total_drawings
-            FROM {table}
-            """
-            conditions = []
-            if division:
-                conditions.append(f"Division = '{division}'")
-            if pc:
-                conditions.append(f"PC = '{pc}'")
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
+        # 4. Fill Map
+        for row in rows:
+            m_key, accepted, total = row
+            if m_key in months_map:
+                ratio = round((accepted / total) * 100, 2) if total > 0 else 0
+                months_map[m_key]["accepted_drawings"] = int(accepted)
+                months_map[m_key]["total_drawings"] = int(total)
+                months_map[m_key]["pass_ratio"] = f"{ratio}%"
 
-            cursor.execute(query)
-            result = cursor.fetchone()
+        pass_ratio_data = list(months_map.values())
+        return jsonify(pass_ratio_data)
 
-            if result:
-                year, month, accepted, total = result
-                pass_ratio = round((accepted / total) * 100, 2) if total else "NA"
-
-                months_map[table_key] = {
-                    "year": year,
-                    "month": month,
-                    "accepted_drawings": accepted if total else "NA",
-                    "total_drawings": total if total else "NA",
-                    "pass_ratio": f"{pass_ratio}%" if pass_ratio != "NA" else "NA"
-                }
-    cursor.close()
-    pass_ratio_data = list(months_map.values())
-    return jsonify(pass_ratio_data)
+    except Exception as e:
+        print(f"Error in get_pass_ratio: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
 
 
 # Employee report code(reports page number 4)
@@ -1676,71 +1714,7 @@ def _parse_error_codes(val):
     # Fallback: comma-separated string "P1,P22"
     return [p.strip() for p in s.split(',') if p.strip()]
 
-@app.route('/api/employee-report', methods=['GET'])
-def employee_report():
-    employee_id = (request.args.get('employeeId') or '').strip()
-    start_date  = (request.args.get('start_date') or '').strip()
-    end_date    = (request.args.get('end_date') or '').strip()
 
-    if not employee_id:
-        return jsonify({"error": "Employee ID is required"}), 400
-
-    table_name = f"`{employee_id}`"    # e.g., `EMP_357` or `emp_357`
-
-    # NOTE: Column is "Date" in your emp_* tables (see screenshot)
-    query = [f"SELECT Drawing_ID, Revision_num, Error_codes, Reviewer_EMP_ID, Review_Date, Decision FROM {table_name}"]
-    args = []
-
-    where = []
-    if start_date:
-        where.append("Review_Date >= %s")
-        args.append(start_date)
-    if end_date:
-        where.append("Review_Date <= %s")
-        args.append(end_date)
-    if where:
-        query.append("WHERE " + " AND ".join(where))
-    query.append("ORDER BY Review_Date DESC")
-    sql = " ".join(query)
-
-    try:
-        # Use g.db instead of creating a new connection
-        if not hasattr(g, 'db') or g.db is None:
-            return jsonify({'error': 'Database connection error'}), 500
-        
-        with g.db.cursor() as cur:
-            # Fetch rows
-            cur.execute(sql, tuple(args))
-            rows = cur.fetchall()
-            cols = [d[0] for d in cur.description]
-
-        # Fetch profile info for summary (name/PC/division)
-        emp_name = pc = division = ""
-        with g.db.cursor() as cur:
-            cur.execute("""
-                SELECT EMP_Name, emp_PC, emp_division
-                FROM Employees
-                WHERE emp_id = %s
-            """, (employee_id,))
-            r = cur.fetchone()
-            if r:
-                emp_name, pc, division = r[0] or "", r[1] or "", r[2] or ""
-
-
-        result = []
-        for tup in rows:
-            row = dict(zip(cols, tup))
-            row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
-            # Attach summary fields so the front-end can read from the first row
-            row["Employee_name"] = emp_name
-            row["PC"] = pc
-            row["Division"] = division
-            result.append(row)
-
-        return jsonify(result)
-
-    except pymysql.MySQLError as e:
-        return jsonify({"error": str(e)}), 500
 
 # Drawing report code(reports page number 5)
 @app.route('/api/drawing-report', methods=['GET'])
@@ -1752,44 +1726,143 @@ def drawing_report():
     if not drawing_id:
         return jsonify({"error": "Drawing ID is required"}), 400
 
-    table_name = f"`{drawing_id}`"  # e.g., `DR_9096998787`
-
-    query = [f"SELECT Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Error_codes, Date, Drawing_type, Decision FROM {table_name}"]
-    args = []
-
-    where = []
-    if start_date:
-        where.append("Date >= %s")
-        args.append(start_date)
-    if end_date:
-        where.append("Date <= %s")
-        args.append(end_date)
-    if where:
-        query.append("WHERE " + " AND ".join(where))
-    query.append("ORDER BY Date DESC")
-    sql = " ".join(query)
-
     try:
         # Use g.db instead of creating a new connection
         if not hasattr(g, 'db') or g.db is None:
             return jsonify({'error': 'Database connection error'}), 500
-        
-        with g.db.cursor() as cur:
-            cur.execute(sql, tuple(args))
-            rows = cur.fetchall()
-            cols = [d[0] for d in cur.description]
+
+        cursor = g.db.cursor()
+
+        # Build query using normalized schema
+        # We need: Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Error_codes, Date, Drawing_type, Decision
+        query = """
+            SELECT
+                dr.revision_no as Revision_num,
+                u_rev.emp_id as Reviewer_EMP_ID,
+                u_cre.emp_id as Creator_EMP_ID,
+                dr.reviewed_date as Date,
+                d.drawing_type as Drawing_type,
+                CASE WHEN dr.approved = TRUE THEN 'Approve' ELSE 'Reject' END as Decision,
+                GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes
+            FROM drawings d
+            JOIN drawing_revisions dr ON d.id = dr.drawing_id
+            JOIN users u_cre ON d.creator_id = u_cre.id
+            LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
+            LEFT JOIN revision_error_codes rec ON dr.id = rec.revision_id
+            LEFT JOIN error_codes ec ON rec.error_code_id = ec.id
+            WHERE d.drawing_no = %s
+        """
+
+        params = [drawing_id]
+
+        if start_date:
+            query += " AND dr.reviewed_date >= %s"
+            params.append(start_date)
+        if end_date:
+            query += " AND dr.reviewed_date <= %s"
+            params.append(end_date)
+
+        query += " GROUP BY dr.id ORDER BY dr.reviewed_date DESC"
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
 
         result = []
         for tup in rows:
             row = dict(zip(cols, tup))
+            # Format Error_codes as list or string depending on frontend need.
+            # Legacy expected string/list. _parse_error_codes usually handles string.
+            # Here we returned a string "P1, P2".
+            # The original code did: row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
+            # Let's match that behavior.
             row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
-            # The drawing table doesn’t have a Drawing_ID column → include it for the UI
             row["Drawing_ID"] = drawing_id
             result.append(row)
 
         return jsonify(result)
 
-    except pymysql.MySQLError as e:
+    except Exception as e:
+        print(f"Error in drawing_report: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/employee-report', methods=['GET'])
+def employee_report():
+    """
+    Returns list of drawings/revisions for a specific employee (creator).
+    Used for the Employee Report table and metrics (Accepted/Rejected counts).
+    """
+    employee_id = (request.args.get('employeeId') or '').strip()
+    start_date = (request.args.get('start_date') or '').strip()
+    end_date   = (request.args.get('end_date') or '').strip()
+
+    if not employee_id:
+        return jsonify({"error": "Employee ID is required"}), 400
+
+    try:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({'error': 'Database connection error'}), 500
+
+        cursor = g.db.cursor()
+
+        # Get user details first (for name, pc, division)
+        cursor.execute("SELECT id, name, pc, division FROM users WHERE emp_id = %s", (employee_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            return jsonify([]), 200 # No such user
+
+        user_id, user_name, user_pc, user_division = user_row
+
+        # Build query
+        query = """
+            SELECT
+                d.drawing_no as Drawing_ID,
+                dr.revision_no as Revision_num,
+                u_rev.emp_id as Reviewer_EMP_ID,
+                dr.reviewed_date as Date,
+                CASE WHEN dr.approved = TRUE THEN 'Approve'
+                     WHEN dr.approved = FALSE THEN 'Reject'
+                     ELSE 'Pending' END as Decision,
+                GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes
+            FROM drawings d
+            JOIN drawing_revisions dr ON d.id = dr.drawing_id
+            LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
+            LEFT JOIN revision_error_codes rec ON dr.id = rec.revision_id
+            LEFT JOIN error_codes ec ON rec.error_code_id = ec.id
+            WHERE d.creator_id = %s
+        """
+
+        params = [user_id]
+
+        if start_date:
+            query += " AND dr.reviewed_date >= %s"
+            params.append(start_date)
+        if end_date:
+            query += " AND dr.reviewed_date <= %s"
+            params.append(end_date)
+
+        query += " GROUP BY dr.id ORDER BY dr.reviewed_date DESC"
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
+
+        result = []
+        for tup in rows:
+            row = dict(zip(cols, tup))
+            row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
+            # Add employee metadata to every row (frontend uses this for summary)
+            row["Employee_name"] = user_name
+            row["PC"] = user_pc
+            row["Division"] = user_division
+            result.append(row)
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"Error in employee_report: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1798,20 +1871,25 @@ def drawing_report():
 @app.route('/api/drawings/<drawing_id>/<int:revision>/download', methods=['GET'])
 def download_drawing(drawing_id, revision):
     """
-    Returns the PDF blob from the per-drawing table `<drawing_id>` for the given revision.
+    Returns the PDF blob from drawing_files table for the given drawing and revision.
+    Now queries drawing_files table instead of per-drawing tables.
     """
-    table_name = f"`{drawing_id}`"
-
     try:
         # Use g.db instead of creating a new connection
         if not hasattr(g, 'db') or g.db is None:
             return jsonify({'error': 'Database connection error'}), 500
-        
+
         with g.db.cursor() as cur:
-            cur.execute(
-                f"SELECT Drawing_PDF FROM {table_name} WHERE Revision_num = %s",
-                (revision,)
-            )
+            # Query drawing_files table
+            cur.execute("""
+                SELECT df.file_data
+                FROM drawing_files df
+                JOIN drawing_revisions dr ON df.revision_id = dr.id
+                JOIN drawings d ON dr.drawing_id = d.id
+                WHERE d.drawing_no = %s AND dr.revision_no = %s
+                ORDER BY df.uploaded_at DESC
+                LIMIT 1
+            """, (drawing_id, revision))
             row = cur.fetchone()
 
         if not row:
@@ -1831,19 +1909,24 @@ def download_drawing(drawing_id, revision):
         )
 
     except pymysql.MySQLError as e:
+        print(f"Error in download_drawing: {e}")
         return jsonify({"error": str(e)}), 500
 
 # Get dropdown data for employees in report page
 @app.route('/api/employees-dropdown', methods=['GET'])
 def get_employee_ids():
+    """
+    Returns list of employee IDs for dropdown.
+    Now queries users table instead of employees table.
+    """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({"error": "Database connection error"}), 500
-    
+
     cursor = g.db.cursor()
-    
+
     try:
-        cursor.execute("SELECT EMP_ID FROM employees;")
+        cursor.execute("SELECT emp_id FROM users WHERE is_active = TRUE ORDER BY emp_id;")
         employees = [row[0] for row in cursor.fetchall()]
         return jsonify(employees)
     except Exception as e:
@@ -1854,14 +1937,18 @@ def get_employee_ids():
 # Get dropdown data for drawings in report page
 @app.route('/api/drawings-dropdown', methods=['GET'])
 def get_drawing_ids():
+    """
+    Returns list of drawing IDs for dropdown.
+    Queries drawings table (already using new schema).
+    """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({"error": "Database connection error"}), 500
-    
+
     cursor = g.db.cursor()
-    
+
     try:
-        cursor.execute("SELECT drawing_ID FROM drawings;")
+        cursor.execute("SELECT drawing_no FROM drawings ORDER BY drawing_no;")
         drawings = [row[0] for row in cursor.fetchall()]
         return jsonify(drawings)
     except Exception as e:
@@ -1873,6 +1960,10 @@ def get_drawing_ids():
 # /api/employee-drawing-status — use `Date` column (and case-insensitive Decision)
 @app.route('/api/employee-drawing-status', methods=['GET'])
 def employee_drawing_status():
+    """
+    Returns monthly approved/rejected counts for a specific employee.
+    Now queries drawing_revisions table instead of per-employee tables.
+    """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
@@ -1885,47 +1976,54 @@ def employee_drawing_status():
         if not employee_id:
             return jsonify({'error': 'Missing employee_id'}), 400
 
-        # Validate employee_id format to prevent SQL injection
-        import re
-        if not re.match(r'^[A-Za-z0-9_]+$', employee_id):
-            return jsonify({'error': 'Invalid employee_id format'}), 400
+        # Get user_id from emp_id
+        cursor.execute("SELECT id FROM users WHERE emp_id = %s AND is_active = TRUE", (employee_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            return jsonify({}), 200  # Return empty if employee not found
 
-        cursor.execute("SHOW TABLES LIKE %s", (employee_id,))
-        if not cursor.fetchone():
-            return jsonify({})
+        user_id = user_row[0]
 
+        # Set date range
         if start_date and end_date:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = datetime.strptime(end_date, "%Y-%m-%d")
         else:
             # Default range: last ~6 months
             end_dt = datetime.today()
-            # simple month back-off (kept as-is; adjust if you need exact month arithmetic)
             start_month = max(1, end_dt.month - 5)
             start_dt = end_dt.replace(month=start_month)
 
-        # Safely construct the query with the validated table name
-        query = f"""
+        # Query drawing_revisions for this employee
+        query = """
             SELECT
-                DATE_FORMAT(Review_Date, '%%m-%%Y') AS month,
-                SUM(CASE WHEN LOWER(Decision) = 'approve' THEN 1 ELSE 0 END) AS approved,
-                SUM(CASE WHEN LOWER(Decision) = 'reject' THEN 1 ELSE 0 END) AS rejected
-            FROM `{employee_id}`
-            WHERE Review_Date BETWEEN %s AND %s
-            GROUP BY DATE_FORMAT(Review_Date, '%%m-%%Y')
-            ORDER BY STR_TO_DATE(DATE_FORMAT(Review_Date, '%%m-%%Y'), '%%m-%%Y')
+                DATE_FORMAT(dr.reviewed_date, '%%m-%%Y') as month,
+                SUM(CASE WHEN dr.approved = TRUE THEN 1 ELSE 0 END) as approved_count,
+                SUM(CASE WHEN dr.approved = FALSE THEN 1 ELSE 0 END) as rejected_count
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u ON d.creator_id = u.id
+            WHERE u.emp_id = %s
+            AND dr.reviewed_date >= %s
+            AND dr.reviewed_date <= %s
+            GROUP BY month
+            ORDER BY dr.reviewed_date
         """
 
-        cursor.execute(query, (start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d')))
+        cursor.execute(query, (employee_id, start_dt, end_dt))
+        rows = cursor.fetchall()
 
         results = {}
-        rows = cursor.fetchall()
         for row in rows:
-            month, approved, rejected = row
-            # keys like EC_01_2025
-            results[f"EC_{month.replace('-', '_')}"] = {
-                "approve": int(approved or 0),
-                "reject": int(rejected or 0)
+            month = row[0] # "MM-YYYY"
+            approved = row[1]
+            rejected = row[2]
+
+            # Format key as EC_MM_YYYY
+            key = f"EC_{month.replace('-', '_')}"
+            results[key] = {
+                "approve": int(approved),
+                "reject": int(rejected)
             }
 
         return jsonify(results)
@@ -1939,10 +2037,14 @@ def employee_drawing_status():
 # Error codes in employees and drawings(Reports page number 4 and 5)
 @app.route('/api/error-summary', methods=['GET'])
 def error_summary():
+    """
+    Returns top error codes for an employee or drawing.
+    Now queries revision_error_codes table instead of per-employee/drawing tables.
+    """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     cursor = g.db.cursor()
     try:
         employee_id = request.args.get('employeeId')
@@ -1950,57 +2052,64 @@ def error_summary():
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
-        # both table types use the same date column name now
-    
         if employee_id:
-            table_name = f"{employee_id}"
-            date_column = "Review_Date"
+            # Get user_id from emp_id
+            cursor.execute("SELECT id FROM users WHERE emp_id = %s AND is_active = TRUE", (employee_id,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                return jsonify([]), 200
+
+            user_id = user_row[0]
             limit = 10
+
+            # Query for employee's error codes
+            query = """
+                SELECT ec.code, COUNT(rec.error_code_id) as count
+                FROM revision_error_codes rec
+                JOIN error_codes ec ON rec.error_code_id = ec.id
+                JOIN drawing_revisions dr ON rec.revision_id = dr.id
+                JOIN drawings d ON dr.drawing_id = d.id
+                WHERE d.creator_id = %s
+            """
+            params = [user_id]
+
         elif drawing_id:
-            table_name = f"{drawing_id}"
-            date_column = "Date"
             limit = 5
+
+            # Query for drawing's error codes
+            query = """
+                SELECT ec.code, COUNT(rec.error_code_id) as count
+                FROM revision_error_codes rec
+                JOIN error_codes ec ON rec.error_code_id = ec.id
+                JOIN drawing_revisions dr ON rec.revision_id = dr.id
+                JOIN drawings d ON dr.drawing_id = d.id
+                WHERE d.drawing_no = %s
+            """
+            params = [drawing_id]
         else:
             return jsonify({"error": "Missing employee_id or drawing_id"}), 400
 
-        cursor.execute("SHOW TABLES LIKE %s", (table_name,))
-        if not cursor.fetchone():
-            return jsonify([])
-
-        # Handle date filters
-        date_filter = ""
-        date_params = []
+        # Add date filters
         if start_date and end_date:
             try:
                 start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                 end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-                date_filter = f"WHERE `{date_column}` BETWEEN %s AND %s"
-                date_params = [start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d')]
+                query += " AND dr.reviewed_date BETWEEN %s AND %s"
+                params.extend([start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d')])
             except ValueError:
                 return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
 
-        query = f"SELECT Error_codes FROM `{table_name}` {date_filter}"
-        cursor.execute(query, tuple(date_params))
+        query += f" GROUP BY ec.code ORDER BY count DESC LIMIT {limit}"
+
+        cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
 
-        # Process and clean error codes
-        error_list = []
-        for row in rows:
-            raw = row[0]
-            if raw:
-                cleaned = re.sub(r"[\[\]\"']", "", raw)
-                codes = [e.strip() for e in cleaned.split(",") if e.strip()]
-                for code in codes:
-                    if code.lower() not in ["no errors detected", "no error codes", "no error"]:
-                        error_list.append(code.upper())
-
-        counter = Counter(error_list)
-        top_errors = counter.most_common(limit)
-
-        results = [{"error_code": code, "count": count} for code, count in top_errors]
+        # Format results
+        results = [{"error_code": row[0], "count": row[1]} for row in rows]
         return jsonify(results)
 
     except Exception as e:
+        print(f"Error in error_summary: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
@@ -2042,17 +2151,21 @@ def extract_revision_from_name(filename: str) -> int | None:
     except (ValueError, IndexError):
         return None
 
-def send_single_summary_email(to_email: str, items: list[tuple[str, int]], creator_emp_id: str, creator_name: str):
+def send_single_summary_email(to_email: str, items: list[tuple[str, int]], creator_emp_id: str, creator_name: str, user_comments: str = None):
     """
     items: list of (drawing_id, revision)
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Drawings ready for review"
         pairs_str = ', '.join([f"{did} - {rev}" for did, rev in items])
+        
+        # Format user comments
+        user_comments_text = f"\nAdditional Comments: {user_comments}\n" if user_comments else ""
+        
         body = f"""Dear Reviewer,
 
 Multiple drawings have been submitted for your review.
@@ -2062,8 +2175,10 @@ Creator Name  : {creator_name}
 
 Drawing_ID - Revision Number:
 {pairs_str}
-
+{user_comments_text}
 Please log in to the portal to review the submissions.
+
+Portal Link:- https://drawlogai.atlascopco.group
 
 Regards,
 Atlas Copco AI Error Logging System
@@ -2082,22 +2197,23 @@ Atlas Copco AI Error Logging System
 @app.route('/submit-batch', methods=['POST'])
 def submit_batch():
     """
-    Accepts multipart/form-data:
-      - pdfs: multiple PDF files (same key)  <-- REQUIRED
-      - creator_emp_id, reviewer_emp_id, reviewer_email  <-- REQUIRED
-      - creator_email, division, team, pc, drawing_type, decision, design_no, client_revision_no  <-- optional
-    For each file:
-      - Parse drawing_ID from filename -> 'DR_<id>'
-      - If new: INSERT with Revision_num=1, else UPDATE & increment Revision_num
-      - Store proper PDF bytes for that row
-    After all: send ONE email to reviewer listing "Drawing_ID - Revision" pairs.
+    Batch submission endpoint - accepts multiple PDF files.
+    Now uses normalized schema: drawings, drawing_revisions, drawing_files tables.
     """
     try:
+        print(f"\n{'='*80}")
+        print(f">>> INCOMING REQUEST: POST /submit-batch")
+        
         files = request.files.getlist('pdfs')
+        print(f"    Files received: {len(files)}")
+        for i, f in enumerate(files):
+            print(f"    - File {i+1}: {f.filename}")
+            
         if not files:
+            print("    ERROR: No files received")
             return jsonify({"success": False, "message": "At least one PDF is required"}), 400
 
-        # shared metadata
+        # Shared metadata
         creator_emp_id = (request.form.get('creator_emp_id') or '').strip()
         reviewer_emp_id = (request.form.get('reviewer_emp_id') or '').strip()
         reviewer_email  = (request.form.get('reviewer_email')  or '').strip()
@@ -2109,107 +2225,124 @@ def submit_batch():
         team          = (request.form.get('team') or '').strip()
         pc            = (request.form.get('pc') or '').strip()
         drawing_type  = (request.form.get('drawing_type') or '').strip()
-        checklist     = (request.form.get('decision') or '').strip()
-        # optional extras (not used in DB logic here)
-        _design_no    = (request.form.get('design_no') or '').strip()
-        _client_rev   = (request.form.get('client_revision_no') or '').strip()
 
         # Use g.db instead of creating a new connection
         if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
-        results = []  # (drawing_id, new_revision)
+        results = []  # (drawing_no, revision_no)
         today = datetime.today()
 
         try:
             with g.db.cursor() as c:
+                # Get user IDs from emp_ids
+                c.execute("SELECT id FROM users WHERE emp_id = %s AND is_active = TRUE", (creator_emp_id,))
+                creator_row = c.fetchone()
+                if not creator_row:
+                    return jsonify({"success": False, "message": f"Creator {creator_emp_id} not found"}), 400
+                creator_id = creator_row[0]
+
+                c.execute("SELECT id, name FROM users WHERE emp_id = %s AND is_active = TRUE", (reviewer_emp_id,))
+                reviewer_row = c.fetchone()
+                if not reviewer_row:
+                    return jsonify({"success": False, "message": f"Reviewer {reviewer_emp_id} not found"}), 400
+                reviewer_id = reviewer_row[0]
+                reviewer_name = reviewer_row[1]
+
                 for f in files:
                     if not f or not f.filename.lower().endswith('.pdf'):
                         continue
+                    
                     drawing_id = extract_drawing_id_from_name(f.filename)
                     if not drawing_id:
                         continue
 
-                    # Extract revision from filename (e.g., "9096998745-1.pdf" -> revision 1)
+                    # Extract revision from filename
                     revision_from_file = extract_revision_from_name(f.filename)
                     if revision_from_file is None:
                         print(f"Warning: Could not extract revision from filename '{f.filename}', skipping.")
                         continue
 
+                    # Read file content into memory (BLOB)
                     pdf_bytes = f.read()
 
-                    # Check if this drawing+revision already exists
-                    c.execute("""
-                        SELECT 1 FROM drawings 
-                        WHERE drawing_ID=%s AND Revision_num=%s
-                    """, (drawing_id, revision_from_file))
+                    # Check if drawing exists
+                    c.execute("SELECT id FROM drawings WHERE drawing_no = %s", (drawing_id,))
+                    drawing_row = c.fetchone()
                     
-                    if c.fetchone():
-                        # Update existing record
-                        c.execute("""
-                            UPDATE drawings
-                               SET Reviewer_EMP_ID=%s,
-                                   Creator_EMP_ID=%s,
-                                   Date=%s,
-                                   CheckList=%s,
-                                   Drawing_Type=%s,
-                                   Drawing_PDF=%s
-                             WHERE drawing_ID=%s AND Revision_num=%s
-                        """, (reviewer_emp_id, creator_emp_id, today,
-                              checklist, drawing_type, pdf_bytes, drawing_id, revision_from_file))
+                    if drawing_row:
+                        drawing_db_id = drawing_row[0]
                     else:
-                        # Insert new record
-                        c.execute("""
-                            INSERT INTO drawings
-                                (drawing_ID, Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date, CheckList, Drawing_Type, Drawing_PDF)
-                            VALUES
-                                (%s, %s, %s, %s, %s, %s, %s, %s)
-                        """, (drawing_id, revision_from_file, reviewer_emp_id, creator_emp_id, today,
-                              checklist, drawing_type, pdf_bytes))
+                        # Create new drawing
+                        # Create new drawing
+                        c.execute("INSERT INTO drawings (drawing_no, creator_id, drawing_type, created_at) VALUES (%s, %s, %s, %s)", (drawing_id, creator_id, drawing_type, today))
+                        drawing_db_id = c.lastrowid
 
-                results.append((drawing_id, revision_from_file))
+                    # Check if this revision exists
+                    c.execute("SELECT id FROM drawing_revisions WHERE drawing_id = %s AND revision_no = %s", (drawing_db_id, revision_from_file))
+                    
+                    revision_row = c.fetchone()
+                    
+                    if revision_row:
+                        # Update existing revision
+                        revision_db_id = revision_row[0]
+                        c.execute("UPDATE drawing_revisions SET reviewer_id = %s, reviewed_date = NULL, approved = NULL WHERE id = %s", (reviewer_id, revision_db_id))
+                        
+                        # Update PDF file data in drawing_files
+                        c.execute("DELETE FROM drawing_files WHERE revision_id = %s", (revision_db_id,))
+                        c.execute("""
+                            INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
+                    else:
+                        # Create new revision
+                        c.execute("INSERT INTO drawing_revisions (drawing_id, revision_no, reviewer_id, created_at) VALUES (%s, %s, %s, %s)", (drawing_db_id, revision_from_file, reviewer_id, today))
+                        revision_db_id = c.lastrowid
+                        
+                        # Store PDF file info
+                        c.execute("""
+                            INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
+
+                    results.append((drawing_id, revision_from_file))
 
             g.db.commit()
 
-            # Lookup creator name once for email
-            creator_name = creator_emp_id
+            # Send summary email
             try:
-                with g.db.cursor() as c2:
-                    c2.execute("SELECT Emp_Name FROM employees WHERE Emp_ID=%s LIMIT 1", (creator_emp_id,))
-                    r = c2.fetchone()
-                    if r and r[0]:
-                        creator_name = r[0]
-            except Exception as e:
-                print("Creator name lookup failed:", e)
-
-            # Send one summary email
-            try:
+                comments = request.form.get('comments')
                 send_single_summary_email(
                     to_email=reviewer_email,
                     items=results,
                     creator_emp_id=creator_emp_id,
-                    creator_name=creator_name
+                    creator_name=creator_row[0] if creator_row else creator_emp_id,
+                    user_comments=comments
                 )
             except Exception as e:
-                print("Email send error:", e)
+                print(f"Email send error: {e}")
 
             return jsonify({
                 "success": True,
                 "message": "Processed files successfully.",
                 "results": [{"drawing_id": did, "revision": rev} for did, rev in results]
             }), 200
+            
         except Exception as e:
             # Rollback in case of error
             try:
-                g.db.rollback()
+                if hasattr(g, 'db'):
+                    g.db.rollback()
             except:
                 pass
-            print("submit-batch error:", e)
-            return jsonify({"success": False, "message": "Internal Server Error"}), 500
+            print(f"submit-batch error: {e}")
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Internal Server Error: {str(e)}"}), 500
 
     except Exception as e:
-        print("submit-batch error:", e)
-        return jsonify({"success": False, "message": "Internal Server Error"}), 500
+        print(f"submit-batch fatal error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "message": f"Fatal Error: {str(e)}"}), 500
     
     
 # Requests start
@@ -2251,52 +2384,60 @@ def get_dyn_row(cur, table_name: str, rev: int):
 @app.route('/requests/creator/<emp_id>', methods=['GET'])
 def requests_creator(emp_id):
     """
-    Creator table:
-      Status:
-        - Pending if per-drawing table missing OR row for this rev missing OR Decision blank/unknown
-        - Approved if Decision == Approve/Approved for that rev
-        - Rejected if Decision == Reject/Rejected for that rev
+    Returns list of drawings created by this employee with their review status.
+    Now queries drawings and drawing_revisions tables instead of dynamic tables.
     """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
     
     with g.db.cursor() as c:
+        # Get user_id from emp_id
+        c.execute("SELECT id FROM users WHERE emp_id = %s AND is_active = TRUE", (emp_id,))
+        user_row = c.fetchone()
+        if not user_row:
+            return jsonify([]), 200
+        
+        user_id = user_row[0]
+        
+        # Query drawings and their latest revisions
         c.execute("""
-            SELECT drawing_ID, Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date, Drawing_Type
-              FROM drawings
-             WHERE Creator_EMP_ID=%s
-             ORDER BY Date DESC, drawing_ID ASC, Revision_num DESC
-        """, (emp_id,))
+            SELECT 
+                d.drawing_no,
+                dr.revision_no,
+                d.created_at,
+                u_reviewer.emp_id as reviewer_id,
+                u_reviewer.name as reviewer_name,
+                u_reviewer.email as reviewer_email,
+                dr.reviewed_date,
+                dr.approved
+            FROM drawings d
+            JOIN drawing_revisions dr ON d.id = dr.drawing_id
+            JOIN users u_reviewer ON dr.reviewer_id = u_reviewer.id
+            WHERE d.creator_id = %s
+            ORDER BY d.created_at DESC, d.drawing_no ASC, dr.revision_no DESC
+        """, (user_id,))
         rows = c.fetchall()
 
         out = []
-        for drawing_id, rev, reviewer_id, creator_id, created_date, drawing_type in rows:
-            reviewer = get_employee(c, reviewer_id)
-
-            status = 'Pending'
-            if table_exists(c, drawing_id):
-                dyn = get_dyn_row(c, drawing_id, rev)
-                if dyn:
-                    decision = (dyn['Decision'] or '').lower()
-                    if decision in ('approve', 'approved'):
-                        status = 'Approved'
-                    elif decision in ('reject', 'rejected'):
-                        status = 'Rejected'
-                    else:
-                        status = 'Pending'
-                else:
-                    status = 'Pending'
+        for drawing_no, rev, created_date, reviewer_id, reviewer_name, reviewer_email, reviewed_date, approved in rows:
+            # Determine status
+            if reviewed_date is None:
+                status = 'Pending'
+            elif approved == 1:
+                status = 'Approved'
+            elif approved == 0:
+                status = 'Rejected'
             else:
                 status = 'Pending'
 
             out.append({
-                "drawingNo": drawing_id,
+                "drawingNo": drawing_no,
                 "revisionNo": int(rev),
                 "createdDate": created_date.strftime("%Y-%m-%d") if created_date else "",
                 "reviewerId": reviewer_id,
-                "reviewerName": reviewer["name"],
-                "reviewerEmail": reviewer["email"],
+                "reviewerName": reviewer_name,
+                "reviewerEmail": reviewer_email,
                 "status": status
             })
     return jsonify(out), 200
@@ -2304,44 +2445,52 @@ def requests_creator(emp_id):
 @app.route('/requests/reviewer/<emp_id>', methods=['GET'])
 def requests_reviewer(emp_id):
     """
-    Reviewer table:
-      Status:
-        - 'Reviewed' if per-drawing table HAS a row for the same Revision_num
-        - 'Review'   otherwise
+    Returns list of drawings assigned to this reviewer with their review status.
+    Now queries drawings and drawing_revisions tables instead of dynamic tables.
     """
     # Use g.db instead of creating a new connection
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({'error': 'Database connection error'}), 500
     
     with g.db.cursor() as c:
+        # Get user_id from emp_id
+        c.execute("SELECT id FROM users WHERE emp_id = %s AND is_active = TRUE", (emp_id,))
+        user_row = c.fetchone()
+        if not user_row:
+            return jsonify([]), 200
+        
+        user_id = user_row[0]
+        
+        # Query drawings assigned to this reviewer
         c.execute("""
-            SELECT drawing_ID, Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date
-              FROM drawings
-             WHERE Reviewer_EMP_ID=%s
-             ORDER BY Date DESC, drawing_ID ASC, Revision_num DESC
-        """, (emp_id,))
+            SELECT 
+                d.drawing_no,
+                dr.revision_no,
+                d.created_at,
+                u_creator.emp_id as creator_id,
+                u_creator.name as creator_name,
+                u_creator.email as creator_email,
+                dr.reviewed_date
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u_creator ON d.creator_id = u_creator.id
+            WHERE dr.reviewer_id = %s
+            ORDER BY d.created_at DESC, d.drawing_no ASC, dr.revision_no DESC
+        """, (user_id,))
         rows = c.fetchall()
 
         out = []
-        for drawing_id, rev, reviewer_id, creator_id, created_date in rows:
-            creator = get_employee(c, creator_id)
-
-            status = 'Review'
-            last_reviewed = None
-            if table_exists(c, drawing_id):
-                dyn = get_dyn_row(c, drawing_id, rev)
-                if dyn:
-                    status = 'Reviewed'
-                    if dyn['Date']:
-                        last_reviewed = dyn['Date'].strftime("%Y-%m-%d")
+        for drawing_no, rev, created_date, creator_id, creator_name, creator_email, reviewed_date in rows:
+            status = 'Reviewed' if reviewed_date else 'Review'
+            last_reviewed = reviewed_date.strftime("%Y-%m-%d") if reviewed_date else None
 
             out.append({
-                "drawingNo": drawing_id,
+                "drawingNo": drawing_no,
                 "revisionNo": int(rev),
                 "createdDate": created_date.strftime("%Y-%m-%d") if created_date else "",
                 "creatorId": creator_id,
-                "creatorName": creator["name"],
-                "creatorEmail": creator["email"],
+                "creatorName": creator_name,
+                "creatorEmail": creator_email,
                 "lastReviewedDate": last_reviewed,
                 "status": status
             })
@@ -2350,8 +2499,7 @@ def requests_reviewer(emp_id):
 @app.route('/requests/delete/<drawing_id>/<int:revision>', methods=['DELETE'])
 def delete_request(drawing_id, revision):
     """
-    Delete a request from the drawings table.
-    This will remove the request from both incoming (reviewer) and outgoing (creator) views.
+    Delete a request (revision) from the database.
     """
     conn = connect_to_db()
     if conn is None:
@@ -2359,29 +2507,34 @@ def delete_request(drawing_id, revision):
     
     try:
         with conn.cursor() as cur:
-            # Check if the drawing exists
-            cur.execute("""
-                SELECT 1 FROM drawings 
-                WHERE Drawing_ID=%s AND Revision_num=%s
-            """, (drawing_id, revision))
+            # 1. Find the drawing PK
+            cur.execute("SELECT id FROM drawings WHERE drawing_no=%s", (drawing_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Drawing not found"}), 404
             
-            if not cur.fetchone():
-                return jsonify({"error": "Request not found"}), 404
+            drawing_db_id = row[0]
+
+            # 2. Find the revision PK
+            cur.execute("SELECT id FROM drawing_revisions WHERE drawing_id=%s AND revision_no=%s", (drawing_db_id, revision))
+            rev_row = cur.fetchone()
+            if not rev_row:
+                 return jsonify({"error": "Revision not found"}), 404
             
-            # Delete from the main drawings table
-            cur.execute("""
-                DELETE FROM drawings 
-                WHERE Drawing_ID=%s AND Revision_num=%s
-            """, (drawing_id, revision))
+            revision_db_id = rev_row[0]
             
-            # Also delete from per-drawing table if it exists
-            if table_exists(cur, drawing_id):
-                tname = _safe_table_name(drawing_id)
-                cur.execute(
-                    f"DELETE FROM {tname} WHERE Revision_num=%s",
-                    (revision,)
-                )
+            # 3. Delete the revision
+            # ON DELETE CASCADE should handle drawing_files, revision_error_codes etc.
+            cur.execute("DELETE FROM drawing_revisions WHERE id=%s", (revision_db_id,))
             
+            # Optional: Check if drawing has any revisions left
+            cur.execute("SELECT COUNT(*) FROM drawing_revisions WHERE drawing_id=%s", (drawing_db_id,))
+            if cur.fetchone()[0] == 0:
+                # No more revisions, delete the drawing too?
+                # Maybe keeping the drawing record is fine, but usually "Delete Request" implies cleaning up if empty.
+                # Let's delete the drawing if no revisions remain.
+                cur.execute("DELETE FROM drawings WHERE id=%s", (drawing_db_id,))
+
             conn.commit()
             return jsonify({"ok": True, "message": "Request deleted successfully"}), 200
             
@@ -2446,36 +2599,30 @@ def _safe_table_name(name: str) -> str:
         raise ValueError("Invalid table name")
     return f"`{name}`"
 
-def _fetch_pdf_blob(conn, drawing_id: str, revision: int):
-    tname = _safe_table_name(drawing_id)
-
+def _fetch_pdf_blob(conn, drawing_no: str, revision_no: int) -> bytes | None:
     with conn.cursor() as cur:
-        # try per-drawing table first
-        try:
-            cur.execute("SHOW TABLES LIKE %s", (drawing_id,))
-            if cur.fetchone():
-                cur.execute(
-                    f"SELECT Drawing_PDF FROM {tname} WHERE Revision_num=%s",
-                    (revision,)
-                )
-                row = cur.fetchone()
-                if row and row[0]:
-                    return row[0]
-        except Exception:
-            pass
-
-        # fallback: global drawings table
+        # Changed: Fetch file_data directly from DB
         cur.execute("""
-            SELECT Drawing_PDF
-            FROM drawings
-            WHERE Drawing_ID=%s AND Revision_num=%s
-        """, (drawing_id, revision))
+            SELECT df.file_data
+              FROM drawing_files df
+              JOIN drawing_revisions rev ON df.revision_id = rev.id
+              JOIN drawings d ON rev.drawing_id = d.id
+             WHERE d.drawing_no = %s
+               AND rev.revision_no = %s
+             LIMIT 1
+        """, (drawing_no, revision_no))
         row = cur.fetchone()
-        return row[0] if row and row[0] else None
+        if not row:
+            return None
+        return row[0]
 
 
 @app.route("/drawings/<drawing_id>/<int:revision>/pdf/view", methods=["GET"])
 def view_pdf(drawing_id, revision):
+    """
+    View PDF inline in browser.
+    Now queries drawing_files table instead of dynamic tables.
+    """
     conn = connect_to_db()
     try:
         blob = _fetch_pdf_blob(conn, drawing_id, revision)
@@ -2488,6 +2635,10 @@ def view_pdf(drawing_id, revision):
 
 @app.route("/drawings/<drawing_id>/<int:revision>/pdf/download", methods=["GET"])
 def download_pdf(drawing_id, revision):
+    """
+    Download PDF as attachment.
+    Now queries drawing_files table instead of dynamic tables.
+    """
     conn = connect_to_db()
     try:
         blob = _fetch_pdf_blob(conn, drawing_id, revision)
@@ -2861,91 +3012,116 @@ def prefill_upload():
     if db is None:
         return jsonify({"ok": False, "error": "db not connected"}), 500
 
-    drawing_id = (request.args.get('drawing_id') or '').strip()
+    drawing_no = (request.args.get('drawing_id') or '').strip()
     rev_param  = (request.args.get('revision') or '').strip()
 
-    if not drawing_id:
+    if not drawing_no:
         return jsonify({"ok": False, "error": "drawing_id is required"}), 400
 
     try:
         cur = db.cursor()
 
-        # 1) Find the latest revision for this drawing
-        cur.execute("SELECT MAX(Revision_num) FROM drawings WHERE Drawing_ID=%s", (drawing_id,))
+        # 1. Get Drawing ID and Creator
+        cur.execute("""
+            SELECT id, creator_id, drawing_type 
+            FROM drawings 
+            WHERE drawing_no = %s
+        """, (drawing_no,))
+        drawing_row = cur.fetchone()
+        
+        if not drawing_row:
+             return jsonify({"ok": False, "error": "No matching drawing found"}), 404
+        
+        drawing_db_id = drawing_row[0]
+        creator_id = drawing_row[1]
+        drawing_type = drawing_row[2]
+
+        # 2. Determine Revision
+        # Find latest revision for this drawing
+        cur.execute("SELECT MAX(revision_no) FROM drawing_revisions WHERE drawing_id=%s", (drawing_db_id,))
         row = cur.fetchone()
         if not row or row[0] is None:
-            return jsonify({"ok": False, "error": "No rows found for this Drawing_ID"}), 404
+             # Should not happen if drawing exists, but handle it
+             return jsonify({"ok": False, "error": "No revisions found for this drawing"}), 404
         max_rev = int(row[0])
 
-        # 2) Decide which revision to use
         requested_rev = None
         if rev_param.isdigit():
             requested_rev = int(rev_param)
-
+        
         chosen_rev = max_rev
         if requested_rev is not None:
-            cur.execute(
-                "SELECT 1 FROM drawings WHERE Drawing_ID=%s AND Revision_num=%s",
-                (drawing_id, requested_rev)
-            )
+            # Check if requested exists
+            cur.execute("SELECT 1 FROM drawing_revisions WHERE drawing_id=%s AND revision_no=%s", (drawing_db_id, requested_rev))
             if cur.fetchone():
-                chosen_rev = requested_rev  # exact revision exists
-            # else: keep fallback to max_rev
+                chosen_rev = requested_rev
 
-        # 3) Pull the chosen row from drawings
+        # 3. Get Revision Details (Reviewer, Date)
         cur.execute("""
-            SELECT Creator_EMP_ID, Reviewer_EMP_ID, Revision_num, `Date`, Drawing_type
-            FROM drawings
-            WHERE Drawing_ID=%s AND Revision_num=%s
-        """, (drawing_id, chosen_rev))
-        drow = cur.fetchone()
-        if not drow:
-            return jsonify({"ok": False, "error": "No matching drawing row"}), 404
+            SELECT reviewer_id, created_at, id
+            FROM drawing_revisions
+            WHERE drawing_id=%s AND revision_no=%s
+        """, (drawing_db_id, chosen_rev))
+        
+        rev_row = cur.fetchone()
+        if not rev_row:
+             return jsonify({"ok": False, "error": "Revision details not found"}), 404
+        
+        reviewer_id = rev_row[0]
+        revision_date = rev_row[1]
+        revision_db_id = rev_row[2]
 
-        creator_id, reviewer_id, rev_in_row, date_val, drawing_type = drow
+        # 4. Get User Details
+        # Creator
+        cur.execute("SELECT emp_id, division, team, pc FROM users WHERE id=%s", (creator_id,))
+        c_user = cur.fetchone()
+        creator_emp_id = c_user[0] if c_user else ""
+        emp_division = c_user[1] if c_user else ""
+        emp_team = c_user[2] if c_user else ""
+        emp_pc = c_user[3] if c_user else ""
 
-        # 4) Creator org info
+        # Reviewer
+        reviewer_emp_id = ""
+        if reviewer_id:
+            cur.execute("SELECT emp_id FROM users WHERE id=%s", (reviewer_id,))
+            r_user = cur.fetchone()
+            if r_user:
+                reviewer_emp_id = r_user[0]
+
+        # 5. Check if PDF exists in drawing_files
         cur.execute("""
-            SELECT emp_PC, emp_division, emp_team
-            FROM Employees
-            WHERE emp_id=%s
-        """, (creator_id,))
-        erow = cur.fetchone() or ('', '', '')
-        emp_PC, emp_division, emp_team = erow
+            SELECT 1 FROM drawing_files 
+            WHERE revision_id=%s AND file_data IS NOT NULL
+        """, (revision_db_id,))
+        has_pdf = (cur.fetchone() is not None)
 
-        # 5) Whether a PDF exists
-        cur.execute("""
-            SELECT CASE WHEN Drawing_PDF IS NULL THEN 0 ELSE 1 END AS has_pdf
-            FROM drawings
-            WHERE Drawing_ID=%s AND Revision_num=%s
-        """, (drawing_id, chosen_rev))
-        has_pdf = bool((cur.fetchone() or (0,))[0])
-
-        design_no_plain = drawing_id[3:] if drawing_id.startswith('DR_') else drawing_id
+        design_no_plain = drawing_no[3:] if drawing_no.startswith('DR_') else drawing_no
 
         response_data = {
             "ok": True,
-            "drawing_id": drawing_id,
+            "drawing_id": drawing_no,
             "design_no_plain": design_no_plain,
             "requested_revision": requested_rev,
-            "used_revision": rev_in_row,
-            "revision_no": rev_in_row,  # Add this for frontend compatibility
-            "used_latest": (rev_in_row == max_rev),
-            "creator_id": creator_id or "",
-            "reviewer_id": reviewer_id or "",
-            "emp_PC":     emp_PC or "",
-            "emp_division": emp_division or "",
-            "emp_team":     emp_team or "",
+            "used_revision": chosen_rev,
+            "revision_no": chosen_rev,
+            "used_latest": (chosen_rev == max_rev),
+            "creator_id": creator_emp_id,
+            "reviewer_id": reviewer_emp_id,
+            "emp_PC": emp_pc,
+            "emp_division": emp_division,
+            "emp_team": emp_team,
             "has_pdf": has_pdf,
             "Drawing_Type": drawing_type or "",
-            # Keep ISO if you ever want it; UI doesn't have to show it
-            "reviewed_date": (date_val.isoformat() if date_val else None)
+            "reviewed_date": (revision_date.isoformat() if revision_date else None)
         }
         
-        print(f"📤 BACKEND /prefill-upload response: drawing_id={drawing_id}, revision_no={rev_in_row}, requested={requested_rev}")
+        print(f"📤 BACKEND /prefill-upload response: drawing_id={drawing_no}, revision={chosen_rev}")
         
         return jsonify(response_data)
+
     except Exception as e:
+        print(f"Error in prefill-upload: {e}")
+        traceback.print_exc()
         return jsonify({"ok": False, "error": f"Unexpected: {e}"}), 500
     finally:
         try: cur.close()
@@ -2960,8 +3136,8 @@ def prefill_upload():
 @app.route('/drawings/<drawing_id>/<int:revision>/pdf/annotated/upload', methods=['POST'])
 def upload_annotated_pdf(drawing_id, revision):
     """
-    Replaces drawings.Drawing_PDF for (Drawing_ID, Revision_num) with the uploaded annotated PDF.
-    Expects multipart/form-data with 'file' (the PDF). Optional 'filename' for logging.
+    Replaces PDF for (Drawing_ID, Revision_num) with the uploaded annotated PDF.
+    Updates drawing_files.file_data in the normalized schema.
     """
     file = request.files.get('file')
     if file is None:
@@ -2973,24 +3149,51 @@ def upload_annotated_pdf(drawing_id, revision):
     conn = connect_to_db()
     try:
         with conn.cursor() as cur:
-            # Make sure the row exists
+            # 1. Find the revision_id
             cur.execute("""
-                SELECT 1 FROM drawings
-                WHERE Drawing_ID=%s AND Revision_num=%s
-                """, (drawing_id, revision))
-            if cur.fetchone() is None:
+                SELECT rev.id, d.id
+                  FROM drawing_revisions rev
+                  JOIN drawings d ON rev.drawing_id = d.id
+                 WHERE d.drawing_no = %s
+                   AND rev.revision_no = %s
+            """, (drawing_id, revision))
+            row = cur.fetchone()
+            
+            if not row:
                 return jsonify({'error': 'row not found'}), 404
+            
+            revision_db_id = row[0]
+            drawing_db_id = row[1]
 
-            # Update the blob
-            cur.execute("""
-                UPDATE drawings
-                SET Drawing_PDF=%s
-                WHERE Drawing_ID=%s AND Revision_num=%s
-                """, (pdf_bytes, drawing_id, revision))
+            # 2. Update the PDF in drawing_files
+            # We first check if a file entry exists for this revision
+            cur.execute("SELECT id FROM drawing_files WHERE revision_id = %s", (revision_db_id,))
+            if cur.fetchone():
+                cur.execute("""
+                    UPDATE drawing_files
+                       SET file_data = %s, uploaded_at = NOW()
+                     WHERE revision_id = %s
+                """, (pdf_bytes, revision_db_id))
+            else:
+                # Need uploaded_by... we might not have it from this context easy.
+                # But typically we should just update. If missing, we need a fallback.
+                # Let's assume it exists if the revision exists (from submit-batch).
+                # If not, we fall back to creator of the drawing? 
+                # For safety, let's use the Creator of the drawing as uploaded_by if we must insert.
+                cur.execute("SELECT creator_id FROM drawings WHERE id = %s", (drawing_db_id,))
+                creator_id = cur.fetchone()[0]
+                
+                cur.execute("""
+                    INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id))
+
         conn.commit()
         return jsonify({'ok': True, 'filename': filename})
     except Exception as e:
         conn.rollback()
+        print(f"Error uploading annotated PDF: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         conn.close()
@@ -3047,5 +3250,5 @@ def load_annotations(drawing_id):
 
 # Canvas end
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
     # serve(app, port=5000, threads=4)

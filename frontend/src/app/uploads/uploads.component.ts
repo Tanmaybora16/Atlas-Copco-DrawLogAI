@@ -67,16 +67,16 @@ export class UploadsComponent {
     private cdRef: ChangeDetectorRef,
     private route: ActivatedRoute,
     private router: Router
-  ) {}
+  ) { }
 
   ngOnInit() {
     // Prefill when routed from Requests page
     this.route.queryParamMap.subscribe((params) => {
       const drawingId = (params.get('drawing_id') || '').trim();
       const rev = (params.get('revision') || '').trim();
-      
+
       console.log('🎬 UPLOADS ngOnInit - Query params:', { drawing_id: drawingId, revision: rev });
-      
+
       if (drawingId) {
         this.prefillFromServer(drawingId, rev);
       }
@@ -87,14 +87,14 @@ export class UploadsComponent {
 
   private prefillFromServer(drawingId: string, revision: string) {
     console.log('🔍 UPLOADS prefillFromServer called with:', { drawingId, revision });
-    
+
     const q: any = { drawing_id: drawingId };
     if (revision) q.revision = revision;
 
     this.http.get<any>(`${this.API}/prefill-upload`, { params: q }).subscribe({
       next: (res) => {
         console.log('📦 UPLOADS Backend response:', res);
-        
+
         // creator + org
         this.selectedEmpId = res.creator_id || '';
         this.selectedEmployee = {
@@ -319,6 +319,7 @@ export class UploadsComponent {
         pc: (this.selectedPC || '').trim(),
         team: (this.selectedEmployee.emp_team || '').trim(),
         decision: this.decision,
+        comments: (form.value.comments || '').trim() // Added comments
       },
     };
 
@@ -477,18 +478,18 @@ export class UploadsComponent {
       // Remove from both arrays
       this.extractedComments.splice(index, 1);
       this.predictedErrors.splice(index, 1);
-      
+
       // Update error counts
       this.errorCounts = this.countErrorOccurrences(this.predictedErrors);
-      
+
       // Clean up edit tracking for this row
       this.editedRows.delete(index);
       delete this.originalErrors[index];
-      
+
       // Reindex edit tracking (shift down indices after deleted row)
       const newEditedRows = new Set<number>();
       const newOriginalErrors: { [key: number]: string } = {};
-      
+
       this.editedRows.forEach(rowIndex => {
         if (rowIndex > index) {
           newEditedRows.add(rowIndex - 1);
@@ -496,7 +497,7 @@ export class UploadsComponent {
           newEditedRows.add(rowIndex);
         }
       });
-      
+
       Object.keys(this.originalErrors).forEach(key => {
         const rowIndex = parseInt(key);
         if (rowIndex > index) {
@@ -505,16 +506,16 @@ export class UploadsComponent {
           newOriginalErrors[rowIndex] = this.originalErrors[rowIndex];
         }
       });
-      
+
       this.editedRows = newEditedRows;
       this.originalErrors = newOriginalErrors;
-      
+
       // Reset edit mode if we were editing this or a later row
       if (this.editedIndex !== null && this.editedIndex >= index) {
         this.editedIndex = null;
         this.selectedError = '';
       }
-      
+
       // Auto-approve if no errors left
       if (this.predictedErrors.length === 0) {
         this.decision = 'approve';

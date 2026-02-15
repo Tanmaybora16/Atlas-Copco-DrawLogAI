@@ -12,18 +12,18 @@ import { environment } from 'src/environments/environment';
   styleUrls: ['./table.component.scss'],
 })
 export class TableComponent implements OnInit {
-  @Input() selectedDivision: string = '';
+  @Input() selectedTeam: string = '';
   @Input() selectedPC: string = '';
   @Input() startDate: string = '';
   @Input() endDate: string = '';
 
-  get showDivisionPC(): boolean {
-    return this.selectedDivision !== "" || this.selectedPC !== "";
+  get showTeamPC(): boolean {
+    return this.selectedTeam !== "" || this.selectedPC !== "";
   }
 
   passRatioData: any[] = [];
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   ngOnInit() {
     this.fetchPassRatioData();
@@ -35,7 +35,7 @@ export class TableComponent implements OnInit {
 
   fetchPassRatioData() {
     const filters = {
-      division: this.selectedDivision,
+      team: this.selectedTeam,
       pc: this.selectedPC,
       start_date: this.startDate,
       end_date: this.endDate,
@@ -45,7 +45,7 @@ export class TableComponent implements OnInit {
       const currentYear = new Date().getFullYear();
 
       // Check if no filters are applied
-      const noFiltersApplied = !this.selectedDivision && !this.selectedPC && !this.startDate && !this.endDate;
+      const noFiltersApplied = !this.selectedTeam && !this.selectedPC && !this.startDate && !this.endDate;
 
       // Filter to current year only if no filters are selected
       this.passRatioData = noFiltersApplied
@@ -67,7 +67,7 @@ export class TableComponent implements OnInit {
       return {
         'Year': row.year,
         'Month': row.month,
-        ...(this.showDivisionPC ? { 'Division': this.selectedDivision, 'PC': this.selectedPC } : {}),
+        ...(this.showTeamPC ? { 'Team': this.selectedTeam, 'PC': this.selectedPC } : {}),
         'No of Drawings': row.total_drawings,
         'Pass Ratio': row.pass_ratio,
         'Count': row.accepted_drawings
@@ -85,16 +85,16 @@ export class TableComponent implements OnInit {
     doc.text('Pass Ratio Report', 14, 10);
 
     const tableColumn = ['Year', 'Month', 'No of Drawings', 'Pass Ratio', 'Count'];
-    if (this.showDivisionPC) {
-      tableColumn.splice(2, 0, 'Division', 'PC');
+    if (this.showTeamPC) {
+      tableColumn.splice(2, 0, 'Team', 'PC');
     }
 
     autoTable(doc, {
       head: [tableColumn],
       body: this.passRatioData.map(row => {
         const rowData = [row.year, row.month, row.total_drawings, row.pass_ratio, row.accepted_drawings];
-        if (this.showDivisionPC) {
-          rowData.splice(2, 0, this.selectedDivision, this.selectedPC);
+        if (this.showTeamPC) {
+          rowData.splice(2, 0, this.selectedTeam, this.selectedPC);
         }
         return rowData;
       }),
@@ -111,9 +111,9 @@ export class TableComponent implements OnInit {
 
           const color: [number, number, number] =
             passRatioValue === 'NA' ? [28, 196, 135] :
-            passRatioValue >= 71 ? [28, 196, 135] :
-            passRatioValue >= 41 && passRatioValue < 71 ? [244, 237, 91] :
-            [244, 84, 99];
+              passRatioValue >= 71 ? [28, 196, 135] :
+                passRatioValue >= 41 && passRatioValue < 71 ? [244, 237, 91] :
+                  [244, 84, 99];
 
           data.row.cells[3 + columnOffset].styles.fillColor = color;
           data.row.cells[4 + columnOffset].styles.fillColor = color;

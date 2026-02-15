@@ -11,15 +11,15 @@
     </select>
   </div>
 
-  <!-- Division Dropdown -->
+  <!-- Team Dropdown -->
   <div class="dropdown-container" *ngIf="showDefaultDropdowns">
-    <label>Division</label>
-    <div class="dropdown-box" (click)="showDivisions = !showDivisions">
-      {{ selectedDivision || 'Select Division' }}
+    <label>Team</label>
+    <div class="dropdown-box" (click)="showTeams = !showTeams">
+      {{ selectedTeam || 'Select Team' }}
     </div>
-    <div class="dropdown-list" *ngIf="showDivisions">
-      <div class="dropdown-item" *ngFor="let div of divisions" (click)="selectDivision(div)">
-        {{ div }}
+    <div class="dropdown-list" *ngIf="showTeams">
+      <div class="dropdown-item" *ngFor="let team of teams" (click)="selectTeam(team)">
+        {{ team }}
       </div>
     </div>
   </div>
@@ -44,7 +44,8 @@
       {{ selectedEmpId || 'Select Employee ID' }}
     </div>
     <div class="dropdown-list" *ngIf="showEmployees">
-      <input class="dropdown-search" type="text" [(ngModel)]="empSearch" (input)="filterEmployees()" placeholder="Search..." />
+      <input class="dropdown-search" type="text" [(ngModel)]="empSearch" (input)="filterEmployees()"
+        placeholder="Search..." />
       <div class="dropdown-item" *ngFor="let emp of filteredEmployees" (click)="selectEmployee(emp)">
         {{ emp }}
       </div>
@@ -58,7 +59,8 @@
       {{ selectedDrawingId || 'Select Drawing ID' }}
     </div>
     <div class="dropdown-list" *ngIf="showDrawings">
-      <input class="dropdown-search" type="text" [(ngModel)]="drawingSearch" (input)="filterDrawings()" placeholder="Search..." />
+      <input class="dropdown-search" type="text" [(ngModel)]="drawingSearch" (input)="filterDrawings()"
+        placeholder="Search..." />
       <div class="dropdown-item" *ngFor="let drawing of filteredDrawings" (click)="selectDrawing(drawing)">
         {{ drawing }}
       </div>
@@ -81,56 +83,31 @@
 <!-- Charts Section -->
 <div class="charts-container">
   <div class="column-chart">
-    <app-column-chart
-      *ngIf="selectedReport === 'monthly'"
-      [selectedDivision]="selectedDivision"
-      [selectedPC]="selectedPC"
-      [startDate]="startDate"
-      [endDate]="endDate">
+    <app-column-chart *ngIf="selectedReport === 'monthly'" [selectedTeam]="selectedTeam" [selectedPC]="selectedPC"
+      [startDate]="startDate" [endDate]="endDate">
     </app-column-chart>
 
-    <app-report-table 
-      *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport'"
-      [reportType]="selectedReport"
-      [employeeId]="selectedEmpId" 
-      [drawingId]="selectedDrawingId" 
-      [startDate]="startDate"
+    <app-report-table *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport'"
+      [reportType]="selectedReport" [employeeId]="selectedEmpId" [drawingId]="selectedDrawingId" [startDate]="startDate"
       [endDate]="endDate">
     </app-report-table>
 
-    <app-line-chart 
-      *ngIf="selectedReport === 'trend'"
-      [selectedDivision]="selectedDivision"
-      [selectedPC]="selectedPC"
-      [startDate]="startDate"
-      [endDate]="endDate">
+    <app-line-chart *ngIf="selectedReport === 'trend'" [selectedTeam]="selectedTeam" [selectedPC]="selectedPC"
+      [startDate]="startDate" [endDate]="endDate">
     </app-line-chart>
 
-    <app-table 
-      *ngIf="selectedReport === 'passRatio'"
-      [selectedDivision]="selectedDivision"
-      [selectedPC]="selectedPC"
-      [startDate]="startDate"
-      [endDate]="endDate">
+    <app-table *ngIf="selectedReport === 'passRatio'" [selectedTeam]="selectedTeam" [selectedPC]="selectedPC"
+      [startDate]="startDate" [endDate]="endDate">
     </app-table>
   </div>
 
   <div class="bar-chart">
-    <app-bar-chart 
-      *ngIf="selectedReport === 'monthly' || selectedReport === 'trend'"
-      [reportType]="selectedReport"
-      [selectedDivision]="selectedDivision"
-      [selectedPC]="selectedPC"
-      [startDate]="startDate"
-      [endDate]="endDate">
+    <app-bar-chart *ngIf="selectedReport === 'monthly' || selectedReport === 'trend'" [reportType]="selectedReport"
+      [selectedTeam]="selectedTeam" [selectedPC]="selectedPC" [startDate]="startDate" [endDate]="endDate">
     </app-bar-chart>
 
-    <app-report-charts 
-      *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport'" 
-      [reportType]="selectedReport" 
-      [employeeId]="selectedEmpId" 
-      [drawingId]="selectedDrawingId"
-      [startDate]="startDate"
+    <app-report-charts *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport'"
+      [reportType]="selectedReport" [employeeId]="selectedEmpId" [drawingId]="selectedDrawingId" [startDate]="startDate"
       [endDate]="endDate">
     </app-report-charts>
   </div>
