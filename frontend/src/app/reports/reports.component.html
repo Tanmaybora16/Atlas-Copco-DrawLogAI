@@ -40,12 +40,9 @@
   <!-- Employee ID Dropdown with Search -->
   <div class="dropdown-container" *ngIf="showEmployeeDropdown">
     <label>Employee ID</label>
-    <div class="dropdown-box" (click)="showEmployees = !showEmployees">
-      {{ selectedEmpId || 'Select Employee ID' }}
-    </div>
+    <input class="dropdown-box" type="text" [(ngModel)]="empSearch" (focus)="showEmployees = true"
+      (input)="filterEmployees()" placeholder="Select or Type Employee ID" />
     <div class="dropdown-list" *ngIf="showEmployees">
-      <input class="dropdown-search" type="text" [(ngModel)]="empSearch" (input)="filterEmployees()"
-        placeholder="Search..." />
       <div class="dropdown-item" *ngFor="let emp of filteredEmployees" (click)="selectEmployee(emp)">
         {{ emp }}
       </div>
@@ -55,12 +52,9 @@
   <!-- Drawing ID Dropdown with Search -->
   <div class="dropdown-container" *ngIf="showDrawingIdDropdown">
     <label>Drawing ID</label>
-    <div class="dropdown-box" (click)="showDrawings = !showDrawings">
-      {{ selectedDrawingId || 'Select Drawing ID' }}
-    </div>
+    <input class="dropdown-box" type="text" [(ngModel)]="drawingSearch" (focus)="showDrawings = true"
+      (input)="filterDrawings()" placeholder="Select or Type Drawing ID" />
     <div class="dropdown-list" *ngIf="showDrawings">
-      <input class="dropdown-search" type="text" [(ngModel)]="drawingSearch" (input)="filterDrawings()"
-        placeholder="Search..." />
       <div class="dropdown-item" *ngFor="let drawing of filteredDrawings" (click)="selectDrawing(drawing)">
         {{ drawing }}
       </div>

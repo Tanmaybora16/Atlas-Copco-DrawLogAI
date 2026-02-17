@@ -12,9 +12,9 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import * as pdfjsLib from 'pdfjs-dist';
 import { environment } from 'src/environments/environment';
- 
+
 type CanvasMode = 'view' | 'add-text' | 'select' | 'add-stamp';
- 
+
 /**
  * A lightweight text annotation that is always stored in
  * page‑relative, normalized coordinates so it stays aligned
@@ -35,7 +35,7 @@ export interface Annotation {
   fontSize?: number;
   type?: 'text' | 'stamp'; // New property to distinguish annotation types
   stampType?: 'reviewed' | 'approved' | 'rejected'; // Type of stamp
-  reviewerName?: string; // Name of the person who stamped
+  // reviewerName?: string; // Name of the person who stamped
   reviewDate?: string; // Date of the stamp
 }
 
@@ -66,25 +66,25 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   totalPages = 0;
   scale = 1;
   currentPdfFile: File | null = null;
- 
+
   // Annotation state
   annotations: Annotation[] = [];
   selectedAnnotationId: string | null = null;
   mode: CanvasMode = 'view';
- 
+
   // Inline editor state
   isEditingText = false;
   editingAnnotationId: string | null = null;
   textInputPosition = { x: 0, y: 0 };
   textInputValue = '';
- 
+
   // Styles
   textColor = '#000000';
   fontSize = 16;
 
   // Stamp properties
   selectedStampType: 'reviewed' | 'approved' | 'rejected' = 'reviewed';
-  reviewerName = 'Anuj Khande'; // This could come from user settings/profile
+  // reviewerName = 'Anuj Khande'; // This could come from user settings/profile
 
   // Dragging state
   private isDragging = false;
@@ -150,20 +150,20 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
   ngOnInit(): void {
     const nav = this.router.getCurrentNavigation()?.extras.state as any | undefined;
- 
+
     // Fallbacks if user reloads the page or arrives via URL
     const qp = this.route.snapshot.queryParamMap;
     const qpDrawingId = qp.get('drawing_id');
     const qpRevision = qp.get('revision');
- 
+
     this.drawingNumber = nav?.drawingId ?? qpDrawingId ?? this.drawingNumber;
     // Ensure revision is parsed as a number
     this.revisionNumber = nav?.revision ?? (qpRevision ? Number(qpRevision) : this.revisionNumber);
     this.creatorId = nav?.creatorId ?? this.creatorId;
-    
+
     console.log('Canvas ngOnInit - Drawing:', this.drawingNumber, 'Revision:', this.revisionNumber);
   }
- 
+
   showStatusMessageFunc(message: string): void {
     this.statusMessage = message;
     this.showStatusMessage = true;
@@ -191,24 +191,24 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     }
   }
 
-  
+
 
   async renderPage(num: number): Promise<void> {
     if (!this.pdfDoc) {
       this.renderMockPage();
       return;
     }
- 
+
     try {
       const page = await this.pdfDoc.getPage(num);
       const viewport = page.getViewport({ scale: this.scale });
- 
+
       const canvas = this.canvasRef.nativeElement;
       canvas.height = viewport.height;
       canvas.width = viewport.width;
- 
+
       await page.render({ canvasContext: this.pdfContext, viewport }).promise;
- 
+
       // Resize overlay to match canvas
       const layer = this.annotationLayerRef?.nativeElement;
       if (layer) {
@@ -220,27 +220,27 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       this.renderMockPage();
     }
   }
- 
+
   private renderMockPage(): void {
     const pdfCanvas = this.canvasRef.nativeElement;
     const W = 600 * this.scale;
     const H = 800 * this.scale;
     pdfCanvas.width = W;
     pdfCanvas.height = H;
- 
+
     this.pdfContext.fillStyle = '#fff';
     this.pdfContext.fillRect(0, 0, W, H);
     this.pdfContext.fillStyle = '#000';
     this.pdfContext.font = `${18 * this.scale}px Arial`;
     this.pdfContext.fillText('No PDF – showing mock page', 40 * this.scale, 60 * this.scale);
- 
+
     const layer = this.annotationLayerRef?.nativeElement;
     if (layer) {
       layer.style.width = `${W}px`;
       layer.style.height = `${H}px`;
     }
   }
- 
+
   // ───────────────────────────────────────────────────────────────────────────
   // Mode switching & PDF clicks
   // ───────────────────────────────────────────────────────────────────────────
@@ -254,7 +254,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   setStampType(type: 'reviewed' | 'approved' | 'rejected'): void {
     this.selectedStampType = type;
   }
- 
+
   onPdfClick(event: MouseEvent): void {
     // Only proceed if in add-text or add-stamp mode
     if (this.mode !== 'add-text' && this.mode !== 'add-stamp') {
@@ -265,17 +265,17 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       return;
     }
     event.stopPropagation();
- 
+
     const layer = this.annotationLayerRef?.nativeElement;
     if (!layer) return;
- 
+
     const rect = layer.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
     const clickY = event.clientY - rect.top;
- 
+
     const normalizedX = clickX / rect.width;
     const normalizedY = clickY / rect.height;
- 
+
     if (this.mode === 'add-stamp') {
       // Add a stamp annotation
       this.addStampAnnotation(normalizedX, normalizedY);
@@ -287,9 +287,9 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
   private addStampAnnotation(normalizedX: number, normalizedY: number): void {
     const now = new Date();
-    const dateStr = now.toLocaleString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
+    const dateStr = now.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
@@ -305,7 +305,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       text: '', // Empty for stamps, as they use stampType instead
       type: 'stamp',
       stampType: this.selectedStampType,
-      reviewerName: this.reviewerName,
+      // reviewerName: this.reviewerName,
       reviewDate: dateStr,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -329,20 +329,20 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
- 
+
     this.annotations.push(newAnnotation);
     this.selectedAnnotationId = newAnnotation.id;
- 
+
     this.textInputPosition = { x: clickX, y: clickY };
     this.textInputValue = '';
     this.isEditingText = true;
     this.editingAnnotationId = newAnnotation.id;
- 
+
     setTimeout(() => {
       this.textInputRef?.nativeElement.focus();
     }, 0);
   }
- 
+
   onTextInputChange(): void {
     if (this.editingAnnotationId) {
       this.annotations = this.annotations.map(a =>
@@ -350,7 +350,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       );
     }
   }
- 
+
   finishTextEditing(): void {
     if (this.editingAnnotationId && this.textInputValue.trim() === '') {
       this.annotations = this.annotations.filter(a => a.id !== this.editingAnnotationId);
@@ -359,7 +359,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     this.editingAnnotationId = null;
     this.textInputValue = '';
   }
- 
+
   // ───────────────────────────────────────────────────────────────────────────
   // Annotation selection & deletion
   // ───────────────────────────────────────────────────────────────────────────
@@ -381,7 +381,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       setTimeout(() => this.textInputRef?.nativeElement.focus(), 0);
     }
   }
- 
+
   onAnnotationMouseDown(annotation: Annotation, event: MouseEvent): void {
     if (this.mode !== 'select') return;
     event.preventDefault();
@@ -397,7 +397,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     this.dragAnnotationId = annotation.id;
     this.selectedAnnotationId = annotation.id;
   }
- 
+
   deleteSelected(): void {
     if (this.selectedAnnotationId) {
       this.annotations = this.annotations.filter(a => a.id !== this.selectedAnnotationId);
@@ -407,7 +407,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       this.toast('No annotation selected.');
     }
   }
- 
+
   // ───────────────────────────────────────────────────────────────────────────
   // Zoom & navigation
   // ───────────────────────────────────────────────────────────────────────────
@@ -415,24 +415,24 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     this.scale = Math.min(this.scale + 0.2, 3);
     await this.renderPage(this.pageNum);
   }
- 
+
   async zoomOut(): Promise<void> {
     this.scale = Math.max(this.scale - 0.2, 0.4);
     await this.renderPage(this.pageNum);
   }
- 
+
   async previousPage(): Promise<void> {
     if (this.pageNum <= 1) return;
     this.pageNum--;
     await this.renderPage(this.pageNum);
   }
- 
+
   async nextPage(): Promise<void> {
     if (this.pageNum >= this.totalPages) return;
     this.pageNum++;
     await this.renderPage(this.pageNum);
   }
- 
+
   // ───────────────────────────────────────────────────────────────────────────
   // Text style
   // ───────────────────────────────────────────────────────────────────────────
@@ -440,24 +440,24 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     const input = event.target as HTMLInputElement;
     this.textColor = input.value;
   }
- 
+
   setFontSize(event: Event): void {
     const select = event.target as HTMLSelectElement;
     this.fontSize = Number(select.value);
   }
- 
+
   // ───────────────────────────────────────────────────────────────────────────
   // File upload
   // ───────────────────────────────────────────────────────────────────────────
   openFileSelector(): void {
     this.fileInputRef?.nativeElement.click();
   }
- 
+
   async onFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
- 
+
     this.currentPdfFile = file;
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -467,7 +467,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     await this.renderPage(this.pageNum);
     this.toast('PDF uploaded and loaded.');
   }
- 
+
   // ───────────────────────────────────────────────────────────────────────────
   // Positioning helper
   // ───────────────────────────────────────────────────────────────────────────
@@ -480,7 +480,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     const left = a.x * rect.width;
     const top = a.y * rect.height;
     const isSelected = a.id === this.selectedAnnotationId;
-    
+
     // Different styling for stamps vs text annotations
     if (a.type === 'stamp') {
       return {
@@ -501,7 +501,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       };
     }
   }
- 
+
   // ───────────────────────────────────────────────────────────────────────────
   // Backend-based annotation persistence (bulk per document)
   // ───────────────────────────────────────────────────────────────────────────
@@ -524,7 +524,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       this.toast('Failed to save annotations.');
     }
   }
- 
+
   async loadAnnotations(): Promise<void> {
     if (!this.drawingNumber) {
       this.toast('Missing drawing number.');
@@ -545,7 +545,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       this.toast('Failed to load annotations.');
     }
   }
- 
+
   clearAnnotations(): void {
     this.annotations = [];
     this.selectedAnnotationId = null;
@@ -620,13 +620,13 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     this.isDragging = false;
     this.dragAnnotationId = null;
   }
- 
+
   // ───────────────────────────────────────────────────────────────────────────
   // Error Mapping → Uploads (prefill)
   // ───────────────────────────────────────────────────────────────────────────
   async goToErrorMapping(): Promise<void> {
     console.log('goToErrorMapping called - Drawing:', this.drawingNumber, 'Revision:', this.revisionNumber);
-    
+
     if (!this.drawingNumber || !this.revisionNumber) {
       this.toast('Missing drawing number or revision.');
       this.router.navigate(['/uploads']);
@@ -641,7 +641,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
       // Step 2: Generate annotated PDF blob
       const annotatedPdfBlob = await this.generateAnnotatedPdfBlob();
-      
+
       // Step 3: SAVE the annotated PDF to the database (overwrite original)
       await this.saveAnnotatedPdfToDatabase(annotatedPdfBlob);
 
@@ -657,7 +657,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     } catch (err) {
       console.error('Failed to save annotated PDF', err);
       this.toast('Failed to save PDF. Redirecting anyway...');
-      
+
       // Fallback: navigate without saving
       this.router.navigate(['/uploads'], {
         queryParams: {
@@ -687,7 +687,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
     return blob;
   }
-  
+
   /**
    * Save the annotated PDF to the database, replacing the original
    */
@@ -695,20 +695,20 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     const url = `${this.API}/drawings/${encodeURIComponent(
       this.drawingNumber
     )}/${this.revisionNumber}/pdf/annotated/upload`;
-    
+
     // Format revision number as 2-digit string (e.g., "01", "02", etc.)
     const revisionStr = String(this.revisionNumber).padStart(2, '0');
     const filename = `${this.drawingNumber}-${revisionStr}.pdf`;
-    
+
     console.log('Saving annotated PDF:', filename, 'Drawing:', this.drawingNumber, 'Revision:', this.revisionNumber);
-    
+
     const formData = new FormData();
     formData.append('file', annotatedPdfBlob, filename);
-    
+
     await firstValueFrom(
       this.http.post(url, formData)
     );
-    
+
     this.toast('Annotated PDF saved to database');
   }
 
@@ -720,7 +720,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     this.showStatusMessage = true;
     setTimeout(() => (this.showStatusMessage = false), 3000);
   }
- 
+
   private generateId(): string {
     return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
   }

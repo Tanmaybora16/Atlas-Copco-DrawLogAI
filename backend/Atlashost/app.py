@@ -282,6 +282,7 @@ def submit_data():
             IST = timezone('Asia/Kolkata')
             reviewed_date = datetime.now(IST).date()
             drawing_type = str(form_data["drawingType"]).strip()
+            task_number = str(form_data.get("task_number", "")).strip()
             decision = (str(form_data.get("decision", "")).strip() or "approve").lower()
             approved = (decision == "approve")
             division = str(form_data["division"]).strip()
@@ -321,11 +322,50 @@ def submit_data():
                 return dbg_fail("creator-lookup", "Creator not found", extra={"creator_emp_id": creator_emp_id}, code=404)
             creator_id = creator_row[0]
 
-            cursor.execute("SELECT id FROM users WHERE emp_id = %s", (reviewer_emp_id,))
+            cursor.execute("SELECT id, name FROM users WHERE emp_id = %s", (reviewer_emp_id,))
             reviewer_row = cursor.fetchone()
             if not reviewer_row:
                 return dbg_fail("reviewer-lookup", "Reviewer not found", extra={"reviewer_emp_id": reviewer_emp_id}, code=404)
             reviewer_id = reviewer_row[0]
+            reviewer_db_name = reviewer_row[1]
+        except Exception as e:
+            return dbg_fail("user-lookup", e)
+
+        # ... (rest of the code)
+
+        # 6) Send email notification (Approved/Rejected)
+        try:
+            cursor.execute("SELECT email, name FROM users WHERE id = %s", (creator_id,))
+            creator_row = cursor.fetchone()
+            if creator_row:
+                creator_email, creator_db_name = creator_row[0], creator_row[1]
+                
+                # Format names as "EMP_ID - Name"
+                formatted_creator_name = f"{creator_emp_id} - {creator_db_name}"
+                formatted_reviewer_name = f"{reviewer_emp_id} - {reviewer_db_name}"
+
+                try:
+                    send_email(
+                        to_email=creator_email,
+                        drawing_id=drawing_no,
+                        revision_no=revision_no_int,
+                        reviewer_name=formatted_reviewer_name,
+                        reviewed_date=reviewed_date,
+                        error_codes=error_codes,
+                        extracted_comments=extracted_comments,
+                        decision=decision,
+                        drawing_Type=drawing_type,
+                        creator_name=formatted_creator_name,
+                        pdf_bytes=pdf_bytes,
+                        pdf_filename=pdf_filename,
+                        file_path=None, # We have bytes, not path
+                        user_comments=form_data.get('comments')
+                    )
+                except TypeError as e:
+                     print(f"⚠ email-send signature mismatch: {e}")
+        except Exception as e:
+            # Don't fail the whole transaction because of email
+            print("⚠ email-send failed:", e)
         except Exception as e:
             return dbg_fail("user-lookup", e)
 
@@ -365,19 +405,22 @@ def submit_data():
                        SET reviewer_id = %s,
                            reviewed_date = %s,
                            approved = %s,
-                           review_comments = %s
+                           review_comments = %s,
+                           task_number = %s
                      WHERE id = %s
                 """, (reviewer_id, reviewed_date, approved, 
                       json.dumps(extracted_comments) if extracted_comments else None, 
+                      task_number,
                       revision_id))
             else:
                 # Insert new revision
                 cursor.execute("""
                     INSERT INTO drawing_revisions 
-                    (drawing_id, revision_no, reviewer_id, reviewed_date, approved, review_comments)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    (drawing_id, revision_no, reviewer_id, reviewed_date, approved, review_comments, task_number)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (drawing_id, revision_no_int, reviewer_id, reviewed_date, approved, 
-                      json.dumps(extracted_comments) if extracted_comments else None))
+                      json.dumps(extracted_comments) if extracted_comments else None,
+                      task_number))
                 revision_id = cursor.lastrowid
         except Exception as e:
              return dbg_fail("revision-upsert", e, extra={"drawing_id": drawing_id, "rev": revision_no_int})
@@ -443,36 +486,34 @@ def submit_data():
         except Exception as e:
             return dbg_fail("drawing-status-update", e)
 
-        # 6) Send email on reject (only if rejected)
-        if not approved:
-            try:
-                cursor.execute("SELECT email, name FROM users WHERE id = %s", (creator_id,))
-                creator_row = cursor.fetchone()
-                if creator_row:
-                    creator_email, creator_name = creator_row[0], creator_row[1]
-                    try:
-                        send_email(
-                            to_email=creator_email,
-                            drawing_id=drawing_no,
-                            revision_no=revision_no_int,
-                            reviewer_name=reviewer_emp_id,
-                            reviewed_date=reviewed_date,
-                            error_codes=error_codes,
-                            extracted_comments=extracted_comments,
-                            decision=decision,
-                            drawing_Type=drawing_type,
-                            creator_name=creator_name,
-                            pdf_bytes=pdf_bytes,
-                            pdf_filename=pdf_filename,
-                            file_path=None, # We have bytes, not path
-                            user_comments=form_data.get('comments')
-                        )
-                    except TypeError:
-                         # Fallback if send_email signature is weird, but we matched the definition earlier
-                         pass
-            except Exception as e:
-                # Don't fail the whole transaction because of email
-                print("⚠ email-send failed:", e)
+        # 6) Send email notification (Approved/Rejected)
+        try:
+            cursor.execute("SELECT email, name FROM users WHERE id = %s", (creator_id,))
+            creator_row = cursor.fetchone()
+            if creator_row:
+                creator_email, creator_name = creator_row[0], creator_row[1]
+                try:
+                    send_email(
+                        to_email=creator_email,
+                        drawing_id=drawing_no,
+                        revision_no=revision_no_int,
+                        reviewer_name=reviewer_emp_id,
+                        reviewed_date=reviewed_date,
+                        error_codes=error_codes,
+                        extracted_comments=extracted_comments,
+                        decision=decision,
+                        drawing_Type=drawing_type,
+                        creator_name=creator_name,
+                        pdf_bytes=pdf_bytes,
+                        pdf_filename=pdf_filename,
+                        file_path=None, # We have bytes, not path
+                        user_comments=form_data.get('comments')
+                    )
+                except TypeError as e:
+                     print(f"⚠ email-send signature mismatch: {e}")
+        except Exception as e:
+            # Don't fail the whole transaction because of email
+            print("⚠ email-send failed:", e)
 
         # Commit all changes
         try:
@@ -490,7 +531,7 @@ def submit_data():
 
     
     
-def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, error_codes, extracted_comments, decision, file_path, drawing_Type, creator_name, user_comments=None):
+def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, error_codes, extracted_comments, decision, file_path, drawing_Type, creator_name, user_comments=None, pdf_bytes=None, pdf_filename=None):
     try:
         # Set up the SMTP server
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
@@ -536,7 +577,13 @@ def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, 
         msg.attach(MIMEText(body, "plain"))
 
         # Attach PDF file
-        if file_path and os.path.exists(file_path):
+        if pdf_bytes and pdf_filename:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(pdf_bytes)
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", f"attachment; filename={pdf_filename}")
+            msg.attach(part)
+        elif file_path and os.path.exists(file_path):
             with open(file_path, "rb") as attachment:
                 part = MIMEBase("application", "octet-stream")
                 part.set_payload(attachment.read())
@@ -588,7 +635,7 @@ def get_employee_details(emp_id):
         
     cursor = g.db.cursor()
     # Query users table with field mapping
-    cursor.execute("SELECT pc, division, team, email FROM users WHERE emp_id = %s", (emp_id,))
+    cursor.execute("SELECT pc, division, team, email, name FROM users WHERE emp_id = %s", (emp_id,))
     employee = cursor.fetchone()
     cursor.close()
 
@@ -597,8 +644,10 @@ def get_employee_details(emp_id):
             "emp_PC": employee[0],
             "emp_division": employee[1],
             "emp_team": employee[2],
-            "emp_email": employee[3]
+            "emp_email": employee[3],
+            "emp_name": employee[4]
         })
+
     else:
         return jsonify({})
 
@@ -1825,7 +1874,8 @@ def employee_report():
                 CASE WHEN dr.approved = TRUE THEN 'Approve'
                      WHEN dr.approved = FALSE THEN 'Reject'
                      ELSE 'Pending' END as Decision,
-                GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes
+                GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes,
+                dr.task_number as Task_Number
             FROM drawings d
             JOIN drawing_revisions dr ON d.id = dr.drawing_id
             LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
@@ -2225,6 +2275,7 @@ def submit_batch():
         team          = (request.form.get('team') or '').strip()
         pc            = (request.form.get('pc') or '').strip()
         drawing_type  = (request.form.get('drawing_type') or '').strip()
+        task_number   = (request.form.get('task_number') or '').strip()
 
         # Use g.db instead of creating a new connection
         if not hasattr(g, 'db') or g.db is None:
@@ -2236,11 +2287,12 @@ def submit_batch():
         try:
             with g.db.cursor() as c:
                 # Get user IDs from emp_ids
-                c.execute("SELECT id FROM users WHERE emp_id = %s AND is_active = TRUE", (creator_emp_id,))
+                c.execute("SELECT id, name FROM users WHERE emp_id = %s AND is_active = TRUE", (creator_emp_id,))
                 creator_row = c.fetchone()
                 if not creator_row:
                     return jsonify({"success": False, "message": f"Creator {creator_emp_id} not found"}), 400
                 creator_id = creator_row[0]
+                creator_db_name = creator_row[1]
 
                 c.execute("SELECT id, name FROM users WHERE emp_id = %s AND is_active = TRUE", (reviewer_emp_id,))
                 reviewer_row = c.fetchone()
@@ -2286,7 +2338,7 @@ def submit_batch():
                     if revision_row:
                         # Update existing revision
                         revision_db_id = revision_row[0]
-                        c.execute("UPDATE drawing_revisions SET reviewer_id = %s, reviewed_date = NULL, approved = NULL WHERE id = %s", (reviewer_id, revision_db_id))
+                        c.execute("UPDATE drawing_revisions SET reviewer_id = %s, reviewed_date = NULL, approved = NULL, task_number = %s WHERE id = %s", (reviewer_id, task_number, revision_db_id))
                         
                         # Update PDF file data in drawing_files
                         c.execute("DELETE FROM drawing_files WHERE revision_id = %s", (revision_db_id,))
@@ -2296,8 +2348,9 @@ def submit_batch():
                         """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
                     else:
                         # Create new revision
-                        c.execute("INSERT INTO drawing_revisions (drawing_id, revision_no, reviewer_id, created_at) VALUES (%s, %s, %s, %s)", (drawing_db_id, revision_from_file, reviewer_id, today))
+                        c.execute("INSERT INTO drawing_revisions (drawing_id, revision_no, reviewer_id, created_at, task_number) VALUES (%s, %s, %s, %s, %s)", (drawing_db_id, revision_from_file, reviewer_id, today, task_number))
                         revision_db_id = c.lastrowid
+
                         
                         # Store PDF file info
                         c.execute("""
@@ -2312,11 +2365,12 @@ def submit_batch():
             # Send summary email
             try:
                 comments = request.form.get('comments')
+                formatted_creator_name = f"{creator_db_name}"
                 send_single_summary_email(
                     to_email=reviewer_email,
                     items=results,
                     creator_emp_id=creator_emp_id,
-                    creator_name=creator_row[0] if creator_row else creator_emp_id,
+                    creator_name=formatted_creator_name,
                     user_comments=comments
                 )
             except Exception as e:
@@ -3058,7 +3112,7 @@ def prefill_upload():
 
         # 3. Get Revision Details (Reviewer, Date)
         cur.execute("""
-            SELECT reviewer_id, created_at, id
+            SELECT reviewer_id, created_at, id, task_number
             FROM drawing_revisions
             WHERE drawing_id=%s AND revision_no=%s
         """, (drawing_db_id, chosen_rev))
@@ -3070,6 +3124,7 @@ def prefill_upload():
         reviewer_id = rev_row[0]
         revision_date = rev_row[1]
         revision_db_id = rev_row[2]
+        task_number = rev_row[3]
 
         # 4. Get User Details
         # Creator
@@ -3112,7 +3167,8 @@ def prefill_upload():
             "emp_team": emp_team,
             "has_pdf": has_pdf,
             "Drawing_Type": drawing_type or "",
-            "reviewed_date": (revision_date.isoformat() if revision_date else None)
+            "reviewed_date": (revision_date.isoformat() if revision_date else None),
+            "task_number": task_number or ""
         }
         
         print(f"📤 BACKEND /prefill-upload response: drawing_id={drawing_no}, revision={chosen_rev}")

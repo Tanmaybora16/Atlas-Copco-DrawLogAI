@@ -1,4 +1,4 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
 
@@ -7,7 +7,7 @@ import { environment } from 'src/environments/environment';
   templateUrl: './reports.component.html',
   styleUrls: ['./reports.component.scss'],
 })
-export class ReportsComponent {
+export class ReportsComponent implements OnInit {
   selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' = 'monthly';
 
   // Dropdown options
@@ -41,6 +41,36 @@ export class ReportsComponent {
   showDrawingIdDropdown: boolean = false;
   showDefaultDropdowns: boolean = true;
 
+  constructor(private http: HttpClient) { }
+
+  ngOnInit(): void {
+    this.fetchEmployees();
+    this.fetchDrawings();
+  }
+
+  fetchEmployees() {
+    this.http.get<string[]>(`${environment.apiUrl}/api/employees-dropdown`).subscribe({
+      next: (data) => {
+        this.employees = data || [];
+        this.filteredEmployees = [...this.employees];
+      },
+      error: (err) => {
+        console.error('Failed to fetch employees', err);
+      }
+    });
+  }
+
+  fetchDrawings() {
+    this.http.get<string[]>(`${environment.apiUrl}/api/drawings-dropdown`).subscribe({
+      next: (data) => {
+        this.drawings = data || [];
+        this.filteredDrawings = [...this.drawings];
+      },
+      error: (err) => {
+        console.error('Failed to fetch drawings', err);
+      }
+    });
+  }
 
   selectTeam(team: string) {
     this.selectedTeam = team;
@@ -57,12 +87,14 @@ export class ReportsComponent {
   // Select from filtered employee list
   selectEmployee(emp: string) {
     this.selectedEmpId = emp;
+    this.empSearch = emp; // Update the input field
     this.showEmployees = false;
   }
 
   // Select from filtered drawing list
   selectDrawing(drawing: string) {
     this.selectedDrawingId = drawing;
+    this.drawingSearch = drawing; // Update the input field
     this.showDrawings = false;
   }
 
@@ -77,6 +109,8 @@ export class ReportsComponent {
     if (!(event.target as HTMLElement).closest('.dropdown-container')) {
       this.showTeams = false;
       this.showPCs = false;
+      this.showEmployees = false;
+      this.showDrawings = false;
     }
   }
 

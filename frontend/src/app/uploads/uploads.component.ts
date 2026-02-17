@@ -39,6 +39,7 @@ export class UploadsComponent {
 
   // autofilled meta
   designNo = '';
+  taskNumber = ''; // New property
   reviewerId = '';
   revisionNo = '';
   reviewedDate = '';
@@ -110,6 +111,7 @@ export class UploadsComponent {
         this.revisionNo = String(res.revision_no ?? '').padStart(2, '0');
         this.drawing_type = res.Drawing_Type || '';
         this.reviewedDate = (res.reviewed_date || this.todayISO()).slice(0, 10);
+        this.taskNumber = res.task_number || '';
 
         console.log('✅ UPLOADS After assignment - revisionNo:', this.revisionNo, 'from res.revision_no:', res.revision_no);
 
@@ -319,6 +321,7 @@ export class UploadsComponent {
         pc: (this.selectedPC || '').trim(),
         team: (this.selectedEmployee.emp_team || '').trim(),
         decision: this.decision,
+        task_number: (this.taskNumber || '').trim(), // Added task_number
         comments: (form.value.comments || '').trim() // Added comments
       },
     };

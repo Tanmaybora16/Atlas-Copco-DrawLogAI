@@ -175,6 +175,7 @@ export class SubmissionComponent implements OnInit {
     event.stopPropagation();
     this.selectedReviewerId = emp.id;
     this.selectedReviewerDisplay = emp.display;
+    this.reviewerSearch = emp.display; // Update input
     this.reviewerDropdownOpen = false;
     this.fetchReviewerDetails(emp.id);
   }
@@ -196,17 +197,10 @@ export class SubmissionComponent implements OnInit {
         // Fill email
         this.creatorEmail = (this.selectedCreator.emp_email || '').toString();
 
-        // Handle PC (single vs multi)
-        const rawPC = (this.selectedCreator.emp_PC || '').toString();
-        if (rawPC.includes(',')) {
-          this.pcList = rawPC.split(',').map((pc: string) => pc.trim()).filter(Boolean);
-          this.selectedPC = '';
-          this.displaySinglePC = false;
-        } else {
-          this.selectedPC = rawPC;
-          this.pcList = [];
-          this.displaySinglePC = true;
-        }
+        // Handle PC (single vs multi) - NOW ALWAYS KEEP AS STRING
+        this.selectedPC = (this.selectedCreator.emp_PC || '').toString();
+        this.pcList = [];
+        this.displaySinglePC = true; // Effectively unused now, but keeping for safety or refactor
       },
       (error) => console.error('Error fetching creator details:', error)
     );
