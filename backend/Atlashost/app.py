@@ -33,10 +33,10 @@ sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
 # Email Configuration (Placeholders - Update with real values)
-SMTP_SERVER = "output.office365.com"  # Example for Office365
-SMTP_PORT = 587
-EMAIL_SENDER = "admin@atlascopco.com"
-EMAIL_PASSWORD = "change_me"
+# SMTP_SERVER = "output.office365.com"  # Example for Office365
+# SMTP_PORT = 587
+# EMAIL_SENDER = "admin@atlascopco.com"
+# EMAIL_PASSWORD = "change_me"
 
 # Upload Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
@@ -47,42 +47,43 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Enhanced CORS configuration - allow all origins for development
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": False
-    }
-})
+CORS(app
+    # , resources={
+    # r"/*": {
+    #     "origins": "*",
+    #     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    #     "allow_headers": ["Content-Type", "Authorization"],
+    #     "supports_credentials": False
+    # }}
+)
 
 # Request logging middleware
-@app.before_request
-def log_request_info():
-    """Log all incoming requests"""
-    # print(f"\n{'='*80}")
-    # print(f">>> INCOMING REQUEST: {request.method} {request.path}")
-    # print(f"    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    # print(f"    Remote Address: {request.remote_addr}")
-    # print(f"    Origin: {request.headers.get('Origin', 'N/A')}")
-    # if request.args:
-    #     print(f"    Query Params: {dict(request.args)}")
-    # print(f"{'='*80}\n")
+# @app.before_request
+# def log_request_info():
+#     """Log all incoming requests"""
+#     # print(f"\n{'='*80}")
+#     # print(f">>> INCOMING REQUEST: {request.method} {request.path}")
+#     # print(f"    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+#     # print(f"    Remote Address: {request.remote_addr}")
+#     # print(f"    Origin: {request.headers.get('Origin', 'N/A')}")
+#     # if request.args:
+#     #     print(f"    Query Params: {dict(request.args)}")
+#     # print(f"{'='*80}\n")
 
-@app.after_request
-def log_response_info(response):
-    """Log all outgoing responses and ensure CORS headers"""
-    # Ensure CORS headers are always present
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+# @app.after_request
+# def log_response_info(response):
+#     """Log all outgoing responses and ensure CORS headers"""
+#     # Ensure CORS headers are always present
+#     response.headers['Access-Control-Allow-Origin'] = '*'
+#     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+#     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     
-    # print(f"\n{'='*80}")
-    # print(f"<<< RESPONSE: {request.method} {request.path}")
-    # print(f"    Status: {response.status_code} {response.status}")
-    # print(f"    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    # print(f"{'='*80}\n")
-    return response
+#     # print(f"\n{'='*80}")
+#     # print(f"<<< RESPONSE: {request.method} {request.path}")
+#     # print(f"    Status: {response.status_code} {response.status}")
+#     # print(f"    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+#     # print(f"{'='*80}\n")
+#     return response
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
