@@ -27,60 +27,31 @@
       <button (click)="openFileSelector()" title="Upload PDF">
         <img src="assets/upload.svg" alt="" />
       </button>
-      <input
-        #fileInput
-        type="file"
-        accept=".pdf"
-        (change)="onFileSelected($event)"
-        style="display: none"
-      />
+      <input #fileInput type="file" accept=".pdf" (change)="onFileSelected($event)" style="display: none" />
     </div>
 
     <!-- Annotation mode -->
     <div class="tool-group">
-      <button
-        (click)="setMode('view')"
-        [class.active]="mode === 'view'"
-        title="View"
-      >
+      <button (click)="setMode('view')" [class.active]="mode === 'view'" title="View">
         <img src="assets/view.svg" alt="" />
       </button>
-      <button
-        (click)="setMode('add-text')"
-        [class.active]="mode === 'add-text'"
-        title="Add text comment"
-      >
+      <button (click)="setMode('add-text')" [class.active]="mode === 'add-text'" title="Add text comment">
         <img src="assets/type.svg" alt="" />
       </button>
-      <button
-        (click)="setMode('add-stamp')"
-        [class.active]="mode === 'add-stamp'"
-        title="Add stamp"
-      >
+      <button (click)="setMode('add-stamp')" [class.active]="mode === 'add-stamp'" title="Add stamp">
         <img src="assets/stamp.svg" alt="" />
       </button>
-      <button
-        (click)="setMode('select')"
-        [class.active]="mode === 'select'"
-        title="Select"
-      >
+      <button (click)="setMode('select')" [class.active]="mode === 'select'" title="Select">
         <img src="assets/selection.svg" alt="" />
       </button>
-      <button
-        (click)="deleteSelected()"
-        title="Delete selected"
-      >
+      <button (click)="deleteSelected()" title="Delete selected">
         <img src="assets/delete.svg" alt="" />
       </button>
     </div>
 
     <!-- Stamp type selector (only visible when stamp mode is active) -->
     <div class="tool-group" *ngIf="mode === 'add-stamp'">
-      <select
-        [value]="selectedStampType"
-        (change)="setStampType($any($event.target).value)"
-        title="Stamp Type"
-      >
+      <select [value]="selectedStampType" (change)="setStampType($any($event.target).value)" title="Stamp Type">
         <option value="reviewed">Reviewed</option>
         <option value="approved">Approved</option>
         <option value="rejected">Rejected</option>
@@ -89,17 +60,8 @@
 
     <!-- Text style -->
     <div class="tool-group" *ngIf="mode === 'add-text'">
-      <input
-        type="color"
-        [value]="textColor"
-        (change)="setColor($event)"
-        title="Text Color"
-      />
-      <select
-        [value]="fontSize"
-        (change)="setFontSize($event)"
-        title="Font Size"
-      >
+      <input type="color" [value]="textColor" (change)="setColor($event)" title="Text Color" />
+      <select [value]="fontSize" (change)="setFontSize($event)" title="Font Size">
         <option value="12">12px</option>
         <option value="14">14px</option>
         <option value="16">16px</option>
@@ -137,11 +99,8 @@
     </div>
 
     <div class="next-step">
-      <button
-        (click)="goToErrorMapping()"
-        [disabled]="!drawingNumber || !revisionNumber"
-        [title]="(!drawingNumber || !revisionNumber) ? 'Drawing ID and revision are required' : 'Submit PDF'"
-      >
+      <button (click)="goToErrorMapping()" [disabled]="!drawingNumber || !revisionNumber"
+        [title]="(!drawingNumber || !revisionNumber) ? 'Drawing ID and revision are required' : 'Submit PDF'">
         <span>Submit PDF</span>
         <img src="assets/arrow-right.svg" alt="" />
       </button>
@@ -149,19 +108,11 @@
   </div>
 
   <div class="pagination-floating">
-    <button
-      (click)="previousPage()"
-      [disabled]="pageNum <= 1"
-      title="Previous Page"
-    >
+    <button (click)="previousPage()" [disabled]="pageNum <= 1" title="Previous Page">
       <img src="assets/skip-back.svg" alt="" />
     </button>
     <span>Page {{ pageNum }} of {{ totalPages }}</span>
-    <button
-      (click)="nextPage()"
-      [disabled]="pageNum >= totalPages"
-      title="Next Page"
-    >
+    <button (click)="nextPage()" [disabled]="pageNum >= totalPages" title="Next Page">
       <img src="assets/skip-forward.svg" alt="" />
     </button>
   </div>
@@ -170,35 +121,26 @@
     {{ statusMessage }}
   </div>
 
-  <div class="canvas-container" [ngClass]="{'select-mode': mode === 'select', 'add-text-mode': mode === 'add-text', 'add-stamp-mode': mode === 'add-stamp'}">
+  <div class="canvas-container"
+    [ngClass]="{'select-mode': mode === 'select', 'add-text-mode': mode === 'add-text', 'add-stamp-mode': mode === 'add-stamp'}">
     <div class="page-wrapper">
       <canvas #pdfCanvas class="pdf-canvas"></canvas>
-      <div
-        #annotationLayer
-        class="annotation-layer"
-        (click)="onPdfClick($event)"
-      >
+      <div #annotationLayer class="annotation-layer" (click)="onPdfClick($event)">
         <!-- Text annotations -->
-        <div
-          *ngFor="let a of pageAnnotations"
-          class="annotation"
-          [ngClass]="{
+        <div *ngFor="let a of pageAnnotations" class="annotation" [ngClass]="{
             'selected': a.id === selectedAnnotationId,
             'text-annotation': a.type === 'text',
             'stamp-annotation': a.type === 'stamp',
             'stamp-reviewed': a.type === 'stamp' && a.stampType === 'reviewed',
             'stamp-approved': a.type === 'stamp' && a.stampType === 'approved',
             'stamp-rejected': a.type === 'stamp' && a.stampType === 'rejected'
-          }"
-          [ngStyle]="getAnnotationStyle(a)"
-          (click)="onAnnotationClick(a, $event)"
-          (mousedown)="onAnnotationMouseDown(a, $event)"
-        >
+          }" [ngStyle]="getAnnotationStyle(a)" (click)="onAnnotationClick(a, $event)"
+          (mousedown)="onAnnotationMouseDown(a, $event)">
           <!-- Display text for text annotations -->
           <ng-container *ngIf="a.type === 'text'">
             {{ a.text }}
           </ng-container>
-          
+
           <!-- Display stamp for stamp annotations -->
           <ng-container *ngIf="a.type === 'stamp'">
             <div class="stamp-content">
@@ -206,26 +148,17 @@
                 {{ a.stampType?.toUpperCase() }}
               </div>
               <div class="stamp-details">
-                By {{ a.reviewerName }} at {{ a.reviewDate }}
+                at {{ a.reviewDate }}
               </div>
             </div>
           </ng-container>
         </div>
       </div>
 
-      <textarea
-        #textInput
-        class="text-input"
-        *ngIf="isEditingText"
-        [style.left.px]="textInputPosition.x"
-        [style.top.px]="textInputPosition.y"
-        [(ngModel)]="textInputValue"
-        (input)="onTextInputChange()"
-        (blur)="finishTextEditing()"
-        (keydown.enter)="$event.preventDefault(); finishTextEditing()"
-        (keydown.escape)="finishTextEditing()"
-        placeholder="Type your comment..."
-      ></textarea>
+      <textarea #textInput class="text-input" *ngIf="isEditingText" [style.left.px]="textInputPosition.x"
+        [style.top.px]="textInputPosition.y" [(ngModel)]="textInputValue" (input)="onTextInputChange()"
+        (blur)="finishTextEditing()" (keydown.enter)="$event.preventDefault(); finishTextEditing()"
+        (keydown.escape)="finishTextEditing()" placeholder="Type your comment..."></textarea>
     </div>
   </div>
 </div>
