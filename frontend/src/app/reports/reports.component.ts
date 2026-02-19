@@ -11,41 +11,58 @@ export class ReportsComponent implements OnInit {
   selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' = 'monthly';
 
   // Dropdown options
-  teams = ['CPI 1', 'CPI 2', 'CPI 3', 'CPI 4', 'TSG 1', 'TSG 2', 'TSG 3', 'TSG 4', 'AIA']; // Assuming AIA is also a team? Or just using the list from EmployeeComponent
+  teams: any[] = [];
 
   // Data variables
-  pcs: string[] = ['BQR', 'API', 'WUX', 'COX', 'PNE', 'FRJ', 'UTY', 'TRD', 'ITJ', 'PNB', 'APP', 'APC', 'ESF', 'UVC', 'Crepelle', 'UTF', 'APF', 'OFA STD', 'Edwards India (IPG)', 'UWH']; // Hardcoded all unique PCs since no Team->PC map
-  selectedTeam: string = '';
-  selectedPC: string = '';
+  pcs: any[] = [];
+
+  // Multi-select Lists
+  selectedTeams: string[] = [];
+  selectedPCs: string[] = [];
+
+  // Data variables
   employees: string[] = [];
   filteredEmployees: string[] = [];
   empSearch: string = '';
   selectedEmpId: string = '';
-  showEmployees = false;
-  showDrawings = false;
 
   drawings: string[] = [];
   filteredDrawings: string[] = [];
   drawingSearch: string = '';
   selectedDrawingId: string = '';
 
-  selectedTeams: string[] = [];
-  selectedPCs: string[] = [];
-
   startDate: string = '';
   endDate: string = '';
 
+  // Dropdown visibility
   showTeams: boolean = false;
   showPCs: boolean = false;
   showEmployeeDropdown: boolean = false;
   showDrawingIdDropdown: boolean = false;
+  showEmployees: boolean = false;
+  showDrawings: boolean = false;
   showDefaultDropdowns: boolean = true;
 
   constructor(private http: HttpClient) { }
 
   ngOnInit(): void {
+    this.fetchInitialData();
     this.fetchEmployees();
     this.fetchDrawings();
+  }
+
+  fetchInitialData() {
+    this.http.get<any[]>(`${environment.apiUrl}/api/structure/teams`).subscribe(data => this.teams = data || []);
+    this.http.get<any[]>(`${environment.apiUrl}/api/structure/pcs`).subscribe(data => {
+      // Deduplicate PCs by name to avoid duplicates in the dropdown
+      const uniquePCs = new Map();
+      (data || []).forEach(pc => {
+        if (!uniquePCs.has(pc.name)) {
+          uniquePCs.set(pc.name, pc);
+        }
+      });
+      this.pcs = Array.from(uniquePCs.values());
+    });
   }
 
   fetchEmployees() {
@@ -72,16 +89,50 @@ export class ReportsComponent implements OnInit {
     });
   }
 
-  selectTeam(team: string) {
-    this.selectedTeam = team;
-    this.showTeams = false;
-    // this.updatePCList(); // No mapping for now
+  toggleTeam(team: string) {
+    if (this.selectedTeams.includes(team)) {
+      this.selectedTeams = this.selectedTeams.filter(t => t !== team);
+    } else {
+      this.selectedTeams = [...this.selectedTeams, team];
+    }
   }
 
-  // Call this when a PC is selected
-  selectPC(pc: string) {
-    this.selectedPC = pc;
-    this.showPCs = false;
+  togglePC(pc: string) {
+    if (this.selectedPCs.includes(pc)) {
+      this.selectedPCs = this.selectedPCs.filter(p => p !== pc);
+    } else {
+      this.selectedPCs = [...this.selectedPCs, pc];
+    }
+  }
+
+  selectAllTeams() {
+    this.selectedTeams = this.teams.map(t => t.name);
+  }
+
+  deselectAllTeams() {
+    this.selectedTeams = [];
+  }
+
+  selectAllPCs() {
+    this.selectedPCs = this.pcs.map(p => p.name);
+  }
+
+  deselectAllPCs() {
+    this.selectedPCs = [];
+  }
+
+  getSelectedTeamsDisplay(): string {
+    if (this.selectedTeams.length === 0) return 'Select Team';
+    if (this.selectedTeams.length === this.teams.length) return 'All Teams';
+    if (this.selectedTeams.length > 2) return `${this.selectedTeams.length} Teams Selected`;
+    return this.selectedTeams.join(', ');
+  }
+
+  getSelectedPCsDisplay(): string {
+    if (this.selectedPCs.length === 0) return 'Select PC';
+    if (this.selectedPCs.length === this.pcs.length) return 'All PCs';
+    if (this.selectedPCs.length > 2) return `${this.selectedPCs.length} PCs Selected`;
+    return this.selectedPCs.join(', ');
   }
 
   // Select from filtered employee list
@@ -99,9 +150,11 @@ export class ReportsComponent implements OnInit {
   }
 
   toggleSelection(value: string, category: string) {
-    let list: string[] = category === 'team' ? this.selectedTeams : this.selectedPCs;
-    const index = list.indexOf(value);
-    index === -1 ? list.push(value) : list.splice(index, 1);
+    if (category === 'team') {
+      this.toggleTeam(value);
+    } else {
+      this.togglePC(value);
+    }
   }
 
   @HostListener('document:click', ['$event'])

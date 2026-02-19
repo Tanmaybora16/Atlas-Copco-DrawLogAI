@@ -8,19 +8,10 @@ import { environment } from 'src/environments/environment';
   styleUrls: ['./employee.component.scss']
 })
 export class EmployeeComponent implements OnInit {
-  divisions = ['AIA', 'APE', 'CTS', 'IAS', 'IAT', 'OFA', 'PFL', 'VIN'];
-  divisionToPCMap: { [key: string]: string[] } = {
-    'AIA': ['BQR', 'API', 'WUX', 'COX', 'PNE', 'FRJ', 'UTY', 'TRD', 'ITJ', 'PNB'],
-    'APE': ['PNE', 'UVC', 'WUX', 'BQR', 'APP'],
-    'CTS': ['APC'],
-    'IAS': ['PNE', 'ESF', 'UVC', 'WUX', 'BQR'],
-    'IAT': ['BQR', 'API', 'WUX', 'COX', 'PNE', 'FRJ', 'UTY', 'TRD', 'ITJ', 'ITR'],
-    'OFA': ['API', 'WUX', 'COX', 'PNE', 'UTY', 'TRD', 'ITJ', 'PNB', 'Crepelle', 'UTF', 'APF', 'OFA STD'],
-    'PFL': ['PNE', 'ESF', 'UVC', 'WUX', 'BQR'],
-    'VIN': ['Edwards India (IPG)', 'UWH', 'PNE', 'ESF', 'UVC', 'WUX', 'BQR']
-  };
-  pcs: string[] = [];
-  teams = ['CPI 1', 'CPI 2', 'CPI 3', 'CPI 4', 'TSG 1', 'TSG 2', 'TSG 3', 'TSG 4'];
+  divisions: any[] = [];
+  allPCs: any[] = []; // Store all PCs
+  pcs: any[] = [];    // Filtered PCs
+  teams: any[] = [];
 
   employees: any[] = [];
   employeeId: string = '';
@@ -33,12 +24,19 @@ export class EmployeeComponent implements OnInit {
   selectedPCs: string[] = [];
   dropdownOpen = false;
 
-  isBusy = false;  // <-- in-flight guard for all API calls
+  isBusy = false;
 
   constructor(private http: HttpClient) { }
 
   ngOnInit() {
+    this.fetchInitialData();
     this.fetchEmployees();
+  }
+
+  fetchInitialData() {
+    this.http.get<any[]>(`${environment.apiUrl}/api/structure/divisions`).subscribe(data => this.divisions = data);
+    this.http.get<any[]>(`${environment.apiUrl}/api/structure/pcs`).subscribe(data => this.allPCs = data);
+    this.http.get<any[]>(`${environment.apiUrl}/api/structure/teams`).subscribe(data => this.teams = data);
   }
 
   fetchEmployees() {
@@ -68,19 +66,27 @@ export class EmployeeComponent implements OnInit {
   }
 
   onDivisionChange() {
-    // Build the new PC list for the chosen division
-    this.pcs = this.selectedDivision ? (this.divisionToPCMap[this.selectedDivision] || []) : [];
+    // Filter PCs based on selected Division Name
+    // The backend PC object has division_id, but the current UI uses names.
+    // We need to find the Division ID corresponding to the selectedDivision name.
 
-    // Drop any PCs that belonged to the previous division
-    this.selectedPCs = this.selectedPCs.filter(pc => this.pcs.includes(pc));
+    if (!this.selectedDivision) {
+      this.pcs = [];
+      this.selectedPCs = [];
+      return;
+    }
 
-    // If you want to fully clear the selection whenever division changes, use this instead:
-    // this.selectedPCs = [];
+    const selectedDivObj = this.divisions.find(d => d.name === this.selectedDivision);
+    if (selectedDivObj) {
+      this.pcs = this.allPCs.filter(p => p.division_id === selectedDivObj.id);
+    } else {
+      this.pcs = [];
+    }
 
-    // Reset single-select fallback (if you use selectedPC elsewhere)
-    this.selectedPC = '';
+    // Drop any PCs that don't belong to the new list (by name)
+    const availablePCNames = this.pcs.map(p => p.name);
+    this.selectedPCs = this.selectedPCs.filter(pcName => availablePCNames.includes(pcName));
 
-    // Close the PC dropdown so the user re-opens with the fresh list
     this.dropdownOpen = false;
   }
 
@@ -89,7 +95,7 @@ export class EmployeeComponent implements OnInit {
     const target = event.target as HTMLElement;
     const isInsideDropdown = target.closest('.dropdown-box') || target.closest('.dropdown-list');
     if (!isInsideDropdown) {
-      this.dropdownOpen = false; // Close the dropdown if the click is outside
+      this.dropdownOpen = false;
     }
   }
 
@@ -98,13 +104,13 @@ export class EmployeeComponent implements OnInit {
     this.dropdownOpen = !this.dropdownOpen;
   }
 
-  onPCCheckboxChange(pc: string, event: any) {
+  onPCCheckboxChange(pcName: string, event: any) {
     if (this.isBusy) return;
     const isChecked = event.target.checked;
-    if (isChecked && !this.selectedPCs.includes(pc)) {
-      this.selectedPCs.push(pc);
+    if (isChecked && !this.selectedPCs.includes(pcName)) {
+      this.selectedPCs.push(pcName);
     } else if (!isChecked) {
-      this.selectedPCs = this.selectedPCs.filter(item => item !== pc);
+      this.selectedPCs = this.selectedPCs.filter(item => item !== pcName);
     }
   }
 
@@ -121,15 +127,19 @@ export class EmployeeComponent implements OnInit {
     this.employeeName = employee.name;
     this.employeeEmail = employee.email;
     this.selectedDivision = employee.division;
-    this.onDivisionChange(); // Update PC list based on division
-    this.selectedPCs = employee.pc ? employee.pc.split(',') : []; // Convert CSV to array
+
+    // Trigger division change to populate PCs, but we need to wait or do it synchronously
+    // Since onDivisionChange relies on this.divisions and this.allPCs which are already loaded, it's synchronous.
+    this.onDivisionChange();
+
+    // Now set the selected PCs
+    this.selectedPCs = employee.pc ? employee.pc.split(',').map((p: string) => p.trim()) : [];
     this.selectedTeam = employee.team;
     this.editingIndex = index;
-    this.updatePCs(); // Update PCs dropdown when editing
   }
 
   saveEmployee() {
-    if (this.isBusy) return; // prevent double submit
+    if (this.isBusy) return;
 
     if (!this.employeeId || !this.employeeName || !this.employeeEmail || !this.selectedDivision || this.selectedPCs.length === 0 || !this.selectedTeam) {
       (window as any).Swal?.fire?.('Error', 'All fields are required!', 'error');
@@ -141,7 +151,7 @@ export class EmployeeComponent implements OnInit {
       Emp_Name: this.employeeName,
       EMP_Email: this.employeeEmail,
       Emp_Division: this.selectedDivision,
-      Emp_PC: this.selectedPCs.join(','), // Store as CSV string
+      Emp_PC: this.selectedPCs.join(','),
       Emp_Team: this.selectedTeam
     };
 
@@ -155,39 +165,21 @@ export class EmployeeComponent implements OnInit {
     api$.subscribe(
       () => {
         this.isBusy = false;
-        this.fetchEmployees(); // will set busy true/false again
+        this.fetchEmployees();
         this.resetForm();
         (window as any).Swal?.fire?.('Success', isEdit ? 'Employee updated successfully!' : 'Employee added successfully!', 'success');
       },
       (error) => {
         this.isBusy = false;
         const errMsg = error?.error?.message || error?.error?.error || 'Something went wrong.';
-        switch (error.status) {
-          case 4001:
-            (window as any).Swal?.fire?.('Error', 'Invalid request format. Please contact admin.', 'error');
-            break;
-          case 4002:
-            (window as any).Swal?.fire?.('Error', 'All fields are required!', 'error');
-            break;
-          case 4003:
-            (window as any).Swal?.fire?.('Error', 'Employee ID already exists!', 'error');
-            break;
-          case 400:
-            (window as any).Swal?.fire?.('Error', errMsg || 'Invalid input data.', 'error');
-            break;
-          case 500:
-            (window as any).Swal?.fire?.('Server Error', errMsg, 'error');
-            break;
-          default:
-            (window as any).Swal?.fire?.('Error', 'Unexpected error occurred. Please try again.', 'error');
-        }
         console.error('Error saving employee:', error);
+        (window as any).Swal?.fire?.('Error', errMsg, 'error');
       }
     );
   }
 
   deleteEmployee(index: number) {
-    if (this.isBusy) return; // prevent multi-clicks
+    if (this.isBusy) return;
     const employeeId = this.employees[index].id;
 
     (window as any).Swal?.fire?.({
@@ -195,8 +187,7 @@ export class EmployeeComponent implements OnInit {
       text: 'This will delete the employee and associated data!',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'Cancel'
+      confirmButtonText: 'Yes, delete it!'
     }).then((result: any) => {
       if (result.isConfirmed) {
         this.isBusy = true;
@@ -206,32 +197,16 @@ export class EmployeeComponent implements OnInit {
             () => {
               this.isBusy = false;
               this.fetchEmployees();
-              (window as any).Swal?.fire?.(
-                'Deleted!',
-                'Employee has been deleted.',
-                'success'
-              );
+              (window as any).Swal?.fire?.('Deleted!', 'Employee has been deleted.', 'success');
             },
             (error) => {
               this.isBusy = false;
-              const errMsg = error?.error?.error || 'Something went wrong.';
-              (window as any).Swal?.fire?.(
-                'Error',
-                `Failed to delete employee: ${errMsg}`,
-                'error'
-              );
               console.error('Error deleting employee:', error);
+              (window as any).Swal?.fire?.('Error', 'Failed to delete employee.', 'error');
             }
           );
       }
     });
-  }
-
-  updatePCs() {
-    this.pcs = this.selectedDivision ? this.divisionToPCMap[this.selectedDivision] || [] : [];
-    if (!this.pcs.includes(this.selectedPC)) {
-      this.selectedPC = ''; // Reset PC if it is not in the filtered list
-    }
   }
 
   resetForm() {

@@ -45,8 +45,8 @@ export type ChartOptions = {
 export class ColumnChartComponent implements OnChanges {
   @ViewChild('chart') chart!: ChartComponent;
   @Input() reportType: string = 'monthly';
-  @Input() selectedTeam: string = ''; // Team filter
-  @Input() selectedPC: string = ''; // PC filter
+  @Input() selectedTeam: string[] = []; // Team filter
+  @Input() selectedPC: string[] = []; // PC filter
   @Input() startDate: string = ''; // Start date filter
   @Input() endDate: string = ''; // End date filter
 
@@ -74,11 +74,15 @@ export class ColumnChartComponent implements OnChanges {
   fetchChartData() {
     let params = new HttpParams();
 
-    if (this.selectedTeam) {
-      params = params.set('team', this.selectedTeam);
+    if (this.selectedTeam && this.selectedTeam.length > 0) {
+      this.selectedTeam.forEach(team => {
+        params = params.append('team', team);
+      });
     }
-    if (this.selectedPC) {
-      params = params.set('pc', this.selectedPC);
+    if (this.selectedPC && this.selectedPC.length > 0) {
+      this.selectedPC.forEach(pc => {
+        params = params.append('pc', pc);
+      });
     }
     if (this.startDate) {
       params = params.set('start_date', this.startDate);

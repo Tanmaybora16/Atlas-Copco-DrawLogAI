@@ -12,13 +12,13 @@ import { environment } from 'src/environments/environment';
   styleUrls: ['./table.component.scss'],
 })
 export class TableComponent implements OnInit {
-  @Input() selectedTeam: string = '';
-  @Input() selectedPC: string = '';
+  @Input() selectedTeam: string[] = [];
+  @Input() selectedPC: string[] = [];
   @Input() startDate: string = '';
   @Input() endDate: string = '';
 
   get showTeamPC(): boolean {
-    return this.selectedTeam !== "" || this.selectedPC !== "";
+    return this.selectedTeam.length > 0 || this.selectedPC.length > 0;
   }
 
   passRatioData: any[] = [];
@@ -45,7 +45,7 @@ export class TableComponent implements OnInit {
       const currentYear = new Date().getFullYear();
 
       // Check if no filters are applied
-      const noFiltersApplied = !this.selectedTeam && !this.selectedPC && !this.startDate && !this.endDate;
+      const noFiltersApplied = this.selectedTeam.length === 0 && this.selectedPC.length === 0 && !this.startDate && !this.endDate;
 
       // Filter to current year only if no filters are selected
       this.passRatioData = noFiltersApplied
@@ -54,9 +54,10 @@ export class TableComponent implements OnInit {
     });
   }
 
-  getPassRatioClass(passRatio: string): string {
+  getPassRatioClass(passRatio: any): string {
     if (passRatio === 'NA') return 'pass-na'; // Light Green for NA
-    const ratio = parseFloat(passRatio.replace('%', '')) || 0;
+    const val = String(passRatio);
+    const ratio = parseFloat(val.replace('%', '')) || 0;
     if (ratio >= 71) return 'pass-high';   // Green (Good Performance)
     if (ratio >= 41 && ratio < 71) return 'pass-medium'; // Yellow (Average Performance)
     return 'pass-low';                     // Red (Poor Performance)

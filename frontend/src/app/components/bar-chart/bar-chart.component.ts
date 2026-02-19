@@ -155,8 +155,8 @@ export type ChartOptions = {
 })
 export class BarChartComponent implements OnChanges {
   @Input() reportType!: string;
-  @Input() selectedTeam!: string;
-  @Input() selectedPC!: string;
+  @Input() selectedTeam: string[] = [];
+  @Input() selectedPC: string[] = [];
   @Input() startDate!: string;
   @Input() endDate!: string;
 
@@ -241,8 +241,12 @@ export class BarChartComponent implements OnChanges {
     let params = new HttpParams();
     if (this.startDate) params = params.set('start_date', this.startDate);
     if (this.endDate) params = params.set('end_date', this.endDate);
-    if (this.selectedTeam) params = params.set('team', this.selectedTeam);
-    if (this.selectedPC) params = params.set('pc', this.selectedPC);
+    if (this.selectedTeam && this.selectedTeam.length > 0) {
+      this.selectedTeam.forEach(t => params = params.append('team', t));
+    }
+    if (this.selectedPC && this.selectedPC.length > 0) {
+      this.selectedPC.forEach(p => params = params.append('pc', p));
+    }
 
     this.http.get<any[]>(apiUrl, { params }).subscribe(
       (response) => {

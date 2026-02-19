@@ -1355,8 +1355,8 @@ def monthly_drawing_status():
     cursor = g.db.cursor()
     try:
         # Extract filters from request
-        team = request.args.get('team')
-        pc = request.args.get('pc')
+        teams = request.args.getlist('team')
+        pcs = request.args.getlist('pc')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
@@ -1383,14 +1383,18 @@ def monthly_drawing_status():
             query += " AND dr.reviewed_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)"
 
         # Add team filter
-        if team:
-            query += " AND u.team = %s"
-            params.append(team)
+        if teams:
+            placeholders = ','.join(['%s'] * len(teams))
+            query += f" AND u.team IN ({placeholders})"
+            params.extend(teams)
 
         # Add PC filter
-        if pc:
-            query += " AND u.pc LIKE %s"
-            params.append(f"%{pc}%")
+        if pcs:
+            placeholders = []
+            for _ in pcs:
+                placeholders.append("u.pc LIKE %s")
+            query += " AND (" + " OR ".join(placeholders) + ")"
+            params.extend([f"%{p}%" for p in pcs])
 
         query += " GROUP BY DATE_FORMAT(dr.reviewed_date, '%%Y-%%m-01') ORDER BY month_start"
 
@@ -1590,8 +1594,8 @@ def get_drawings_trend():
     cursor = g.db.cursor()
     try:
         # Extract filters
-        team = request.args.get('team', '').strip()
-        pc = request.args.get('pc', '').strip()
+        teams = request.args.getlist('team')
+        pcs = request.args.getlist('pc')
         start_date = request.args.get('start_date', '').strip()
         end_date = request.args.get('end_date', '').strip()
 
@@ -1620,14 +1624,18 @@ def get_drawings_trend():
         params = [start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d')]
 
         # Add team filter
-        if team:
-            query += " AND u.team = %s"
-            params.append(team)
+        if teams:
+            placeholders = ','.join(['%s'] * len(teams))
+            query += f" AND u.team IN ({placeholders})"
+            params.extend(teams)
 
         # Add PC filter
-        if pc:
-            query += " AND u.pc LIKE %s"
-            params.append(f"%{pc}%")
+        if pcs:
+            placeholders = []
+            for _ in pcs:
+                placeholders.append("u.pc LIKE %s")
+            query += " AND (" + " OR ".join(placeholders) + ")"
+            params.extend([f"%{p}%" for p in pcs])
 
         query += " GROUP BY DATE_FORMAT(dr.reviewed_date, '%%Y-%%m') ORDER BY month_sort"
 
@@ -1694,9 +1702,9 @@ def get_pass_ratio():
             months_map[key] = {
                 "year": str(curr.year),
                 "month": month_abbr[curr.month - 1],
-                "accepted_drawings": "NA",
-                "total_drawings": "NA",
-                "pass_ratio": "NA"
+                "accepted_drawings": 0,
+                "total_drawings": 0,
+                "pass_ratio": 0
             }
             # Move to next month
             # (simple way: add 32 days and set to day 1)
@@ -1716,17 +1724,41 @@ def get_pass_ratio():
         """
         params = [s_dt.strftime('%Y-%m-%d'), e_dt.strftime('%Y-%m-%d')]
 
+        # Handle Team (list)
         if team:
-            query += " AND u.team = %s"
-            params.append(team)
+            if isinstance(team, str):
+                teams_list = [team]
+            elif isinstance(team, list):
+                teams_list = team
+            else:
+                teams_list = []
+            
+            if teams_list:
+                placeholders = ','.join(['%s'] * len(teams_list))
+                query += f" AND u.team IN ({placeholders})"
+                params.extend(teams_list)
+
+        # Handle PC (list)
         if pc:
-            query += " AND u.pc LIKE %s"
-            params.append(f"%{pc}%")
+            if isinstance(pc, str):
+                pcs_list = [pc]
+            elif isinstance(pc, list):
+                pcs_list = pc
+            else:
+                pcs_list = []
+
+            if pcs_list:
+                placeholders = []
+                for _ in pcs_list:
+                    placeholders.append("u.pc LIKE %s")
+                query += " AND (" + " OR ".join(placeholders) + ")"
+                params.extend([f"%{p}%" for p in pcs_list])
 
         query += " GROUP BY month_key"
 
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
+
 
         # 4. Fill Map
         for row in rows:
@@ -3304,6 +3336,167 @@ def load_annotations(drawing_id):
         print(f"Error loading annotations: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+
+# ============================================================================
+# STRUCTURE MANAGEMENT API (Divisions, PCs, Teams)
+# ============================================================================
+
+# --- DIVISIONS ---
+@app.route('/api/structure/divisions', methods=['GET'])
+def get_divisions():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        with g.db.cursor(pymysql.cursors.DictCursor) as c:
+            c.execute("SELECT * FROM structure_divisions WHERE is_active = TRUE ORDER BY name")
+            return jsonify(c.fetchall())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/structure/divisions', methods=['POST'])
+def add_division():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        data = request.json or {}
+        name = (data.get('name') or '').strip()
+        if not name: return jsonify({"error": "Name is required"}), 400
+        
+        with g.db.cursor() as c:
+            # Check duplicate
+            c.execute("SELECT id, is_active FROM structure_divisions WHERE name = %s", (name,))
+            row = c.fetchone()
+            if row:
+               if row[1]: # is_active
+                   return jsonify({"error": "Division already exists"}), 400
+               else:
+                   # Reactivate
+                   c.execute("UPDATE structure_divisions SET is_active = TRUE WHERE id = %s", (row[0],))
+                   g.db.commit()
+                   return jsonify({"success": True}), 201
+            
+            c.execute("INSERT INTO structure_divisions (name) VALUES (%s)", (name,))
+        g.db.commit()
+        return jsonify({"success": True}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/structure/divisions/<int:id>', methods=['DELETE'])
+def delete_division(id):
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        with g.db.cursor() as c:
+            c.execute("UPDATE structure_divisions SET is_active = FALSE WHERE id = %s", (id,))
+        g.db.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- PCs ---
+@app.route('/api/structure/pcs', methods=['GET'])
+def get_pcs():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        division_id = request.args.get('division_id')
+        query = "SELECT * FROM structure_pcs WHERE is_active = TRUE"
+        params = []
+        if division_id:
+            query += " AND division_id = %s"
+            params.append(division_id)
+        query += " ORDER BY name"
+        
+        with g.db.cursor(pymysql.cursors.DictCursor) as c:
+            c.execute(query, tuple(params))
+            return jsonify(c.fetchall())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/structure/pcs', methods=['POST'])
+def add_pc():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        data = request.json or {}
+        name = (data.get('name') or '').strip()
+        division_id = data.get('division_id')
+        if not name or not division_id: return jsonify({"error": "Name and Division ID are required"}), 400
+        
+        with g.db.cursor() as c:
+            # Check duplicate
+            c.execute("SELECT id, is_active FROM structure_pcs WHERE name = %s AND division_id = %s", (name, division_id))
+            row = c.fetchone()
+            if row:
+                if row[1]: # is_active
+                    return jsonify({"error": "PC already exists in this division"}), 400
+                else:
+                    # Reactivate
+                    c.execute("UPDATE structure_pcs SET is_active = TRUE WHERE id = %s", (row[0],))
+                    g.db.commit()
+                    return jsonify({"success": True}), 201
+
+            c.execute("INSERT INTO structure_pcs (name, division_id) VALUES (%s, %s)", (name, division_id))
+        g.db.commit()
+        return jsonify({"success": True}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/structure/pcs/<int:id>', methods=['DELETE'])
+def delete_pc(id):
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        with g.db.cursor() as c:
+            c.execute("UPDATE structure_pcs SET is_active = FALSE WHERE id = %s", (id,))
+        g.db.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- TEAMS ---
+@app.route('/api/structure/teams', methods=['GET'])
+def get_teams():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        with g.db.cursor(pymysql.cursors.DictCursor) as c:
+            c.execute("SELECT * FROM structure_teams WHERE is_active = TRUE ORDER BY name")
+            return jsonify(c.fetchall())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/structure/teams', methods=['POST'])
+def add_team():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        data = request.json or {}
+        name = (data.get('name') or '').strip()
+        if not name: return jsonify({"error": "Name is required"}), 400
+        
+        with g.db.cursor() as c:
+             # Check duplicate
+            c.execute("SELECT id, is_active FROM structure_teams WHERE name = %s", (name,))
+            row = c.fetchone()
+            if row:
+                if row[1]:
+                   return jsonify({"error": "Team already exists"}), 400
+                else:
+                   # Reactivate
+                   c.execute("UPDATE structure_teams SET is_active = TRUE WHERE id = %s", (row[0],))
+                   g.db.commit()
+                   return jsonify({"success": True}), 201
+               
+            c.execute("INSERT INTO structure_teams (name) VALUES (%s)", (name,))
+        g.db.commit()
+        return jsonify({"success": True}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/structure/teams/<int:id>', methods=['DELETE'])
+def delete_team(id):
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        with g.db.cursor() as c:
+            c.execute("UPDATE structure_teams SET is_active = FALSE WHERE id = %s", (id,))
+        g.db.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # Canvas end
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-import { HttpClientModule } from '@angular/common/http'; 
+import { HttpClientModule } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { LineChartComponent } from './components/line-chart/line-chart.component';
@@ -24,6 +24,7 @@ import { SubmissionComponent } from './submission/submission.component';
 import { RequestsComponent } from './requests/requests.component';
 import { CanvasComponent } from './canvas/canvas.component';
 import { FooterComponent } from './footer/footer.component';
+import { StructureComponent } from './structure/structure.component';
 
 
 @NgModule({
@@ -46,7 +47,8 @@ import { FooterComponent } from './footer/footer.component';
     SubmissionComponent,
     RequestsComponent,
     CanvasComponent,
-    FooterComponent
+    FooterComponent,
+    StructureComponent
 
   ],
   imports: [
@@ -55,8 +57,8 @@ import { FooterComponent } from './footer/footer.component';
     FormsModule,
     NgApexchartsModule,
     HttpClientModule,
-],
-providers: [AuthService],
+  ],
+  providers: [AuthService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

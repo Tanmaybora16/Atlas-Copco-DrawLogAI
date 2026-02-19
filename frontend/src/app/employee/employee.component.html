@@ -6,65 +6,38 @@
 
       <div class="input-container">
         <label for="employeeId">Employee ID</label>
-        <input
-          type="text"
-          id="employeeId"
-          [(ngModel)]="employeeId"
-          name="employeeId"
-          required
-          [disabled]="isBusy || editingIndex !== null"  
-        />
+        <input type="text" id="employeeId" [(ngModel)]="employeeId" name="employeeId" required
+          [disabled]="isBusy || editingIndex !== null" />
       </div>
 
       <div class="input-container">
         <label for="employeeName">Employee Name</label>
-        <input
-          type="text"
-          id="employeeName"
-          [(ngModel)]="employeeName"
-          name="employeeName"
-          required
-          [disabled]="isBusy"
-        />
+        <input type="text" id="employeeName" [(ngModel)]="employeeName" name="employeeName" required
+          [disabled]="isBusy" />
       </div>
 
       <div class="input-container">
         <label for="employeeEmail">Employee Email</label>
-        <input
-          type="email"
-          id="employeeEmail"
-          [(ngModel)]="employeeEmail"
-          name="employeeEmail"
-          required
-          [disabled]="isBusy"
-        />
+        <input type="email" id="employeeEmail" [(ngModel)]="employeeEmail" name="employeeEmail" required
+          [disabled]="isBusy" />
       </div>
 
       <div class="input-container">
         <label for="division">Division</label>
-        <select
-          id="division"
-          [(ngModel)]="selectedDivision"
-          (change)="onDivisionChange()"
-          name="division"
-          required
-          [disabled]="isBusy"
-        >
+        <select id="division" [(ngModel)]="selectedDivision" (change)="onDivisionChange()" name="division" required
+          [disabled]="isBusy">
           <option value="" disabled selected>Select Division</option>
-          <option *ngFor="let division of divisions" [value]="division">
-            {{ division }}
+          <option *ngFor="let division of divisions" [value]="division.name">
+            {{ division.name }}
           </option>
         </select>
       </div>
 
       <div class="input-container custom-multi-select">
         <label for="pc">PC</label>
-        <div
-          class="dropdown-box"
-          [class.disabled]="!selectedDivision || isBusy"
+        <div class="dropdown-box" [class.disabled]="!selectedDivision || isBusy"
           (click)="(!isBusy && selectedDivision) ? toggleDropdown() : showDivisionAlert()"
-          [class.open]="dropdownOpen && selectedDivision && !isBusy"
-        >
+          [class.open]="dropdownOpen && selectedDivision && !isBusy">
           <span class="selected-text">
             {{ selectedPCs.length > 0 ? selectedPCs.join(', ') : 'Select PC(s)' }}
           </span>
@@ -73,14 +46,9 @@
 
         <div class="dropdown-list" *ngIf="dropdownOpen && selectedDivision && !isBusy">
           <label *ngFor="let pc of pcs">
-            <input
-              type="checkbox"
-              [value]="pc"
-              [checked]="selectedPCs.includes(pc)"
-              (change)="onPCCheckboxChange(pc, $event)"
-              [disabled]="isBusy"
-            />
-            {{ pc }}
+            <input type="checkbox" [value]="pc.name" [checked]="selectedPCs.includes(pc.name)"
+              (change)="onPCCheckboxChange(pc.name, $event)" [disabled]="isBusy" />
+            {{ pc.name }}
           </label>
         </div>
       </div>
@@ -89,22 +57,14 @@
         <label for="team">Team</label>
         <select id="team" [(ngModel)]="selectedTeam" name="team" required [disabled]="isBusy">
           <option value="" disabled selected>Select Team</option>
-          <option *ngFor="let team of teams" [value]="team">{{ team }}</option>
+          <option *ngFor="let team of teams" [value]="team.name">{{ team.name }}</option>
         </select>
       </div>
 
       <div class="add-btn">
-        <button
-          type="button"
-          (click)="saveEmployee()"
-          class="add-employee-button"
-          [disabled]="isBusy"
-        >
-          <img
-            [src]="editingIndex !== null ? 'assets/save.svg' : 'assets/plus.svg'"
-            alt="{{ editingIndex !== null ? 'Save' : 'Add' }}"
-            class="button-icon"
-          />
+        <button type="button" (click)="saveEmployee()" class="add-employee-button" [disabled]="isBusy">
+          <img [src]="editingIndex !== null ? 'assets/save.svg' : 'assets/plus.svg'"
+            alt="{{ editingIndex !== null ? 'Save' : 'Add' }}" class="button-icon" />
           <ng-container *ngIf="!isBusy; else busyTpl">
             {{ editingIndex !== null ? 'Save details' : 'Add employee' }}
           </ng-container>
@@ -137,20 +97,10 @@
             <td>{{ employee.pc }}</td>
             <td>{{ employee.team }}</td>
             <td class="actions">
-              <img
-                src="assets/edit-2.svg"
-                alt="Edit"
-                class="action-icon edit-icon"
-                [class.disabled]="isBusy"
-                (click)="!isBusy && editEmployee(i)"
-              />
-              <img
-                src="assets/delete.svg"
-                alt="Delete"
-                class="action-icon delete-icon"
-                [class.disabled]="isBusy"
-                (click)="!isBusy && deleteEmployee(i)"
-              />
+              <img src="assets/edit-2.svg" alt="Edit" class="action-icon edit-icon" [class.disabled]="isBusy"
+                (click)="!isBusy && editEmployee(i)" />
+              <img src="assets/delete.svg" alt="Delete" class="action-icon delete-icon" [class.disabled]="isBusy"
+                (click)="!isBusy && deleteEmployee(i)" />
             </td>
           </tr>
         </tbody>
