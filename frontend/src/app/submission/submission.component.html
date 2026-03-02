@@ -13,8 +13,15 @@
 
             <div class="detail-item">
               <label>PC</label>
-              <!-- Always show text -->
-              <div class="detail-value">{{ selectedPC || '—' }}</div>
+              <!-- Single PC text -->
+              <div class="detail-value" *ngIf="displaySinglePC">{{ selectedPC || '—' }}</div>
+              <!-- Multi PC dropdown -->
+              <ng-container *ngIf="!displaySinglePC">
+                <select class="custom-dropdown" [(ngModel)]="selectedPC" [ngModelOptions]="{ standalone: true }"
+                  style="width: 100%; border: 1px solid #ccc; border-radius: 4px; padding: 4px; background: white;">
+                  <option *ngFor="let pc of pcList" [value]="pc">{{ pc }}</option>
+                </select>
+              </ng-container>
             </div>
 
             <div class="detail-item">

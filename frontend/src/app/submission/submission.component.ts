@@ -197,10 +197,17 @@ export class SubmissionComponent implements OnInit {
         // Fill email
         this.creatorEmail = (this.selectedCreator.emp_email || '').toString();
 
-        // Handle PC (single vs multi) - NOW ALWAYS KEEP AS STRING
-        this.selectedPC = (this.selectedCreator.emp_PC || '').toString();
-        this.pcList = [];
-        this.displaySinglePC = true; // Effectively unused now, but keeping for safety or refactor
+        // Handle PC (single vs multi)
+        const rawPC = (this.selectedCreator.emp_PC || '').toString().trim();
+        if (rawPC.includes(',')) {
+          this.pcList = rawPC.split(',').map((pc: string) => pc.trim()).filter((pc: string) => pc.length > 0);
+          this.displaySinglePC = false;
+          this.selectedPC = this.pcList.length > 0 ? this.pcList[0] : '';
+        } else {
+          this.pcList = [rawPC];
+          this.displaySinglePC = true;
+          this.selectedPC = rawPC;
+        }
       },
       (error) => console.error('Error fetching creator details:', error)
     );

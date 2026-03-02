@@ -32,12 +32,6 @@ import os
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
-# Email Configuration (Placeholders - Update with real values)
-# SMTP_SERVER = "output.office365.com"  # Example for Office365
-# SMTP_PORT = 587
-# EMAIL_SENDER = "admin@atlascopco.com"
-# EMAIL_PASSWORD = "change_me"
-
 # Upload Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
 if not os.path.exists(UPLOAD_FOLDER):
@@ -57,57 +51,12 @@ CORS(app
     # }}
 )
 
-# Request logging middleware
-# @app.before_request
-# def log_request_info():
-#     """Log all incoming requests"""
-#     # print(f"\n{'='*80}")
-#     # print(f">>> INCOMING REQUEST: {request.method} {request.path}")
-#     # print(f"    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-#     # print(f"    Remote Address: {request.remote_addr}")
-#     # print(f"    Origin: {request.headers.get('Origin', 'N/A')}")
-#     # if request.args:
-#     #     print(f"    Query Params: {dict(request.args)}")
-#     # print(f"{'='*80}\n")
-
-# @app.after_request
-# def log_response_info(response):
-#     """Log all outgoing responses and ensure CORS headers"""
-#     # Ensure CORS headers are always present
-#     response.headers['Access-Control-Allow-Origin'] = '*'
-#     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-#     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    
-#     # print(f"\n{'='*80}")
-#     # print(f"<<< RESPONSE: {request.method} {request.path}")
-#     # print(f"    Status: {response.status_code} {response.status}")
-#     # print(f"    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-#     # print(f"{'='*80}\n")
-#     return response
-
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "error_code_classifier_model.pkl")
 VECTORIZER_PATH = os.path.join(BASE_DIR, "tfidf_vectorizer.pkl")
-
-# def connect_to_db():
-#     try:
-#         db = pymysql.connect(
-#             host="localhost",
-#             user="root",
-#             password="root",
-#             database="error_db",
-#         )
-        
-#         with db.cursor() as c:
-#             # If timezone tables aren’t loaded, use '+05:30'
-#             c.execute("SET time_zone = '+05:30'")
-#         return db
-#     except pymysql.MySQLError as err:
-#         print(f"Database connection failed: {err}")
-#         return None
 
 def connect_to_db():
     for i in range(10):  # retry logic
@@ -156,14 +105,14 @@ model = joblib.load(MODEL_PATH)
 tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 
 # SMTP Email Configuration (Use your SMTP server details)
-EMAIL_SENDER = "Errorloggingportal@atlascopco.com"
-SMTP_SERVER = "smtp.onevirtualoffice.local"  
-SMTP_PORT = 25  
+# EMAIL_SENDER = "Errorloggingportal@atlascopco.com"
+# SMTP_SERVER = "smtp.onevirtualoffice.local"  
+# SMTP_PORT = 25  
 
-# EMAIL_SENDER = "atlascopcotestmail2025@gmail.com"
-# EMAIL_PASSWORD = "pwbd zgow smzm ywza"
-# SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
-# SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
+EMAIL_SENDER = "atlascopcotestmail2025@gmail.com"
+EMAIL_PASSWORD = "pwbd zgow smzm ywza"
+SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
+SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
 
 
 # ============================================================================
@@ -332,44 +281,6 @@ def submit_data():
         except Exception as e:
             return dbg_fail("user-lookup", e)
 
-        # ... (rest of the code)
-
-        # 6) Send email notification (Approved/Rejected)
-        try:
-            cursor.execute("SELECT email, name FROM users WHERE id = %s", (creator_id,))
-            creator_row = cursor.fetchone()
-            if creator_row:
-                creator_email, creator_db_name = creator_row[0], creator_row[1]
-                
-                # Format names as "EMP_ID - Name"
-                formatted_creator_name = f"{creator_emp_id} - {creator_db_name}"
-                formatted_reviewer_name = f"{reviewer_emp_id} - {reviewer_db_name}"
-
-                try:
-                    send_email(
-                        to_email=creator_email,
-                        drawing_id=drawing_no,
-                        revision_no=revision_no_int,
-                        reviewer_name=formatted_reviewer_name,
-                        reviewed_date=reviewed_date,
-                        error_codes=error_codes,
-                        extracted_comments=extracted_comments,
-                        decision=decision,
-                        drawing_Type=drawing_type,
-                        creator_name=formatted_creator_name,
-                        pdf_bytes=pdf_bytes,
-                        pdf_filename=pdf_filename,
-                        file_path=None, # We have bytes, not path
-                        user_comments=form_data.get('comments')
-                    )
-                except TypeError as e:
-                     print(f"⚠ email-send signature mismatch: {e}")
-        except Exception as e:
-            # Don't fail the whole transaction because of email
-            print("⚠ email-send failed:", e)
-        except Exception as e:
-            return dbg_fail("user-lookup", e)
-
         # 1) Insert or get drawing
         try:
             cursor.execute("SELECT id FROM drawings WHERE drawing_no = %s", (drawing_no,))
@@ -492,19 +403,24 @@ def submit_data():
             cursor.execute("SELECT email, name FROM users WHERE id = %s", (creator_id,))
             creator_row = cursor.fetchone()
             if creator_row:
-                creator_email, creator_name = creator_row[0], creator_row[1]
+                creator_email, creator_db_name = creator_row[0], creator_row[1]
+                
+                # Format names as "EMP_ID - Name"
+                formatted_creator_name = f"{creator_emp_id} - {creator_db_name}"
+                formatted_reviewer_name = f"{reviewer_emp_id} - {reviewer_db_name}"
+
                 try:
                     send_email(
                         to_email=creator_email,
                         drawing_id=drawing_no,
                         revision_no=revision_no_int,
-                        reviewer_name=reviewer_emp_id,
+                        reviewer_name=formatted_reviewer_name,
                         reviewed_date=reviewed_date,
                         error_codes=error_codes,
                         extracted_comments=extracted_comments,
                         decision=decision,
                         drawing_Type=drawing_type,
-                        creator_name=creator_name,
+                        creator_name=formatted_creator_name,
                         pdf_bytes=pdf_bytes,
                         pdf_filename=pdf_filename,
                         file_path=None, # We have bytes, not path
@@ -536,8 +452,8 @@ def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, 
     try:
         # Set up the SMTP server
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         # Email content
         subject = f"Drawing Review Notification :- {drawing_id} (Revision number :- {revision_no})"
@@ -722,8 +638,8 @@ def send_otp_email(to_email: str, emp_id: str, otp_plain: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Your OTP for Password Reset (valid for 5 minutes)"
         body = f"""Dear User ({emp_id}),
@@ -1007,8 +923,8 @@ def send_password_change_notification(to_email: str, emp_id: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Your Atlas Copco AI Error Logging Portal account password was changed"
         body = f"""Dear User ({emp_id}),
@@ -1123,8 +1039,8 @@ def send_welcome_credentials_email(to_email: str, emp_id: str):
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Welcome to Atlas Copco Error Logging"
         body = f"""Dear User,
@@ -1388,12 +1304,12 @@ def monthly_drawing_status():
             query += f" AND u.team IN ({placeholders})"
             params.extend(teams)
 
-        # Add PC filter
+        # Add PC filter: use d.pc for new data; fallback to u.pc LIKE for old drawings (d.pc IS NULL)
         if pcs:
-            placeholders = []
-            for _ in pcs:
-                placeholders.append("u.pc LIKE %s")
-            query += " AND (" + " OR ".join(placeholders) + ")"
+            exact_placeholders = ','.join(['%s'] * len(pcs))
+            like_conditions = ' OR '.join(['u.pc LIKE %s'] * len(pcs))
+            query += f" AND (d.pc IN ({exact_placeholders}) OR (d.pc IS NULL AND ({like_conditions})))"
+            params.extend(pcs)
             params.extend([f"%{p}%" for p in pcs])
 
         query += " GROUP BY DATE_FORMAT(dr.reviewed_date, '%%Y-%%m-01') ORDER BY month_start"
@@ -1467,12 +1383,12 @@ def monthly_error_report():
             query += f" AND u.team IN ({placeholders})"
             params.extend(selected_teams)
 
-        # Add PC filter
+        # Add PC filter: use d.pc for new data; fallback to u.pc LIKE for old drawings (d.pc IS NULL)
         if selected_pcs:
-            placeholders = []
-            for _ in selected_pcs:
-                placeholders.append("u.pc LIKE %s")
-            query += " AND (" + " OR ".join(placeholders) + ")"
+            exact_placeholders = ','.join(['%s'] * len(selected_pcs))
+            like_conditions = ' OR '.join(['u.pc LIKE %s'] * len(selected_pcs))
+            query += f" AND (d.pc IN ({exact_placeholders}) OR (d.pc IS NULL AND ({like_conditions})))"
+            params.extend(selected_pcs)
             params.extend([f"%{p}%" for p in selected_pcs])
 
         query += " GROUP BY DATE_FORMAT(dr.reviewed_date, '%%m-%%Y') ORDER BY MIN(dr.reviewed_date)"
@@ -1548,12 +1464,12 @@ def trend_error_report():
             query += f" AND u.team IN ({placeholders})"
             params.extend(selected_teams)
 
-        # Add PC filter
+        # Add PC filter: use d.pc for new data; fallback to u.pc LIKE for old drawings (d.pc IS NULL)
         if selected_pcs:
-            placeholders = []
-            for _ in selected_pcs:
-                placeholders.append("u.pc LIKE %s")
-            query += " AND (" + " OR ".join(placeholders) + ")"
+            exact_placeholders = ','.join(['%s'] * len(selected_pcs))
+            like_conditions = ' OR '.join(['u.pc LIKE %s'] * len(selected_pcs))
+            query += f" AND (d.pc IN ({exact_placeholders}) OR (d.pc IS NULL AND ({like_conditions})))"
+            params.extend(selected_pcs)
             params.extend([f"%{p}%" for p in selected_pcs])
 
         query += " GROUP BY ec.code ORDER BY count DESC LIMIT 10"
@@ -1629,12 +1545,12 @@ def get_drawings_trend():
             query += f" AND u.team IN ({placeholders})"
             params.extend(teams)
 
-        # Add PC filter
+        # Add PC filter: use d.pc for new data; fallback to u.pc LIKE for old drawings (d.pc IS NULL)
         if pcs:
-            placeholders = []
-            for _ in pcs:
-                placeholders.append("u.pc LIKE %s")
-            query += " AND (" + " OR ".join(placeholders) + ")"
+            exact_placeholders = ','.join(['%s'] * len(pcs))
+            like_conditions = ' OR '.join(['u.pc LIKE %s'] * len(pcs))
+            query += f" AND (d.pc IN ({exact_placeholders}) OR (d.pc IS NULL AND ({like_conditions})))"
+            params.extend(pcs)
             params.extend([f"%{p}%" for p in pcs])
 
         query += " GROUP BY DATE_FORMAT(dr.reviewed_date, '%%Y-%%m') ORDER BY month_sort"
@@ -1747,11 +1663,12 @@ def get_pass_ratio():
             else:
                 pcs_list = []
 
+            # Add PC filter: use d.pc for new data; fallback to u.pc LIKE for old drawings (d.pc IS NULL)
             if pcs_list:
-                placeholders = []
-                for _ in pcs_list:
-                    placeholders.append("u.pc LIKE %s")
-                query += " AND (" + " OR ".join(placeholders) + ")"
+                exact_placeholders = ','.join(['%s'] * len(pcs_list))
+                like_conditions = ' OR '.join(['u.pc LIKE %s'] * len(pcs_list))
+                query += f" AND (d.pc IN ({exact_placeholders}) OR (d.pc IS NULL AND ({like_conditions})))"
+                params.extend(pcs_list)
                 params.extend([f"%{p}%" for p in pcs_list])
 
         query += " GROUP BY month_key"
@@ -1908,7 +1825,8 @@ def employee_report():
                      WHEN dr.approved = FALSE THEN 'Reject'
                      ELSE 'Pending' END as Decision,
                 GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes,
-                dr.task_number as Task_Number
+                dr.task_number as Task_Number,
+                d.pc as drawing_pc
             FROM drawings d
             JOIN drawing_revisions dr ON d.id = dr.drawing_id
             LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
@@ -1926,7 +1844,7 @@ def employee_report():
             query += " AND dr.reviewed_date <= %s"
             params.append(end_date)
 
-        query += " GROUP BY dr.id ORDER BY dr.reviewed_date DESC"
+        query += " GROUP BY dr.id, d.pc ORDER BY dr.reviewed_date DESC"
 
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
@@ -1936,9 +1854,11 @@ def employee_report():
         for tup in rows:
             row = dict(zip(cols, tup))
             row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
-            # Add employee metadata to every row (frontend uses this for summary)
+            # Add employee metadata to every row
             row["Employee_name"] = user_name
-            row["PC"] = user_pc
+            # Use the drawing-specific PC if available, otherwise fallback to the user's default PC
+            drawing_pc_val = row.pop("drawing_pc", None)
+            row["PC"] = drawing_pc_val if drawing_pc_val else user_pc
             row["Division"] = user_division
             result.append(row)
 
@@ -2240,8 +2160,8 @@ def send_single_summary_email(to_email: str, items: list[tuple[str, int]], creat
     """
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        # server.starttls()
-        # server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
 
         subject = "Drawings ready for review"
         pairs_str = ', '.join([f"{did} - {rev}" for did, rev in items])
@@ -2359,8 +2279,7 @@ def submit_batch():
                         drawing_db_id = drawing_row[0]
                     else:
                         # Create new drawing
-                        # Create new drawing
-                        c.execute("INSERT INTO drawings (drawing_no, creator_id, drawing_type, created_at) VALUES (%s, %s, %s, %s)", (drawing_id, creator_id, drawing_type, today))
+                        c.execute("INSERT INTO drawings (drawing_no, creator_id, drawing_type, pc, created_at) VALUES (%s, %s, %s, %s, %s)", (drawing_id, creator_id, drawing_type, pc, today))
                         drawing_db_id = c.lastrowid
 
                     # Check if this revision exists
@@ -3110,7 +3029,7 @@ def prefill_upload():
 
         # 1. Get Drawing ID and Creator
         cur.execute("""
-            SELECT id, creator_id, drawing_type 
+            SELECT id, creator_id, drawing_type, pc 
             FROM drawings 
             WHERE drawing_no = %s
         """, (drawing_no,))
@@ -3122,6 +3041,7 @@ def prefill_upload():
         drawing_db_id = drawing_row[0]
         creator_id = drawing_row[1]
         drawing_type = drawing_row[2]
+        drawing_pc = drawing_row[3]
 
         # 2. Determine Revision
         # Find latest revision for this drawing
@@ -3166,7 +3086,9 @@ def prefill_upload():
         creator_emp_id = c_user[0] if c_user else ""
         emp_division = c_user[1] if c_user else ""
         emp_team = c_user[2] if c_user else ""
-        emp_pc = c_user[3] if c_user else ""
+        
+        # Prefer the PC specific to this drawing. If none exists (e.g. older drawing), fallback to the user's PCs.
+        emp_pc = drawing_pc if drawing_pc else (c_user[3] if c_user else "")
 
         # Reviewer
         reviewer_emp_id = ""
