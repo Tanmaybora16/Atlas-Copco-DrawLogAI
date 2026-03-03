@@ -1,4 +1,9 @@
-import { Component, OnInit, HostListener, ChangeDetectorRef } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  HostListener,
+  ChangeDetectorRef,
+} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { NgForm } from '@angular/forms';
 import { debounceTime } from 'rxjs/operators';
@@ -9,15 +14,15 @@ import { environment } from 'src/environments/environment';
 declare const Swal: any;
 
 interface EmployeeOption {
-  id: string;      // EMP_ID
-  name: string;    // EMP_Name
+  id: string; // EMP_ID
+  name: string; // EMP_Name
   display: string; // "EMP_ID - EMP_Name"
 }
 
 @Component({
   selector: 'app-submission',
   templateUrl: './submission.component.html',
-  styleUrls: ['./submission.component.scss']
+  styleUrls: ['./submission.component.scss'],
 })
 export class SubmissionComponent implements OnInit {
   private readonly API = `${environment.apiUrl}`;
@@ -38,7 +43,13 @@ export class SubmissionComponent implements OnInit {
   filteredCreators: EmployeeOption[] = [];
   selectedCreatorId = '';
   selectedCreatorDisplay = '';
-  selectedCreator: any = { emp_PC: '', emp_division: '', emp_team: '', emp_email: '', emp_name: '' };
+  selectedCreator: any = {
+    emp_PC: '',
+    emp_division: '',
+    emp_team: '',
+    emp_email: '',
+    emp_name: '',
+  };
 
   // REVIEWER dropdown
   reviewerDropdownOpen = false;
@@ -60,10 +71,21 @@ export class SubmissionComponent implements OnInit {
   // Drawing type
   drawingDropdownOpen = false;
   drawingTypes = [
-    'Casted Machined Drawing', 'Decal', 'Dimension Drawing', 'Ferrous Casting Drawing',
-    'Flexible', 'Foam', 'Hose', 'Installation Drawing', 'Instruction Drawing',
-    'Non-Casted Machined Drawing', 'Non-Ferrous Casting Drawing', 'Piping Other',
-    'Sheet Metal Drawing', 'Supplier Drawing', 'Welded Piping'
+    'Casted Machined Drawing',
+    'Decal',
+    'Dimension Drawing',
+    'Ferrous Casting Drawing',
+    'Flexible',
+    'Foam',
+    'Hose',
+    'Installation Drawing',
+    'Instruction Drawing',
+    'Non-Casted Machined Drawing',
+    'Non-Ferrous Casting Drawing',
+    'Piping Other',
+    'Sheet Metal Drawing',
+    'Supplier Drawing',
+    'Welded Piping',
   ];
   selectedDrawingType = '';
 
@@ -81,13 +103,17 @@ export class SubmissionComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private cdRef: ChangeDetectorRef,
-    private auth: AuthService
-  ) { }
+    private auth: AuthService,
+  ) {}
 
   ngOnInit() {
     // Debounced search (for Reviewer dropdown only)
-    this.creatorSearch$.pipe(debounceTime(250)).subscribe((txt) => this.filterCreators(txt));
-    this.reviewerSearch$.pipe(debounceTime(250)).subscribe((txt) => this.filterReviewers(txt));
+    this.creatorSearch$
+      .pipe(debounceTime(250))
+      .subscribe((txt) => this.filterCreators(txt));
+    this.reviewerSearch$
+      .pipe(debounceTime(250))
+      .subscribe((txt) => this.filterReviewers(txt));
 
     // 1) Get logged-in Creator ID
     const me = this.auth.getLoggedInUser?.();
@@ -113,7 +139,9 @@ export class SubmissionComponent implements OnInit {
     this.reviewerDropdownOpen = !this.reviewerDropdownOpen;
     if (this.reviewerDropdownOpen) this.filteredReviewers = [...this.employees];
   }
-  toggleDrawingDropdown() { this.drawingDropdownOpen = !this.drawingDropdownOpen; }
+  toggleDrawingDropdown() {
+    this.drawingDropdownOpen = !this.drawingDropdownOpen;
+  }
 
   // Close dropdowns when clicking elsewhere
   @HostListener('document:click', ['$event'])
@@ -130,37 +158,57 @@ export class SubmissionComponent implements OnInit {
   fetchEmployees() {
     this.http.get<any[]>(`${this.API}/get-employees`).subscribe(
       (data) => {
-        this.employees = (data || []).map((row: any) => {
-          const id: string = (row.Emp_ID || row.emp_id || '').toString().trim();
-          const name: string = (row.Emp_Name || row.emp_name || '').toString().trim();
-          return { id, name, display: id && name ? `${id} - ${name}` : id || name };
-        }).filter(e => !!e.id);
+        this.employees = (data || [])
+          .map((row: any) => {
+            const id: string = (row.Emp_ID || row.emp_id || '')
+              .toString()
+              .trim();
+            const name: string = (row.Emp_Name || row.emp_name || '')
+              .toString()
+              .trim();
+            return {
+              id,
+              name,
+              display: id && name ? `${id} - ${name}` : id || name,
+            };
+          })
+          .filter((e) => !!e.id);
 
         this.filteredCreators = [...this.employees];
         this.filteredReviewers = [...this.employees];
 
         // If we already know the creator ID, try to show "ID - Name"
         if (this.selectedCreatorId && !this.selectedCreatorDisplay) {
-          const meRow = this.employees.find(e => e.id === this.selectedCreatorId);
+          const meRow = this.employees.find(
+            (e) => e.id === this.selectedCreatorId,
+          );
           if (meRow) this.selectedCreatorDisplay = meRow.display;
         }
 
         this.cdRef.detectChanges();
       },
-      (error) => console.error('Error fetching employees:', error)
+      (error) => console.error('Error fetching employees:', error),
     );
   }
 
   // Search
-  onCreatorSearchChange(text: string) { this.creatorSearch$.next(text); }
-  onReviewerSearchChange(text: string) { this.reviewerSearch$.next(text); }
+  onCreatorSearchChange(text: string) {
+    this.creatorSearch$.next(text);
+  }
+  onReviewerSearchChange(text: string) {
+    this.reviewerSearch$.next(text);
+  }
   private filterCreators(text: string) {
     const q = (text || '').toLowerCase();
-    this.filteredCreators = this.employees.filter(e => e.display.toLowerCase().includes(q));
+    this.filteredCreators = this.employees.filter((e) =>
+      e.display.toLowerCase().includes(q),
+    );
   }
   private filterReviewers(text: string) {
     const q = (text || '').toLowerCase();
-    this.filteredReviewers = this.employees.filter(e => e.display.toLowerCase().includes(q));
+    this.filteredReviewers = this.employees.filter((e) =>
+      e.display.toLowerCase().includes(q),
+    );
   }
 
   selectCreator(emp: EmployeeOption, event: Event) {
@@ -186,7 +234,13 @@ export class SubmissionComponent implements OnInit {
 
     this.http.get<any>(`${this.API}/get-employee/${empId}`).subscribe(
       (data) => {
-        this.selectedCreator = data || { emp_PC: '', emp_division: '', emp_team: '', emp_email: '', emp_name: '' };
+        this.selectedCreator = data || {
+          emp_PC: '',
+          emp_division: '',
+          emp_team: '',
+          emp_email: '',
+          emp_name: '',
+        };
 
         // Build "ID - Name" label if we have a name
         if (!this.selectedCreatorDisplay) {
@@ -200,7 +254,10 @@ export class SubmissionComponent implements OnInit {
         // Handle PC (single vs multi)
         const rawPC = (this.selectedCreator.emp_PC || '').toString().trim();
         if (rawPC.includes(',')) {
-          this.pcList = rawPC.split(',').map((pc: string) => pc.trim()).filter((pc: string) => pc.length > 0);
+          this.pcList = rawPC
+            .split(',')
+            .map((pc: string) => pc.trim())
+            .filter((pc: string) => pc.length > 0);
           this.displaySinglePC = false;
           this.selectedPC = this.pcList.length > 0 ? this.pcList[0] : '';
         } else {
@@ -209,7 +266,7 @@ export class SubmissionComponent implements OnInit {
           this.selectedPC = rawPC;
         }
       },
-      (error) => console.error('Error fetching creator details:', error)
+      (error) => console.error('Error fetching creator details:', error),
     );
   }
 
@@ -219,13 +276,15 @@ export class SubmissionComponent implements OnInit {
     this.http.get<any>(`${this.API}/get-employee/${empId}`).subscribe(
       (data) => {
         this.selectedReviewer = data || { emp_email: '' };
-        this.selectedReviewerEmail = (this.selectedReviewer.emp_email || '').toString();
+        this.selectedReviewerEmail = (
+          this.selectedReviewer.emp_email || ''
+        ).toString();
       },
       (error) => {
         console.error('Error fetching reviewer details:', error);
         this.selectedReviewer = { emp_email: '' };
         this.selectedReviewerEmail = '';
-      }
+      },
     );
   }
 
@@ -236,7 +295,9 @@ export class SubmissionComponent implements OnInit {
       return;
     }
     // Only PDFs
-    const all = Array.from(input.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    const all = Array.from(input.files).filter((f) =>
+      f.name.toLowerCase().endsWith('.pdf'),
+    );
     this.selectedFiles = [...this.selectedFiles, ...all];
     this.updateFileNamesDisplay();
 
@@ -253,15 +314,20 @@ export class SubmissionComponent implements OnInit {
 
   // Update file names display
   private updateFileNamesDisplay() {
-    this.fileNamesDisplay = this.selectedFiles.map(f => f.name).join(', ');
+    this.fileNamesDisplay = this.selectedFiles.map((f) => f.name).join(', ');
   }
 
   fetchCreatorEmail(creatorId: string) {
     if (!creatorId) return;
-    this.http.get<{ email: string }>(`${this.API}/get-creator-email/${creatorId}`)
+    this.http
+      .get<{ email: string }>(`${this.API}/get-creator-email/${creatorId}`)
       .subscribe(
-        (response) => { this.creatorEmail = response.email; },
-        () => { this.creatorEmail = ''; }
+        (response) => {
+          this.creatorEmail = response.email;
+        },
+        () => {
+          this.creatorEmail = '';
+        },
       );
   }
 
@@ -276,45 +342,76 @@ export class SubmissionComponent implements OnInit {
     if (this.isBusy) return;
 
     if (!this.selectedFiles?.length) {
-      Swal.fire({ icon: 'error', title: 'No Files Selected', text: 'Please select one or more PDFs.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'No Files Selected',
+        text: 'Please select one or more PDFs.',
+      });
       return;
     }
     if (!this.selectedCreatorId) {
-      Swal.fire({ icon: 'error', title: 'Missing Creator', text: 'Creator could not be determined from your session.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Creator',
+        text: 'Creator could not be determined from your session.',
+      });
       return;
     }
     if (!this.selectedReviewerId) {
-      Swal.fire({ icon: 'error', title: 'Missing Reviewer', text: 'Please select a reviewer.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Reviewer',
+        text: 'Please select a reviewer.',
+      });
       return;
     }
     if (!this.selectedReviewerEmail) {
-      Swal.fire({ icon: 'error', title: 'Reviewer Email', text: 'Reviewer email could not be fetched.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Reviewer Email',
+        text: 'Reviewer email could not be fetched.',
+      });
       return;
     }
     if (!this.selectedPC) {
-      Swal.fire({ icon: 'error', title: 'Missing PC', text: 'Please select a Profit Center (PC).' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing PC',
+        text: 'Please select a Profit Center (PC).',
+      });
       return;
     }
     if (!this.selectedDrawingType) {
-      Swal.fire({ icon: 'error', title: 'Missing Drawing Type', text: 'Please choose a drawing type.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Drawing Type',
+        text: 'Please choose a drawing type.',
+      });
       return;
     }
+    this.submitBatch(form, false);
+  }
 
+  private submitBatch(form: NgForm, forceOverwrite: boolean) {
     this.isBusy = true;
 
     const fd = new FormData();
-    this.selectedFiles.forEach(f => fd.append('pdfs', f, f.name));
+    this.selectedFiles.forEach((f) => fd.append('pdfs', f, f.name));
 
     // shared metadata
     fd.append('creator_emp_id', this.selectedCreatorId);
     fd.append('reviewer_emp_id', this.selectedReviewerId);
     fd.append('reviewer_email', this.selectedReviewerEmail);
-    fd.append('creator_email', (this.selectedCreator.emp_email || '').toString());
+    fd.append(
+      'creator_email',
+      (this.selectedCreator.emp_email || '').toString(),
+    );
     fd.append('division', (this.selectedCreator.emp_division || '').toString());
     fd.append('team', (this.selectedCreator.emp_team || '').toString());
     fd.append('pc', (this.selectedPC || '').toString());
     fd.append('drawing_type', this.selectedDrawingType);
     fd.append('decision', this.decision);
+    fd.append('force_overwrite', forceOverwrite ? 'true' : 'false');
 
     // NEW: Add task number and comments
     fd.append('task_number', (form.value.taskNumber || '').toString());
@@ -326,11 +423,13 @@ export class SubmissionComponent implements OnInit {
 
     this.http.post(`${this.API}/submit-batch`, fd).subscribe({
       next: (res: any) => {
-        const lines = (res?.results || []).map((r: any) => `${r.drawing_id} - ${r.revision}`).join(', ');
+        const lines = (res?.results || [])
+          .map((r: any) => `${r.drawing_id} - ${r.revision}`)
+          .join(', ');
         Swal.fire({
           icon: 'success',
           title: 'Submission Successful',
-          html: res?.message || `Processed files.<br/>Revisions: ${lines}`
+          html: res?.message || `Processed files.<br/>Revisions: ${lines}`,
         });
         form.resetForm();
         this.resetFormState();
@@ -342,20 +441,75 @@ export class SubmissionComponent implements OnInit {
         }
 
         this.isBusy = false;
+
+        let delayedPopup = false;
+
+        // Handle Duplicate files intercept
+        if (res?.duplicates && res.duplicates.length > 0) {
+          delayedPopup = true;
+          const duplicateFilesList = res.duplicates.join('<br/>');
+          setTimeout(() => {
+            Swal.fire({
+              title: 'Duplicate Revisions Found',
+              html: `The following files already exist in the system and were not saved:<br/><br/><strong>${duplicateFilesList}</strong><br/><br/>Would you like to overwrite the existing revisions with these files?`,
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#3085d6',
+              cancelButtonColor: '#d33',
+              confirmButtonText: 'Yes, Overwrite!',
+              cancelButtonText: 'Ignore',
+            }).then((result: any) => {
+              if (result.isConfirmed) {
+                // Keep only duplicates for the retry by filtering selectedFiles
+                this.selectedFiles = this.selectedFiles.filter((f) =>
+                  res.duplicates.includes(f.name),
+                );
+                this.updateFileNamesDisplay();
+                this.submitBatch(form, true);
+              } else {
+                this.showRejectedPopupIfNeeded(res?.rejected);
+              }
+            });
+          }, 500);
+        }
+
+        if (!delayedPopup) {
+          this.showRejectedPopupIfNeeded(res?.rejected);
+        }
       },
       error: (err) => {
-        const msg = err?.error?.message || 'Submission failed. Please try again.';
+        const msg =
+          err?.error?.message || 'Submission failed. Please try again.';
         Swal.fire({ icon: 'error', title: 'Submission Failed', text: msg });
         this.isBusy = false;
-      }
+      },
     });
+  }
+
+  private showRejectedPopupIfNeeded(rejected: string[]) {
+    if (rejected && rejected.length > 0) {
+      const rejectedFilesList = rejected.join('<br/>');
+      setTimeout(() => {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Some Files Skipped',
+          html: `The following files were skipped due to incorrect naming format (missing revision number '-#'):<br/><br/><strong>${rejectedFilesList}</strong>`,
+        });
+      }, 500);
+    }
   }
 
   private resetFormState(): void {
     this.selectedFile = null;
     this.fileName = '';
     this.selectedCreatorDisplay = '';
-    this.selectedCreator = { emp_PC: '', emp_division: '', emp_team: '', emp_email: '', emp_name: '' };
+    this.selectedCreator = {
+      emp_PC: '',
+      emp_division: '',
+      emp_team: '',
+      emp_email: '',
+      emp_name: '',
+    };
 
     this.selectedReviewerId = '';
     this.selectedReviewerDisplay = '';

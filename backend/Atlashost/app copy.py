@@ -2235,7 +2235,11 @@ def submit_batch():
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
         results = []  # (drawing_no, revision_no)
+        rejected = [] # List of filenames that were rejected due to invalid naming
+        duplicates = [] # List of duplicated filenames that request confirmation
         today = datetime.today()
+        
+        force_overwrite = request.form.get('force_overwrite') == 'true'
 
         try:
             with g.db.cursor() as c:
@@ -2260,12 +2264,14 @@ def submit_batch():
                     
                     drawing_id = extract_drawing_id_from_name(f.filename)
                     if not drawing_id:
+                        rejected.append(f.filename)
                         continue
 
                     # Extract revision from filename
                     revision_from_file = extract_revision_from_name(f.filename)
                     if revision_from_file is None:
                         print(f"Warning: Could not extract revision from filename '{f.filename}', skipping.")
+                        rejected.append(f.filename)
                         continue
 
                     # Read file content into memory (BLOB)
@@ -2288,6 +2294,10 @@ def submit_batch():
                     revision_row = c.fetchone()
                     
                     if revision_row:
+                        if not force_overwrite:
+                            duplicates.append(f.filename)
+                            continue
+
                         # Update existing revision
                         revision_db_id = revision_row[0]
                         c.execute("UPDATE drawing_revisions SET reviewer_id = %s, reviewed_date = NULL, approved = NULL, task_number = %s WHERE id = %s", (reviewer_id, task_number, revision_db_id))
@@ -2318,20 +2328,23 @@ def submit_batch():
             try:
                 comments = request.form.get('comments')
                 formatted_creator_name = f"{creator_db_name}"
-                send_single_summary_email(
-                    to_email=reviewer_email,
-                    items=results,
-                    creator_emp_id=creator_emp_id,
-                    creator_name=formatted_creator_name,
-                    user_comments=comments
-                )
+                if results:
+                    send_single_summary_email(
+                        to_email=reviewer_email,
+                        items=results,
+                        creator_emp_id=creator_emp_id,
+                        creator_name=formatted_creator_name,
+                        user_comments=comments
+                    )
             except Exception as e:
                 print(f"Email send error: {e}")
 
             return jsonify({
                 "success": True,
                 "message": "Processed files successfully.",
-                "results": [{"drawing_id": did, "revision": rev} for did, rev in results]
+                "results": [{"drawing_id": did, "revision": rev} for did, rev in results],
+                "rejected": rejected,
+                "duplicates": duplicates
             }), 200
             
         except Exception as e:
@@ -2406,22 +2419,23 @@ def requests_creator(emp_id):
         
         user_id = user_row[0]
         
-        # Query drawings and their latest revisions
+        # Query drawings using drawing_files to ensure we get exactly what was uploaded by this user
         c.execute("""
             SELECT 
                 d.drawing_no,
                 dr.revision_no,
-                d.created_at,
+                df.uploaded_at as created_date,
                 u_reviewer.emp_id as reviewer_id,
                 u_reviewer.name as reviewer_name,
                 u_reviewer.email as reviewer_email,
                 dr.reviewed_date,
                 dr.approved
-            FROM drawings d
-            JOIN drawing_revisions dr ON d.id = dr.drawing_id
-            JOIN users u_reviewer ON dr.reviewer_id = u_reviewer.id
-            WHERE d.creator_id = %s
-            ORDER BY d.created_at DESC, d.drawing_no ASC, dr.revision_no DESC
+            FROM drawing_files df
+            JOIN drawing_revisions dr ON df.revision_id = dr.id
+            JOIN drawings d ON dr.drawing_id = d.id
+            LEFT JOIN users u_reviewer ON dr.reviewer_id = u_reviewer.id
+            WHERE df.uploaded_by = %s
+            ORDER BY df.uploaded_at DESC, d.drawing_no ASC, dr.revision_no DESC
         """, (user_id,))
         rows = c.fetchall()
 
@@ -2467,21 +2481,22 @@ def requests_reviewer(emp_id):
         
         user_id = user_row[0]
         
-        # Query drawings assigned to this reviewer
+        # Query drawings assigned to this reviewer, anchored on drawing_files
         c.execute("""
             SELECT 
                 d.drawing_no,
                 dr.revision_no,
-                d.created_at,
+                df.uploaded_at as created_date,
                 u_creator.emp_id as creator_id,
                 u_creator.name as creator_name,
                 u_creator.email as creator_email,
                 dr.reviewed_date
-            FROM drawing_revisions dr
+            FROM drawing_files df
+            JOIN drawing_revisions dr ON df.revision_id = dr.id
             JOIN drawings d ON dr.drawing_id = d.id
-            JOIN users u_creator ON d.creator_id = u_creator.id
+            LEFT JOIN users u_creator ON df.uploaded_by = u_creator.id
             WHERE dr.reviewer_id = %s
-            ORDER BY d.created_at DESC, d.drawing_no ASC, dr.revision_no DESC
+            ORDER BY df.uploaded_at DESC, d.drawing_no ASC, dr.revision_no DESC
         """, (user_id,))
         rows = c.fetchall()
 
