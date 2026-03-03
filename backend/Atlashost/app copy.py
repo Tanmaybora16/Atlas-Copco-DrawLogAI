@@ -2238,8 +2238,14 @@ def submit_batch():
         rejected = [] # List of filenames that were rejected due to invalid naming
         duplicates = [] # List of duplicated filenames that request confirmation
         today = datetime.today()
-        
-        force_overwrite = request.form.get('force_overwrite') == 'true'
+
+        # Per-file action map: filename -> 'overwrite' | 'increment' | 'ignore'
+        import json as _json
+        raw_file_actions = request.form.get('file_actions') or '{}'
+        try:
+            file_actions = _json.loads(raw_file_actions)
+        except Exception:
+            file_actions = {}
 
         try:
             with g.db.cursor() as c:
@@ -2290,37 +2296,61 @@ def submit_batch():
 
                     # Check if this revision exists
                     c.execute("SELECT id FROM drawing_revisions WHERE drawing_id = %s AND revision_no = %s", (drawing_db_id, revision_from_file))
-                    
                     revision_row = c.fetchone()
-                    
+
                     if revision_row:
-                        if not force_overwrite:
+                        # Duplicate detected — look up per-file action
+                        action = file_actions.get(f.filename, 'ignore')  # default: ignore
+
+                        if action == 'ignore':
                             duplicates.append(f.filename)
                             continue
 
-                        # Update existing revision
-                        revision_db_id = revision_row[0]
-                        c.execute("UPDATE drawing_revisions SET reviewer_id = %s, reviewed_date = NULL, approved = NULL, task_number = %s WHERE id = %s", (reviewer_id, task_number, revision_db_id))
-                        
-                        # Update PDF file data in drawing_files
-                        c.execute("DELETE FROM drawing_files WHERE revision_id = %s", (revision_db_id,))
-                        c.execute("""
-                            INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
-                            VALUES (%s, %s, %s, %s, %s)
-                        """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
+                        elif action == 'overwrite':
+                            # Delete & replace existing revision
+                            revision_db_id = revision_row[0]
+                            c.execute(
+                                "UPDATE drawing_revisions SET reviewer_id = %s, reviewed_date = NULL, approved = NULL, task_number = %s WHERE id = %s",
+                                (reviewer_id, task_number, revision_db_id)
+                            )
+                            c.execute("DELETE FROM drawing_files WHERE revision_id = %s", (revision_db_id,))
+                            c.execute("""
+                                INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
+                                VALUES (%s, %s, %s, %s, %s)
+                            """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
+                            results.append((drawing_id, revision_from_file))
+
+                        elif action == 'increment':
+                            # Find max existing revision_no for this drawing and add 1
+                            c.execute(
+                                "SELECT MAX(revision_no) FROM drawing_revisions WHERE drawing_id = %s",
+                                (drawing_db_id,)
+                            )
+                            max_rev_row = c.fetchone()
+                            new_revision = (max_rev_row[0] or 0) + 1
+                            c.execute(
+                                "INSERT INTO drawing_revisions (drawing_id, revision_no, reviewer_id, created_at, task_number) VALUES (%s, %s, %s, %s, %s)",
+                                (drawing_db_id, new_revision, reviewer_id, today, task_number)
+                            )
+                            revision_db_id = c.lastrowid
+                            c.execute("""
+                                INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
+                                VALUES (%s, %s, %s, %s, %s)
+                            """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
+                            results.append((drawing_id, new_revision))
+
                     else:
-                        # Create new revision
-                        c.execute("INSERT INTO drawing_revisions (drawing_id, revision_no, reviewer_id, created_at, task_number) VALUES (%s, %s, %s, %s, %s)", (drawing_db_id, revision_from_file, reviewer_id, today, task_number))
+                        # No existing revision — create new normally
+                        c.execute(
+                            "INSERT INTO drawing_revisions (drawing_id, revision_no, reviewer_id, created_at, task_number) VALUES (%s, %s, %s, %s, %s)",
+                            (drawing_db_id, revision_from_file, reviewer_id, today, task_number)
+                        )
                         revision_db_id = c.lastrowid
-
-                        
-                        # Store PDF file info
                         c.execute("""
                             INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
                             VALUES (%s, %s, %s, %s, %s)
                         """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
-
-                    results.append((drawing_id, revision_from_file))
+                        results.append((drawing_id, revision_from_file))
 
             g.db.commit()
 
