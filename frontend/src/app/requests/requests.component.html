@@ -1,16 +1,10 @@
 <div class="main-container">
   <div class="top-panel">
     <div class="tabs">
-      <button
-        [class.active]="selectedTab === 'outgoing'"
-        (click)="selectedTab = 'outgoing'"
-      >
+      <button [class.active]="selectedTab === 'outgoing'" (click)="selectedTab = 'outgoing'">
         Creator
       </button>
-      <button
-        [class.active]="selectedTab === 'incoming'"
-        (click)="selectedTab = 'incoming'"
-      >
+      <button [class.active]="selectedTab === 'incoming'" (click)="selectedTab = 'incoming'">
         Reviewer
       </button>
     </div>
@@ -25,16 +19,20 @@
 
       <div class="search-container">
         <img src="/assets/search-icon.svg" alt="search" />
-        <input
-          type="text"
-          placeholder="Search for requests"
-          [(ngModel)]="searchTerm"
-          (input)="onSearch()"
-        />
+        <input type="text" placeholder="Search for requests" [(ngModel)]="searchTerm" (input)="onSearch()" />
       </div>
 
       <button class="refresh-btn" (click)="refreshRequests()" title="Refresh data">
         <img src="/assets/reload.png" alt="Refresh" style="width: 20px; height: 20px;" />
+      </button>
+    </div>
+
+    <!-- Status filter tabs -->
+    <div class="status-filter-bar">
+      <button *ngFor="let f of incomingFilters" [class.active]="incomingStatusFilter === f"
+        (click)="setIncomingFilter(f)">
+        {{ f }}
+        <span class="filter-count">{{ getIncomingCount(f) }}</span>
       </button>
     </div>
 
@@ -91,53 +89,29 @@
           <td>{{ req.createdDate }}</td>
           <td>{{ req.lastReviewedDate || 'N/A' }}</td>
           <td class="actions">
-            <!-- <p class="status-review">{{ req.status }}</p> -->
-             <p
-              [ngClass]="{
+            <p [ngClass]="{
                 'status-pending': req.status === 'Review',
                 'status-reviewed': req.status === 'Reviewed',
-              }"
-            >
+              }">
               {{ req.status }}
             </p>
           </td>
           <td>
-            <img
-              src="assets/eye.svg"
-              alt="View"
-              class="action-icon"
-              (click)="viewDrawing(i)"
-            />
+            <img src="assets/eye.svg" alt="View" class="action-icon" (click)="viewDrawing(i)" />
           </td>
-          <!-- ...within the INCOMING table row... -->
           <td>
-            <button
-              class="icon-btn"
-              [disabled]="req.status === 'Reviewed'"
-              [attr.aria-disabled]="req.status === 'Reviewed'"
-              (click)="onEditClick(i)"
-              title="Edit"
-            >
+            <button class="icon-btn" [disabled]="req.status === 'Reviewed'"
+              [attr.aria-disabled]="req.status === 'Reviewed'" (click)="onEditClick(i)" title="Edit">
               <img src="assets/edit-2.svg" alt="Edit" class="action-icon" />
             </button>
           </td>
 
           <td>
-            <img
-              src="assets/download.svg"
-              alt="Download"
-              class="action-icon"
-              (click)="downloadDrawing(i)"
-            />
+            <img src="assets/download.svg" alt="Download" class="action-icon" (click)="downloadDrawing(i)" />
           </td>
           <td>
-            <img
-              src="assets/delete.svg"
-              alt="Delete"
-              class="action-icon delete-icon"
-              (click)="deleteRequest(i, 'incoming')"
-              title="Delete request"
-            />
+            <img src="assets/delete.svg" alt="Delete" class="action-icon delete-icon"
+              (click)="deleteRequest(i, 'incoming')" title="Delete request" />
           </td>
         </tr>
       </tbody>
@@ -153,16 +127,20 @@
 
       <div class="search-container">
         <img src="/assets/search-icon.svg" alt="search" />
-        <input
-          type="text"
-          placeholder="Search for requests"
-          [(ngModel)]="searchTerm"
-          (input)="onSearch()"
-        />
+        <input type="text" placeholder="Search for requests" [(ngModel)]="searchTerm" (input)="onSearch()" />
       </div>
 
       <button class="refresh-btn" (click)="refreshRequests()" title="Refresh data">
         <img src="/assets/reload.png" alt="Refresh" style="width: 20px; height: 20px;" />
+      </button>
+    </div>
+
+    <!-- Status filter tabs -->
+    <div class="status-filter-bar">
+      <button *ngFor="let f of outgoingFilters" [class.active]="outgoingStatusFilter === f"
+        (click)="setOutgoingFilter(f)">
+        {{ f }}
+        <span class="filter-count">{{ getOutgoingCount(f) }}</span>
       </button>
     </div>
 
@@ -206,40 +184,23 @@
           <td>{{ req.reviewerEmail }}</td>
           <td>{{ req.createdDate }}</td>
           <td>
-            <p
-              [ngClass]="{
+            <p [ngClass]="{
                 'status-pending': req.status === 'Pending',
                 'status-approved': req.status === 'Approved',
                 'status-rejected': req.status === 'Rejected'
-              }"
-            >
+              }">
               {{ req.status }}
             </p>
           </td>
           <td>
-            <img
-              src="assets/eye.svg"
-              alt="View"
-              class="action-icon"
-              (click)="viewDrawing(i)"
-            />
+            <img src="assets/eye.svg" alt="View" class="action-icon" (click)="viewDrawing(i)" />
           </td>
           <td>
-            <img
-              src="assets/download.svg"
-              alt="Download"
-              class="action-icon"
-              (click)="downloadDrawing(i)"
-            />
+            <img src="assets/download.svg" alt="Download" class="action-icon" (click)="downloadDrawing(i)" />
           </td>
           <td>
-            <img
-              src="assets/delete.svg"
-              alt="Delete"
-              class="action-icon delete-icon"
-              (click)="deleteRequest(i, 'outgoing')"
-              title="Delete request"
-            />
+            <img src="assets/delete.svg" alt="Delete" class="action-icon delete-icon"
+              (click)="deleteRequest(i, 'outgoing')" title="Delete request" />
           </td>
         </tr>
       </tbody>

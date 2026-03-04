@@ -41,6 +41,7 @@ export class RequestsComponent implements OnInit {
 
   selectedTab: 'incoming' | 'outgoing' = 'incoming';
   searchTerm = '';
+
   // PDF preview overlay state
   pdfOpen = false;
   pdfSafeUrl: SafeResourceUrl | null = null;
@@ -48,16 +49,22 @@ export class RequestsComponent implements OnInit {
   private currentDrawingNo = '';
   private currentRevision = 0;
 
+  // Status filter pills
+  incomingStatusFilter: 'All' | 'Review' | 'Reviewed' = 'All';
+  outgoingStatusFilter: 'All' | 'Pending' | 'Approved' | 'Rejected' = 'All';
 
-  // data from backend
+  readonly incomingFilters: Array<'All' | 'Review' | 'Reviewed'> = ['All', 'Review', 'Reviewed'];
+  readonly outgoingFilters: Array<'All' | 'Pending' | 'Approved' | 'Rejected'> = ['All', 'Pending', 'Approved', 'Rejected'];
+
+  // Data from backend
   incomingRequests: IncomingRow[] = [];
   outgoingRequests: OutgoingRow[] = [];
 
-  // filtered copies (used by search/sort)
+  // Filtered copies (used by search/sort)
   filteredIncoming: IncomingRow[] = [];
   filteredOutgoing: OutgoingRow[] = [];
 
-  // sort state (kept from your code)
+  // Sort state
   sortColumn: string | null = null;
   sortDirection: SortDir = '';
 
@@ -122,19 +129,57 @@ export class RequestsComponent implements OnInit {
   }
 
   onSearch() {
+    this.applyFilters();
+  }
+
+  setIncomingFilter(f: 'All' | 'Review' | 'Reviewed') {
+    this.incomingStatusFilter = f;
+    this.applyFilters();
+  }
+
+  setOutgoingFilter(f: 'All' | 'Pending' | 'Approved' | 'Rejected') {
+    this.outgoingStatusFilter = f;
+    this.applyFilters();
+  }
+
+  private applyFilters() {
     const term = (this.searchTerm || '').toLowerCase();
 
-    if (this.selectedTab === 'incoming') {
-      this.filteredIncoming = this.incomingRequests.filter(req =>
-        Object.values(req).some(val => String(val ?? '').toLowerCase().includes(term))
-      );
-    } else {
-      this.filteredOutgoing = this.outgoingRequests.filter(req =>
+    let incoming = this.incomingRequests;
+    if (this.incomingStatusFilter !== 'All') {
+      incoming = incoming.filter(r => r.status === this.incomingStatusFilter);
+    }
+    if (term) {
+      incoming = incoming.filter(req =>
         Object.values(req).some(val => String(val ?? '').toLowerCase().includes(term))
       );
     }
+    this.filteredIncoming = incoming;
+
+    let outgoing = this.outgoingRequests;
+    if (this.outgoingStatusFilter !== 'All') {
+      outgoing = outgoing.filter(r => r.status === this.outgoingStatusFilter);
+    }
+    if (term) {
+      outgoing = outgoing.filter(req =>
+        Object.values(req).some(val => String(val ?? '').toLowerCase().includes(term))
+      );
+    }
+    this.filteredOutgoing = outgoing;
 
     if (this.sortColumn) this.sortData(this.sortColumn);
+  }
+
+  getIncomingCount(f: string): number {
+    return f === 'All'
+      ? this.incomingRequests.length
+      : this.incomingRequests.filter(r => r.status === f).length;
+  }
+
+  getOutgoingCount(f: string): number {
+    return f === 'All'
+      ? this.outgoingRequests.length
+      : this.outgoingRequests.filter(r => r.status === f).length;
   }
 
   sortData(column: string) {

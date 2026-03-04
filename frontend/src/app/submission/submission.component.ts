@@ -439,30 +439,7 @@ export class SubmissionComponent implements OnInit {
     const newFiles = results.filter((r: any) => r.type === 'new');
     const updatedFiles = results.filter((r: any) => r.type === 'updated');
 
-    const styles = `
-      <style>
-        .sum-section { margin-bottom:14px; }
-        .sum-title {
-          font-size:12.5px; font-weight:700; padding:7px 12px;
-          border-radius:6px 6px 0 0; display:flex; align-items:center; gap:6px;
-        }
-        .sum-title-new   { background:#166534; color:#f0fdf4; }
-        .sum-title-upd   { background:#1e3a8a; color:#eff6ff; }
-        .sum-list { border:1px solid #e2e8f0; border-top:none; border-radius:0 0 6px 6px; overflow:hidden; }
-        .sum-row {
-          display:flex; align-items:center; justify-content:space-between;
-          padding:8px 12px; border-bottom:1px solid #f1f5f9; font-size:12px;
-        }
-        .sum-row:last-child { border-bottom:none; }
-        .sum-draw { font-family:monospace; color:#1e293b; }
-        .sum-badge-new { background:#dcfce7; color:#166534; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
-        .sum-badge-upd { background:#dbeafe; color:#1e3a8a; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
-        .sum-badge-skip { background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
-        .sum-title-skip  { background:#78350f; color:#fef3c7; }
-        .sum-prev { color:#94a3b8; font-size:11px; }
-      </style>`;
-
-    let html = `${styles}<div style="text-align:left; max-height:440px; overflow-y:auto; padding-right:4px;">`;
+    let html = `<div class="sum-popup-body">`;
 
     if (newFiles.length > 0) {
       const rows = newFiles
@@ -484,7 +461,7 @@ export class SubmissionComponent implements OnInit {
         .map((r: any) => `
           <div class="sum-row">
             <span class="sum-draw">📄 ${r.drawing_id}</span>
-            <div style="text-align:right;">
+            <div class="sum-rev-col">
               <span class="sum-badge-upd">Updated · Rev ${r.revision}</span>
               <div class="sum-prev">Previous: Rev ${r.previous_revision}</div>
             </div>

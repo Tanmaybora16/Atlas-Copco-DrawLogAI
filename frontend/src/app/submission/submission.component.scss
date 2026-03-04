@@ -895,3 +895,107 @@ footer {
     padding: 12px 16px;
   }
 }
+
+// ===================================
+// Submission Summary Popup (SweetAlert)
+// Uses ::ng-deep because Swal renders outside Angular encapsulation
+// ===================================
+::ng-deep {
+  .sum-popup-body {
+    text-align: left;
+    max-height: 440px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .sum-section {
+    margin-bottom: 14px;
+  }
+
+  .sum-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 7px 12px;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sum-title-new {
+    background: #166534;
+    color: #f0fdf4;
+  }
+
+  .sum-title-upd {
+    background: #1e3a8a;
+    color: #eff6ff;
+  }
+
+  .sum-title-skip {
+    background: #78350f;
+    color: #fef3c7;
+  }
+
+  .sum-list {
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    overflow: hidden;
+  }
+
+  .sum-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 12px;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .sum-draw {
+    font-family: monospace;
+    color: #1e293b;
+  }
+
+  .sum-badge-new {
+    background: #dcfce7;
+    color: #166534;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .sum-badge-upd {
+    background: #dbeafe;
+    color: #1e3a8a;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .sum-badge-skip {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .sum-rev-col {
+    text-align: right;
+    display: ruby;
+  }
+
+  .sum-prev {
+    color: #94a3b8;
+    font-size: 11px;
+  }
+}
