@@ -389,22 +389,15 @@ export class SubmissionComponent implements OnInit {
       });
       return;
     }
-    this.submitBatch(form, {});
+    this.submitBatch(form);
   }
 
-  // type alias kept in the component so the template can reference it if needed
-  private submitBatch(
-    form: NgForm,
-    fileActions: Record<string, 'overwrite' | 'increment' | 'ignore'>,
-    filesToSend?: File[]
-  ) {
+  private submitBatch(form: NgForm) {
     this.isBusy = true;
 
     const fd = new FormData();
-    const files = filesToSend ?? this.selectedFiles;
-    files.forEach((f) => fd.append('pdfs', f, f.name));
+    this.selectedFiles.forEach((f) => fd.append('pdfs', f, f.name));
 
-    // shared metadata
     fd.append('creator_emp_id', this.selectedCreatorId);
     fd.append('reviewer_emp_id', this.selectedReviewerId);
     fd.append('reviewer_email', this.selectedReviewerEmail);
@@ -414,7 +407,6 @@ export class SubmissionComponent implements OnInit {
     fd.append('pc', (this.selectedPC || '').toString());
     fd.append('drawing_type', this.selectedDrawingType);
     fd.append('decision', this.decision);
-    fd.append('file_actions', JSON.stringify(fileActions));
 
     fd.append('task_number', (form.value.taskNumber || '').toString());
     fd.append('comments', (form.value.comments || '').toString());
@@ -424,33 +416,16 @@ export class SubmissionComponent implements OnInit {
     this.http.post(`${this.API}/submit-batch`, fd).subscribe({
       next: (res: any) => {
         this.isBusy = false;
+        const results: any[] = res?.results || [];
 
-        const hasDuplicates = res?.duplicates && res.duplicates.length > 0;
+        // Reset form immediately
+        form.resetForm();
+        this.resetFormState();
+        this.selectedCreatorId = this.auth.getLoggedInUser?.() || '';
+        if (this.selectedCreatorId) this.fetchCreatorDetails(this.selectedCreatorId);
 
-        // Only show success toast if there are no outstanding duplicates
-        if (!hasDuplicates) {
-          const lines = (res?.results || [])
-            .map((r: any) => `${r.drawing_id} - ${r.revision}`)
-            .join(', ');
-          Swal.fire({
-            icon: 'success',
-            title: 'Submission Successful',
-            html: res?.message || `Processed files.<br/>Revisions: ${lines}`,
-          });
-          form.resetForm();
-          this.resetFormState();
-          this.selectedCreatorId = this.auth.getLoggedInUser?.() || '';
-          if (this.selectedCreatorId) this.fetchCreatorDetails(this.selectedCreatorId);
-          this.showRejectedPopupIfNeeded(res?.rejected);
-        } else {
-          // There are duplicates — show per-file resolution popup.
-          // Keep the duplicate files in selectedFiles for potential retry.
-          const allFiles = filesToSend ?? this.selectedFiles;
-          const duplicateFiles = allFiles.filter((f) =>
-            (res.duplicates as string[]).includes(f.name)
-          );
-          this.showDuplicatePopup(res.duplicates as string[], duplicateFiles, form, res?.rejected);
-        }
+        // Show summary popup
+        this.showSummaryPopup(results, res?.rejected);
       },
       error: (err) => {
         const msg = err?.error?.message || 'Submission failed. Please try again.';
@@ -460,181 +435,93 @@ export class SubmissionComponent implements OnInit {
     });
   }
 
-  private showDuplicatePopup(
-    duplicateNames: string[],
-    duplicateFiles: File[],
-    form: NgForm,
-    rejected?: string[]
-  ) {
-    // ── Colour tokens ──────────────────────────────────────────────────────────
-    const colors: Record<string, { bg: string; border: string; text: string }> = {
-      overwrite: { bg: '#fff3cd', border: '#f0a500', text: '#7a5000' },
-      increment: { bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a' },
-      ignore: { bg: '#f3f4f6', border: '#9ca3af', text: '#374151' },
-    };
+  private showSummaryPopup(results: any[], rejected?: string[]) {
+    const newFiles = results.filter((r: any) => r.type === 'new');
+    const updatedFiles = results.filter((r: any) => r.type === 'updated');
 
-    // ── Inline <style> for the :checked pseudo-class trick ────────────────────
     const styles = `
       <style>
-        .dup-pill-radio { display:none; }
-        .dup-pill-label {
-          display:inline-flex; align-items:center; gap:5px;
-          padding:5px 12px; border-radius:999px; font-size:12px; font-weight:500;
-          cursor:pointer; border:1.5px solid #d1d5db; background:#f9fafb; color:#6b7280;
-          transition:all .15s ease; user-select:none; white-space:nowrap;
+        .sum-section { margin-bottom:14px; }
+        .sum-title {
+          font-size:12.5px; font-weight:700; padding:7px 12px;
+          border-radius:6px 6px 0 0; display:flex; align-items:center; gap:6px;
         }
-        .dup-pill-label:hover { filter:brightness(.95); }
-        .dup-pill-radio[value="overwrite"]:checked ~ label[data-opt="overwrite"],
-        .dup-opt-overwrite:has(input:checked) .dup-pill-label {
-          background:${colors['overwrite'].bg}; border-color:${colors['overwrite'].border}; color:${colors['overwrite'].text}; font-weight:600;
+        .sum-title-new   { background:#166534; color:#f0fdf4; }
+        .sum-title-upd   { background:#1e3a8a; color:#eff6ff; }
+        .sum-list { border:1px solid #e2e8f0; border-top:none; border-radius:0 0 6px 6px; overflow:hidden; }
+        .sum-row {
+          display:flex; align-items:center; justify-content:space-between;
+          padding:8px 12px; border-bottom:1px solid #f1f5f9; font-size:12px;
         }
-        .dup-pill-radio[value="increment"]:checked ~ label[data-opt="increment"],
-        .dup-opt-increment:has(input:checked) .dup-pill-label {
-          background:${colors['increment'].bg}; border-color:${colors['increment'].border}; color:${colors['increment'].text}; font-weight:600;
-        }
-        .dup-pill-radio[value="ignore"]:checked ~ label[data-opt="ignore"],
-        .dup-opt-ignore:has(input:checked) .dup-pill-label {
-          background:${colors['ignore'].bg}; border-color:${colors['ignore'].border}; color:${colors['ignore'].text}; font-weight:600;
-        }
-        .dup-group { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-        .dup-row { display:flex; align-items:center; justify-content:space-between;
-                   padding:9px 12px; border-bottom:1px solid #e5e7eb; gap:12px; }
-        .dup-row:last-child { border-bottom:none; }
-        .dup-global-row { background:#1e293b; border-radius:8px 8px 0 0; padding:10px 12px; }
-        .dup-file-name {
-          font-size:12.5px; color:#334155; font-family:monospace;
-          word-break:break-all; max-width:280px; flex-shrink:1;
-        }
-        .dup-global-label { font-size:13px; font-weight:600; color:#f1f5f9; letter-spacing:.3px; }
-        .dup-table { width:100%; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
-        .dup-pill-dot { width:7px; height:7px; border-radius:50%; background:currentColor; opacity:.7; }
+        .sum-row:last-child { border-bottom:none; }
+        .sum-draw { font-family:monospace; color:#1e293b; }
+        .sum-badge-new { background:#dcfce7; color:#166534; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+        .sum-badge-upd { background:#dbeafe; color:#1e3a8a; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+        .sum-badge-skip { background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+        .sum-title-skip  { background:#78350f; color:#fef3c7; }
+        .sum-prev { color:#94a3b8; font-size:11px; }
       </style>`;
 
-    // ── Helper: build one pill group ──────────────────────────────────────────
-    const icons: Record<string, string> = {
-      overwrite: '↺', increment: '+1', ignore: '—',
-    };
+    let html = `${styles}<div style="text-align:left; max-height:440px; overflow-y:auto; padding-right:4px;">`;
 
-    const pillGroup = (name: string, defaultVal: string) =>
-      `<div class="dup-group">${['overwrite', 'increment', 'ignore'].map(opt => `
-        <span class="dup-opt-${opt}">
-          <input class="dup-pill-radio" type="radio" name="${name}" value="${opt}" id="${name}_${opt}" ${opt === defaultVal ? 'checked' : ''} />
-          <label class="dup-pill-label" for="${name}_${opt}" data-opt="${opt}">
-            <span class="dup-pill-dot"></span>${icons[opt]}&nbsp;${opt.charAt(0).toUpperCase() + opt.slice(1)}
-          </label>
-        </span>`).join('')}</div>`;
+    if (newFiles.length > 0) {
+      const rows = newFiles
+        .map((r: any) => `
+          <div class="sum-row">
+            <span class="sum-draw">📄 ${r.drawing_id}</span>
+            <span class="sum-badge-new">New · Rev 1</span>
+          </div>`)
+        .join('');
+      html += `
+        <div class="sum-section">
+          <div class="sum-title sum-title-new">✅ New Drawings Added (${newFiles.length})</div>
+          <div class="sum-list">${rows}</div>
+        </div>`;
+    }
 
-    // ── Build file rows ───────────────────────────────────────────────────────
-    const fileRows = duplicateNames.map((fname, i) => `
-      <div class="dup-row">
-        <span class="dup-file-name" title="${fname}">📄 ${fname}</span>
-        ${pillGroup(`file_${i}`, 'ignore')}
-      </div>`).join('');
+    if (updatedFiles.length > 0) {
+      const rows = updatedFiles
+        .map((r: any) => `
+          <div class="sum-row">
+            <span class="sum-draw">📄 ${r.drawing_id}</span>
+            <div style="text-align:right;">
+              <span class="sum-badge-upd">Updated · Rev ${r.revision}</span>
+              <div class="sum-prev">Previous: Rev ${r.previous_revision}</div>
+            </div>
+          </div>`)
+        .join('');
+      html += `
+        <div class="sum-section">
+          <div class="sum-title sum-title-upd">🔄 Existing Drawings Updated (${updatedFiles.length})</div>
+          <div class="sum-list">${rows}</div>
+        </div>`;
+    }
 
-    const html = `
-      ${styles}
-      <div style="text-align:left;">
-        <p style="font-size:13.5px;color:#475569;margin-bottom:10px;">
-          The following revisions already exist. Choose an action for each:
-        </p>
-        <div class="dup-table">
-          <div class="dup-global-row dup-row">
-            <span class="dup-global-label">🌐 Global Default</span>
-            ${pillGroup('global_action', '')}
-          </div>
-          ${fileRows}
-        </div>
-      </div>`;
+    if (rejected && rejected.length > 0) {
+      const rows = rejected
+        .map((fname: string) => `
+          <div class="sum-row">
+            <span class="sum-draw">📄 ${fname}</span>
+            <span class="sum-badge-skip">Skipped</span>
+          </div>`)
+        .join('');
+      html += `
+        <div class="sum-section">
+          <div class="sum-title sum-title-skip">⚠️ Skipped — Invalid Naming (${rejected.length})</div>
+          <div class="sum-list">${rows}</div>
+        </div>`;
+    }
 
+    html += '</div>';
 
     Swal.fire({
-      title: 'Duplicate Revisions Found',
+      icon: results.length > 0 ? 'success' : 'warning',
+      title: 'Submission Complete',
       html,
-      icon: 'warning',
-      width: '680px',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Apply',
-      cancelButtonText: 'Cancel',
-      didOpen: () => {
-        const container = Swal.getHtmlContainer() as HTMLElement | null;
-        if (!container) return;
-
-        const globalRadios = Array.from(
-          container.querySelectorAll('input[name="global_action"]') as NodeListOf<HTMLInputElement>
-        );
-
-        // Global default → cascade to all per-file rows
-        globalRadios.forEach((radio: HTMLInputElement) => {
-          radio.addEventListener('change', () => {
-            const newVal = radio.value;
-            duplicateNames.forEach((_, i) => {
-              const fileRadio = container.querySelector(
-                `input[name="file_${i}"][value="${newVal}"]`
-              ) as HTMLInputElement | null;
-              if (fileRadio) fileRadio.checked = true;
-            });
-          });
-        });
-
-        // Per-file change → deselect all global default radios
-        duplicateNames.forEach((_, i) => {
-          const fileRadios = Array.from(
-            container.querySelectorAll(`input[name="file_${i}"]`) as NodeListOf<HTMLInputElement>
-          );
-          fileRadios.forEach((radio: HTMLInputElement) => {
-            radio.addEventListener('change', () => {
-              globalRadios.forEach((gr) => (gr.checked = false));
-            });
-          });
-        });
-      },
-    }).then((result: any) => {
-      if (!result.isConfirmed) {
-        // User cancelled — show rejected popup if any, but don't reset form
-        this.showRejectedPopupIfNeeded(rejected);
-        return;
-      }
-
-      // Collect per-file selections from popup DOM
-      const container = Swal.getHtmlContainer() as HTMLElement | null;
-      const fileActions: Record<string, 'overwrite' | 'increment' | 'ignore'> = {};
-      duplicateNames.forEach((fname: string, i: number) => {
-        const checked = container
-          ? (container.querySelector(`input[name="file_${i}"]:checked`) as HTMLInputElement | null)
-          : null;
-        fileActions[fname] = (checked?.value as any) ?? 'ignore';
-      });
-
-      // Only resubmit files that aren't set to 'ignore'
-      const filesToRetry = duplicateFiles.filter(
-        (f) => fileActions[f.name] !== 'ignore'
-      );
-
-      if (filesToRetry.length === 0) {
-        this.showRejectedPopupIfNeeded(rejected);
-        return;
-      }
-
-      // Always surface bad-naming rejections from the first response,
-      // regardless of what the retry does with the duplicate files.
-      this.showRejectedPopupIfNeeded(rejected);
-      this.submitBatch(form, fileActions, filesToRetry);
+      width: '580px',
+      confirmButtonColor: '#2563eb',
+      confirmButtonText: 'OK',
     });
-  }
-
-  private showRejectedPopupIfNeeded(rejected?: string[]) {
-    if (rejected && rejected.length > 0) {
-      const rejectedFilesList = rejected.join('<br/>');
-      setTimeout(() => {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Some Files Skipped',
-          html: `The following files were skipped due to incorrect naming format (missing revision number '-#'):<br/><br/><strong>${rejectedFilesList}</strong>`,
-        });
-      }, 500);
-    }
   }
 
   private resetFormState(): void {

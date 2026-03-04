@@ -28,7 +28,7 @@ interface ErrorCodeCount {
 export class UploadsComponent {
   private readonly API = `${environment.apiUrl}`;
 
-  // state
+  // State
   selectedFile: File | null = null;
   fileName = '';
   filePath = '';
@@ -37,9 +37,9 @@ export class UploadsComponent {
   errorCounts: ErrorCodeCount[] = [];
   decision: string = 'approve';
 
-  // autofilled meta
+  // Autofilled meta
   designNo = '';
-  taskNumber = ''; // New property
+  taskNumber = '';
   reviewerId = '';
   revisionNo = '';
   reviewedDate = '';
@@ -49,7 +49,7 @@ export class UploadsComponent {
   selectedEmployee: any = { emp_PC: '', emp_division: '', emp_team: '' };
   selectedPC = '';
 
-  // ui flags
+  // UI flags
   showCodeList = false;
   hasErrors = true;
   editedRows = new Set<number>();
@@ -57,9 +57,9 @@ export class UploadsComponent {
   editedIndex: number | null = null;
   selectedError = '';
   submitted = false;
-  isRevisionReadonly = true; // Initially readonly when auto-loaded from canvas
+  isRevisionReadonly = true;
 
-  // disable duplicate calls
+  // Prevent duplicate calls
   isUploading = false;
   isSubmitting = false;
 
@@ -71,32 +71,21 @@ export class UploadsComponent {
   ) { }
 
   ngOnInit() {
-    // Prefill when routed from Requests page
     this.route.queryParamMap.subscribe((params) => {
       const drawingId = (params.get('drawing_id') || '').trim();
       const rev = (params.get('revision') || '').trim();
-
-      console.log('🎬 UPLOADS ngOnInit - Query params:', { drawing_id: drawingId, revision: rev });
-
       if (drawingId) {
         this.prefillFromServer(drawingId, rev);
       }
     });
   }
 
-  // Removed unused method
-
   private prefillFromServer(drawingId: string, revision: string) {
-    console.log('🔍 UPLOADS prefillFromServer called with:', { drawingId, revision });
-
     const q: any = { drawing_id: drawingId };
     if (revision) q.revision = revision;
 
     this.http.get<any>(`${this.API}/prefill-upload`, { params: q }).subscribe({
       next: (res) => {
-        console.log('📦 UPLOADS Backend response:', res);
-
-        // creator + org
         this.selectedEmpId = res.creator_id || '';
         this.selectedEmployee = {
           emp_PC: res.emp_PC || '',
@@ -105,7 +94,6 @@ export class UploadsComponent {
         };
         this.selectedPC = res.emp_PC || '';
 
-        // reviewer + drawing meta
         this.reviewerId = (res.reviewer_id || '').replace(/^EMP_/i, '');
         this.designNo = res.design_no_plain || '';
         this.revisionNo = String(res.revision_no ?? '').padStart(2, '0');
@@ -113,17 +101,11 @@ export class UploadsComponent {
         this.reviewedDate = (res.reviewed_date || this.todayISO()).slice(0, 10);
         this.taskNumber = res.task_number || '';
 
-        console.log('✅ UPLOADS After assignment - revisionNo:', this.revisionNo, 'from res.revision_no:', res.revision_no);
-
         this.cdRef.detectChanges();
 
-        // 🚀 Auto-fetch stored PDF (if present) and run AI extraction
         if (res.has_pdf === true) {
-          const revNum =
-            Number(res.revision_no ?? revision ?? this.revisionNo) || 0;
-          console.log('📄 UPLOADS Loading PDF with revision:', revNum);
+          const revNum = Number(res.revision_no ?? revision ?? this.revisionNo) || 0;
           if (revNum > 0) {
-            // We can build the URL directly; backend route is already wired
             this.loadPdfFromServer(res.drawing_id || drawingId, revNum);
           }
         }
@@ -189,10 +171,8 @@ export class UploadsComponent {
   onFileSelected(event: Event) {
     const fileInput = event.target as HTMLInputElement;
     if (!fileInput.files || fileInput.files.length === 0) return;
-
     this.selectedFile = fileInput.files[0];
     this.fileName = this.selectedFile.name;
-    // Make revision field editable when user manually selects a file
     this.isRevisionReadonly = false;
     this.extractErrors();
   }
@@ -218,10 +198,7 @@ export class UploadsComponent {
         this.predictedErrors = response.predicted_errors || [];
         this.errorCounts = this.countErrorOccurrences(this.predictedErrors);
         this.decision = this.predictedErrors.length > 0 ? 'reject' : 'approve';
-
-        // Make revision field editable after PDF is loaded
         this.isRevisionReadonly = false;
-
         Swal.fire({
           icon: 'success',
           title: 'File Uploaded',
@@ -242,50 +219,29 @@ export class UploadsComponent {
     });
   }
 
-  // 🔹 NEW: fetch stored PDF and run the same AI pipeline automatically
   private loadPdfFromServer(drawingId: string, revision: number) {
-    const url = `${this.API}/drawings/${encodeURIComponent(
-      drawingId
-    )}/${revision}/pdf/download`;
+    const url = `${this.API}/drawings/${encodeURIComponent(drawingId)}/${revision}/pdf/download`;
 
-    console.log('📥 Fetching PDF from server:', url);
-
-    // We don't set isUploading here; extractErrors() will handle the busy state
     this.http.get(url, { responseType: 'blob' }).subscribe({
       next: (blob) => {
         const name = `${drawingId}-${String(revision).padStart(2, '0')}.pdf`;
-        console.log('📥 PDF downloaded:', name, `(${blob.size} bytes)`);
-
         try {
-          // Create a File object so we can reuse the exact same flow
           const file = new File([blob], name, {
             type: 'application/pdf',
             lastModified: Date.now(),
           });
           this.selectedFile = file;
           this.fileName = name;
-
-          // Kick off AI extraction
-          console.log('🔍 Extracting errors from server PDF...');
           this.extractErrors();
-          // Make revision field editable after PDF is loaded
           this.isRevisionReadonly = false;
         } catch (e) {
           console.error('Failed to create File from blob', e);
-          Swal.fire(
-            'PDF error',
-            'Could not prepare the PDF for analysis. Please upload a file manually.',
-            'error'
-          );
+          Swal.fire('PDF error', 'Could not prepare the PDF for analysis. Please upload a file manually.', 'error');
         }
       },
       error: (err) => {
         console.error('Failed to fetch existing PDF', err);
-        Swal.fire(
-          'PDF not found',
-          'No stored PDF found for this drawing/revision. Please upload a PDF to continue.',
-          'info'
-        );
+        Swal.fire('PDF not found', 'No stored PDF found for this drawing/revision. Please upload a PDF to continue.', 'info');
       },
     });
   }
@@ -309,7 +265,6 @@ export class UploadsComponent {
       predicted_errors: this.predictedErrors.length
         ? this.predictedErrors
         : ['No errors detected'],
-      // creator_email removed: backend already looks it up
       form_data: {
         designNo: (this.designNo || '').trim(),
         reviewerName: (this.reviewerId || '').trim(),
@@ -321,8 +276,8 @@ export class UploadsComponent {
         pc: (this.selectedPC || '').trim(),
         team: (this.selectedEmployee.emp_team || '').trim(),
         decision: this.decision,
-        task_number: (this.taskNumber || '').trim(), // Added task_number
-        comments: (form.value.comments || '').trim() // Added comments
+        task_number: (this.taskNumber || '').trim(),
+        comments: (form.value.comments || '').trim()
       },
     };
 
@@ -396,7 +351,6 @@ export class UploadsComponent {
     this.originalErrors = {};
     this.editedIndex = null;
     this.selectedError = '';
-    // Reset revision field to readonly when form is reset
     this.isRevisionReadonly = true;
   }
 
@@ -475,7 +429,6 @@ export class UploadsComponent {
     this.selectedError = '';
   }
 
-  // Newly Added Part ofr deleting the comment in uploads page
   deleteRow(index: number) {
     if (confirm('Are you sure you want to delete this comment and its error code?')) {
       // Remove from both arrays
@@ -513,13 +466,11 @@ export class UploadsComponent {
       this.editedRows = newEditedRows;
       this.originalErrors = newOriginalErrors;
 
-      // Reset edit mode if we were editing this or a later row
       if (this.editedIndex !== null && this.editedIndex >= index) {
         this.editedIndex = null;
         this.selectedError = '';
       }
 
-      // Auto-approve if no errors left
       if (this.predictedErrors.length === 0) {
         this.decision = 'approve';
       }

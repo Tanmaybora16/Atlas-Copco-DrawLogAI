@@ -1,4 +1,3 @@
-// canvas.component.ts
 import {
   Component,
   ElementRef,
@@ -15,28 +14,20 @@ import { environment } from 'src/environments/environment';
 
 type CanvasMode = 'view' | 'add-text' | 'select' | 'add-stamp';
 
-/**
- * A lightweight text annotation that is always stored in
- * page‑relative, normalized coordinates so it stays aligned
- * when the PDF is zoomed or resized.
- */
 export interface Annotation {
   id: string;
   documentId: string;
   page: number;
-  /** 0–1 relative to page width */
   x: number;
-  /** 0–1 relative to page height */
   y: number;
   text: string;
   createdAt?: string;
   updatedAt?: string;
   color?: string;
   fontSize?: number;
-  type?: 'text' | 'stamp'; // New property to distinguish annotation types
-  stampType?: 'reviewed' | 'approved' | 'rejected'; // Type of stamp
-  // reviewerName?: string; // Name of the person who stamped
-  reviewDate?: string; // Date of the stamp
+  type?: 'text' | 'stamp';
+  stampType?: 'reviewed' | 'approved' | 'rejected';
+  reviewDate?: string;
 }
 
 @Component({
@@ -84,7 +75,6 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
   // Stamp properties
   selectedStampType: 'reviewed' | 'approved' | 'rejected' = 'reviewed';
-  // reviewerName = 'Anuj Khande'; // This could come from user settings/profile
 
   // Dragging state
   private isDragging = false;
@@ -112,10 +102,8 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   // Init & PDF loading
   // ───────────────────────────────────────────────────────────────────────────
   async ngAfterViewInit(): Promise<void> {
-    // Grab contexts
     this.pdfContext = this.canvasRef.nativeElement.getContext('2d')!;
 
-    // 1) From navigation state
     const st: any = history.state || {};
     if (st.drawingId) this.drawingNumber = st.drawingId;
     if (st.drawingNo) this.drawingNumber = st.drawingNo;
@@ -123,13 +111,10 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     if (st.revisionNo !== undefined) this.revisionNumber = Number(st.revisionNo);
     if (st.creatorName) this.creatorName = st.creatorName;
 
-    // If state already has what we need, try loading immediately
     if (this.drawingNumber && this.revisionNumber) {
-      console.log('Canvas ngAfterViewInit - Loading PDF:', this.drawingNumber, 'Rev:', this.revisionNumber);
       await this.loadPdfFromApi(this.drawingNumber, this.revisionNumber);
     }
 
-    // 2) Also listen to query params (direct links)
     this.route.queryParamMap.subscribe(async qp => {
       const qDrawing = qp.get('drawing_id');
       const qRev = qp.get('revision');
@@ -140,7 +125,6 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       if (qCreator && !this.creatorName) this.creatorName = qCreator;
 
       if (this.drawingNumber && this.revisionNumber) {
-        console.log('Canvas queryParams - Loading PDF:', this.drawingNumber, 'Rev:', this.revisionNumber);
         await this.loadPdfFromApi(this.drawingNumber, this.revisionNumber);
       } else if (!this.pdfDoc) {
         this.renderMockPage();
@@ -150,18 +134,12 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
   ngOnInit(): void {
     const nav = this.router.getCurrentNavigation()?.extras.state as any | undefined;
-
-    // Fallbacks if user reloads the page or arrives via URL
     const qp = this.route.snapshot.queryParamMap;
     const qpDrawingId = qp.get('drawing_id');
     const qpRevision = qp.get('revision');
-
     this.drawingNumber = nav?.drawingId ?? qpDrawingId ?? this.drawingNumber;
-    // Ensure revision is parsed as a number
     this.revisionNumber = nav?.revision ?? (qpRevision ? Number(qpRevision) : this.revisionNumber);
     this.creatorId = nav?.creatorId ?? this.creatorId;
-
-    console.log('Canvas ngOnInit - Drawing:', this.drawingNumber, 'Revision:', this.revisionNumber);
   }
 
   showStatusMessageFunc(message: string): void {
@@ -302,10 +280,9 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       page: this.pageNum,
       x: normalizedX,
       y: normalizedY,
-      text: '', // Empty for stamps, as they use stampType instead
+      text: '',
       type: 'stamp',
       stampType: this.selectedStampType,
-      // reviewerName: this.reviewerName,
       reviewDate: dateStr,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -625,8 +602,6 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   // Error Mapping → Uploads (prefill)
   // ───────────────────────────────────────────────────────────────────────────
   async goToErrorMapping(): Promise<void> {
-    console.log('goToErrorMapping called - Drawing:', this.drawingNumber, 'Revision:', this.revisionNumber);
-
     if (!this.drawingNumber || !this.revisionNumber) {
       this.toast('Missing drawing number or revision.');
       this.router.navigate(['/uploads']);
@@ -635,30 +610,19 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
     try {
       this.toast('Saving annotations and PDF...');
-
-      // Step 1: Save annotations to backend
       await this.saveAnnotations();
-
-      // Step 2: Generate annotated PDF blob
       const annotatedPdfBlob = await this.generateAnnotatedPdfBlob();
-
-      // Step 3: SAVE the annotated PDF to the database (overwrite original)
       await this.saveAnnotatedPdfToDatabase(annotatedPdfBlob);
-
-      // Step 4: Navigate to uploads page (now with updated PDF in database)
       this.router.navigate(['/uploads'], {
         queryParams: {
           drawing_id: this.drawingNumber,
           revision: this.revisionNumber
         }
       });
-
       this.toast('Redirecting to uploads page...');
     } catch (err) {
       console.error('Failed to save annotated PDF', err);
       this.toast('Failed to save PDF. Redirecting anyway...');
-
-      // Fallback: navigate without saving
       this.router.navigate(['/uploads'], {
         queryParams: {
           drawing_id: this.drawingNumber,
@@ -696,11 +660,8 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       this.drawingNumber
     )}/${this.revisionNumber}/pdf/annotated/upload`;
 
-    // Format revision number as 2-digit string (e.g., "01", "02", etc.)
     const revisionStr = String(this.revisionNumber).padStart(2, '0');
     const filename = `${this.drawingNumber}-${revisionStr}.pdf`;
-
-    console.log('Saving annotated PDF:', filename, 'Drawing:', this.drawingNumber, 'Revision:', this.revisionNumber);
 
     const formData = new FormData();
     formData.append('file', annotatedPdfBlob, filename);

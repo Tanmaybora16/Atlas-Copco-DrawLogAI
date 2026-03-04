@@ -2122,35 +2122,42 @@ def error_summary():
 # Submission page start .............
 def extract_drawing_id_from_name(filename: str) -> str | None:
     """
-    '7058609753-01.pdf' -> 'DR_7058609753'
-    Take part before the first '-', ignore any rev/extension.
+    Accept any PDF whose name starts with exactly 10 digits.
+    '7058609753-01.pdf'    -> 'DR_7058609753'
+    '7058609753.pdf'       -> 'DR_7058609753'
+    '7058609753 desc.pdf'  -> 'DR_7058609753'
+    'SomeName.pdf'         -> None  (does NOT start with 10 digits)
     """
     if not filename:
-      return None
+        return None
+    # Strip directory components and extension
     base = filename.rsplit('/', 1)[-1]
-    base = base.rsplit('.', 1)[0]
-    core = base.split('-', 1)[0]
-    if not core:
-      return None
-    return f"DR_{core}"
+    base = base.rsplit('\\', 1)[-1]  # Windows paths too
+    base = base.rsplit('.', 1)[0]    # remove .pdf
+    # First 10 chars must ALL be digits
+    if len(base) < 10 or not base[:10].isdigit():
+        return None
+    return f"DR_{base[:10]}"
+
 
 def extract_revision_from_name(filename: str) -> int | None:
     """
-    Extract revision number from filename.
-    '9096998745-1.pdf' -> 1
+    Optionally extract a revision suffix from filename.
+    '9096998745-1.pdf'  -> 1
     '9096998745-01.pdf' -> 1
-    '9096998745-10.pdf' -> 10
-    Returns None if no revision number is found.
+    '9096998745.pdf'    -> None  (no revision — that is OK now)
     """
     if not filename:
         return None
     base = filename.rsplit('/', 1)[-1]
+    base = base.rsplit('\\', 1)[-1]
     base = base.rsplit('.', 1)[0]
-    parts = base.split('-', 1)
-    if len(parts) < 2:
+    # Drawing number is first 10 digits; look for '-N' after position 10
+    remainder = base[10:]  # everything after the 10-digit drawing number
+    if not remainder.startswith('-'):
         return None
     try:
-        return int(parts[1])
+        return int(remainder[1:])
     except (ValueError, IndexError):
         return None
 
@@ -2200,193 +2207,170 @@ Atlas Copco AI Error Logging System
 @app.route('/submit-batch', methods=['POST'])
 def submit_batch():
     """
-    Batch submission endpoint - accepts multiple PDF files.
-    Now uses normalized schema: drawings, drawing_revisions, drawing_files tables.
+    Batch submission endpoint — single pass, no user interaction required.
+    - Any PDF whose name starts with 10 digits is a valid drawing.
+    - Fresh drawings (not in DB) -> revision_no = 1.
+    - Duplicate drawings (already in DB) -> new revision = MAX+1 (auto-increment).
+    Returns results with type='new'|'updated' and previous_revision for display.
     """
     try:
         print(f"\n{'='*80}")
         print(f">>> INCOMING REQUEST: POST /submit-batch")
-        
+
         files = request.files.getlist('pdfs')
         print(f"    Files received: {len(files)}")
         for i, f in enumerate(files):
             print(f"    - File {i+1}: {f.filename}")
-            
+
         if not files:
-            print("    ERROR: No files received")
             return jsonify({"success": False, "message": "At least one PDF is required"}), 400
 
-        # Shared metadata
         creator_emp_id = (request.form.get('creator_emp_id') or '').strip()
         reviewer_emp_id = (request.form.get('reviewer_emp_id') or '').strip()
         reviewer_email  = (request.form.get('reviewer_email')  or '').strip()
 
         if not creator_emp_id or not reviewer_emp_id or not reviewer_email:
-            return jsonify({"success": False, "message": "creator_emp_id, reviewer_emp_id and reviewer_email are required"}), 400
+            return jsonify({"success": False,
+                            "message": "creator_emp_id, reviewer_emp_id and reviewer_email are required"}), 400
 
-        division      = (request.form.get('division') or '').strip()
-        team          = (request.form.get('team') or '').strip()
-        pc            = (request.form.get('pc') or '').strip()
-        drawing_type  = (request.form.get('drawing_type') or '').strip()
-        task_number   = (request.form.get('task_number') or '').strip()
+        pc           = (request.form.get('pc') or '').strip()
+        drawing_type = (request.form.get('drawing_type') or '').strip()
+        task_number  = (request.form.get('task_number') or '').strip()
+        comments     = (request.form.get('comments') or '').strip()
 
-        # Use g.db instead of creating a new connection
         if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
 
-        results = []  # (drawing_no, revision_no)
-        rejected = [] # List of filenames that were rejected due to invalid naming
-        duplicates = [] # List of duplicated filenames that request confirmation
-        today = datetime.today()
-
-        # Per-file action map: filename -> 'overwrite' | 'increment' | 'ignore'
-        import json as _json
-        raw_file_actions = request.form.get('file_actions') or '{}'
-        try:
-            file_actions = _json.loads(raw_file_actions)
-        except Exception:
-            file_actions = {}
+        # results: {drawing_id, revision, previous_revision, type:'new'|'updated'}
+        results  = []
+        rejected = []  # filenames that don't start with 10 digits
+        today    = datetime.today()
 
         try:
             with g.db.cursor() as c:
-                # Get user IDs from emp_ids
                 c.execute("SELECT id, name FROM users WHERE emp_id = %s AND is_active = TRUE", (creator_emp_id,))
                 creator_row = c.fetchone()
                 if not creator_row:
                     return jsonify({"success": False, "message": f"Creator {creator_emp_id} not found"}), 400
-                creator_id = creator_row[0]
-                creator_db_name = creator_row[1]
+                creator_id, creator_db_name = creator_row[0], creator_row[1]
 
-                c.execute("SELECT id, name FROM users WHERE emp_id = %s AND is_active = TRUE", (reviewer_emp_id,))
+                c.execute("SELECT id FROM users WHERE emp_id = %s AND is_active = TRUE", (reviewer_emp_id,))
                 reviewer_row = c.fetchone()
                 if not reviewer_row:
                     return jsonify({"success": False, "message": f"Reviewer {reviewer_emp_id} not found"}), 400
                 reviewer_id = reviewer_row[0]
-                reviewer_name = reviewer_row[1]
 
                 for f in files:
                     if not f or not f.filename.lower().endswith('.pdf'):
                         continue
-                    
-                    drawing_id = extract_drawing_id_from_name(f.filename)
-                    if not drawing_id:
+
+                    drawing_no = extract_drawing_id_from_name(f.filename)
+                    if not drawing_no:
                         rejected.append(f.filename)
+                        print(f"    REJECTED (bad name): {f.filename}")
                         continue
 
-                    # Extract revision from filename
-                    revision_from_file = extract_revision_from_name(f.filename)
-                    if revision_from_file is None:
-                        print(f"Warning: Could not extract revision from filename '{f.filename}', skipping.")
-                        rejected.append(f.filename)
-                        continue
-
-                    # Read file content into memory (BLOB)
+                    print(f"    Processing: {f.filename} -> drawing_no={drawing_no}")
                     pdf_bytes = f.read()
 
-                    # Check if drawing exists
-                    c.execute("SELECT id FROM drawings WHERE drawing_no = %s", (drawing_id,))
+                    c.execute("SELECT id FROM drawings WHERE drawing_no = %s", (drawing_no,))
                     drawing_row = c.fetchone()
-                    
+
                     if drawing_row:
                         drawing_db_id = drawing_row[0]
-                    else:
-                        # Create new drawing
-                        c.execute("INSERT INTO drawings (drawing_no, creator_id, drawing_type, pc, created_at) VALUES (%s, %s, %s, %s, %s)", (drawing_id, creator_id, drawing_type, pc, today))
-                        drawing_db_id = c.lastrowid
 
-                    # Check if this revision exists
-                    c.execute("SELECT id FROM drawing_revisions WHERE drawing_id = %s AND revision_no = %s", (drawing_db_id, revision_from_file))
-                    revision_row = c.fetchone()
-
-                    if revision_row:
-                        # Duplicate detected — look up per-file action
-                        action = file_actions.get(f.filename, 'ignore')  # default: ignore
-
-                        if action == 'ignore':
-                            duplicates.append(f.filename)
-                            continue
-
-                        elif action == 'overwrite':
-                            # Delete & replace existing revision
-                            revision_db_id = revision_row[0]
-                            c.execute(
-                                "UPDATE drawing_revisions SET reviewer_id = %s, reviewed_date = NULL, approved = NULL, task_number = %s WHERE id = %s",
-                                (reviewer_id, task_number, revision_db_id)
-                            )
-                            c.execute("DELETE FROM drawing_files WHERE revision_id = %s", (revision_db_id,))
-                            c.execute("""
-                                INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
-                                VALUES (%s, %s, %s, %s, %s)
-                            """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
-                            results.append((drawing_id, revision_from_file))
-
-                        elif action == 'increment':
-                            # Find max existing revision_no for this drawing and add 1
-                            c.execute(
-                                "SELECT MAX(revision_no) FROM drawing_revisions WHERE drawing_id = %s",
-                                (drawing_db_id,)
-                            )
-                            max_rev_row = c.fetchone()
-                            new_revision = (max_rev_row[0] or 0) + 1
-                            c.execute(
-                                "INSERT INTO drawing_revisions (drawing_id, revision_no, reviewer_id, created_at, task_number) VALUES (%s, %s, %s, %s, %s)",
-                                (drawing_db_id, new_revision, reviewer_id, today, task_number)
-                            )
-                            revision_db_id = c.lastrowid
-                            c.execute("""
-                                INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
-                                VALUES (%s, %s, %s, %s, %s)
-                            """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
-                            results.append((drawing_id, new_revision))
-
-                    else:
-                        # No existing revision — create new normally
+                        # Duplicate: auto-increment revision
                         c.execute(
-                            "INSERT INTO drawing_revisions (drawing_id, revision_no, reviewer_id, created_at, task_number) VALUES (%s, %s, %s, %s, %s)",
-                            (drawing_db_id, revision_from_file, reviewer_id, today, task_number)
+                            "SELECT MAX(revision_no) FROM drawing_revisions WHERE drawing_id = %s",
+                            (drawing_db_id,)
+                        )
+                        max_rev_row = c.fetchone()
+                        current_max = max_rev_row[0] if max_rev_row and max_rev_row[0] is not None else 0
+                        next_revision = current_max + 1
+
+                        c.execute(
+                            "INSERT INTO drawing_revisions "
+                            "(drawing_id, revision_no, reviewer_id, created_at, task_number) "
+                            "VALUES (%s, %s, %s, %s, %s)",
+                            (drawing_db_id, next_revision, reviewer_id, today, task_number)
                         )
                         revision_db_id = c.lastrowid
-                        c.execute("""
-                            INSERT INTO drawing_files (drawing_id, revision_id, file_data, uploaded_by, uploaded_at)
-                            VALUES (%s, %s, %s, %s, %s)
-                        """, (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today))
-                        results.append((drawing_id, revision_from_file))
+                        c.execute(
+                            "INSERT INTO drawing_files "
+                            "(drawing_id, revision_id, file_data, uploaded_by, uploaded_at) "
+                            "VALUES (%s, %s, %s, %s, %s)",
+                            (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today)
+                        )
+                        results.append({
+                            "drawing_id": drawing_no,
+                            "revision": next_revision,
+                            "previous_revision": current_max,
+                            "type": "updated"
+                        })
+                        print(f"    UPDATED: {f.filename} -> {drawing_no} rev {next_revision}")
+
+                    else:
+                        # Fresh drawing — insert drawing + revision 1
+                        c.execute(
+                            "INSERT INTO drawings "
+                            "(drawing_no, creator_id, drawing_type, pc, created_at) "
+                            "VALUES (%s, %s, %s, %s, %s)",
+                            (drawing_no, creator_id, drawing_type, pc, today)
+                        )
+                        drawing_db_id = c.lastrowid
+                        c.execute(
+                            "INSERT INTO drawing_revisions "
+                            "(drawing_id, revision_no, reviewer_id, created_at, task_number) "
+                            "VALUES (%s, %s, %s, %s, %s)",
+                            (drawing_db_id, 1, reviewer_id, today, task_number)
+                        )
+                        revision_db_id = c.lastrowid
+                        c.execute(
+                            "INSERT INTO drawing_files "
+                            "(drawing_id, revision_id, file_data, uploaded_by, uploaded_at) "
+                            "VALUES (%s, %s, %s, %s, %s)",
+                            (drawing_db_id, revision_db_id, pdf_bytes, creator_id, today)
+                        )
+                        results.append({
+                            "drawing_id": drawing_no,
+                            "revision": 1,
+                            "previous_revision": None,
+                            "type": "new"
+                        })
+                        print(f"    NEW: {f.filename} -> {drawing_no} rev 1")
 
             g.db.commit()
 
-            # Send summary email
-            try:
-                comments = request.form.get('comments')
-                formatted_creator_name = f"{creator_db_name}"
-                if results:
+            if results:
+                try:
+                    items_for_email = [(r["drawing_id"], r["revision"]) for r in results]
                     send_single_summary_email(
                         to_email=reviewer_email,
-                        items=results,
+                        items=items_for_email,
                         creator_emp_id=creator_emp_id,
-                        creator_name=formatted_creator_name,
+                        creator_name=creator_db_name,
                         user_comments=comments
                     )
-            except Exception as e:
-                print(f"Email send error: {e}")
+                except Exception as email_err:
+                    print(f"    Email send error: {email_err}")
 
             return jsonify({
                 "success": True,
                 "message": "Processed files successfully.",
-                "results": [{"drawing_id": did, "revision": rev} for did, rev in results],
+                "results": results,
                 "rejected": rejected,
-                "duplicates": duplicates
             }), 200
-            
+
         except Exception as e:
-            # Rollback in case of error
             try:
                 if hasattr(g, 'db'):
                     g.db.rollback()
-            except:
+            except Exception:
                 pass
             print(f"submit-batch error: {e}")
             traceback.print_exc()
-            return jsonify({"success": False, "message": f"Internal Server Error: {str(e)}"}), 500
+            return jsonify({"success": False,
+                            "message": f"Internal Server Error: {str(e)}"}), 500
 
     except Exception as e:
         print(f"submit-batch fatal error: {e}")

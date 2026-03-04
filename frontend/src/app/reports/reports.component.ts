@@ -10,31 +10,20 @@ import { environment } from 'src/environments/environment';
 export class ReportsComponent implements OnInit {
   selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' = 'monthly';
 
-  // Dropdown options
   teams: any[] = [];
-
-  // Data variables
   pcs: any[] = [];
-
-  // Multi-select Lists
   selectedTeams: string[] = [];
   selectedPCs: string[] = [];
-
-  // Data variables
   employees: string[] = [];
   filteredEmployees: string[] = [];
   empSearch: string = '';
   selectedEmpId: string = '';
-
   drawings: string[] = [];
   filteredDrawings: string[] = [];
   drawingSearch: string = '';
   selectedDrawingId: string = '';
-
   startDate: string = '';
   endDate: string = '';
-
-  // Dropdown visibility
   showTeams: boolean = false;
   showPCs: boolean = false;
   showEmployeeDropdown: boolean = false;
@@ -135,17 +124,15 @@ export class ReportsComponent implements OnInit {
     return this.selectedPCs.join(', ');
   }
 
-  // Select from filtered employee list
   selectEmployee(emp: string) {
     this.selectedEmpId = emp;
-    this.empSearch = emp; // Update the input field
+    this.empSearch = emp;
     this.showEmployees = false;
   }
 
-  // Select from filtered drawing list
   selectDrawing(drawing: string) {
     this.selectedDrawingId = drawing;
-    this.drawingSearch = drawing; // Update the input field
+    this.drawingSearch = drawing;
     this.showDrawings = false;
   }
 
@@ -174,13 +161,6 @@ export class ReportsComponent implements OnInit {
     this.showDefaultDropdowns = ['monthly', 'trend', 'passRatio'].includes(this.selectedReport);
     this.showEmployeeDropdown = this.selectedReport === 'employeeReport';
     this.showDrawingIdDropdown = this.selectedReport === 'drawingReport';
-
-    // Reset specific selections to avoid confusion
-    if (this.showDefaultDropdowns) {
-      // Keep team/pc selections
-    } else {
-      // Maybe reset? For now ensure correct dropdowns are shown
-    }
   }
 
   filterEmployees() {
