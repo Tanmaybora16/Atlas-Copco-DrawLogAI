@@ -185,6 +185,7 @@ export class ReportTableComponent implements OnChanges {
     'Review Date': 'Review_Date',
     'Creator Emp ID': 'Creator_EMP_ID',
     'Drawing Type': 'Drawing_type',
+    'Task Number': 'Task_Number', 
     Decision: 'Decision',
   };
 
