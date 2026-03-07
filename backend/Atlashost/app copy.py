@@ -2279,6 +2279,12 @@ def submit_batch():
                     if drawing_row:
                         drawing_db_id = drawing_row[0]
 
+                        # Update PC and drawing_type for this submission
+                        c.execute(
+                            "UPDATE drawings SET pc = %s, drawing_type = %s WHERE id = %s",
+                            (pc, drawing_type, drawing_db_id)
+                        )
+
                         # Duplicate: auto-increment revision
                         c.execute(
                             "SELECT MAX(revision_no) FROM drawing_revisions WHERE drawing_id = %s",
