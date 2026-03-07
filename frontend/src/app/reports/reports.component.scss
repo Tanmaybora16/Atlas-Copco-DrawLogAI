@@ -93,8 +93,8 @@ select,
   top: 165px;
   font-size: 16px;
   overflow-y: auto;
-  overflow-x: hidden; // 👈 prevent horizontal scroll
-  white-space: nowrap; // 👈 keep items in one line without wrapping
+  overflow-x: auto;
+  white-space: nowrap;
 
 }
 

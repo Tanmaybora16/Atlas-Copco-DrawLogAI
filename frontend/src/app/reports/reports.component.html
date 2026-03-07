@@ -57,7 +57,7 @@
   <div class="dropdown-container" *ngIf="showEmployeeDropdown">
     <label>Employee ID</label>
     <input class="dropdown-box" type="text" [(ngModel)]="empSearch" (focus)="showEmployees = true"
-      (input)="filterEmployees()" placeholder="Select or Type Employee ID" />
+      (input)="filterEmployees()" placeholder="Search by Name or Employee ID" />
     <div class="dropdown-list" *ngIf="showEmployees">
       <div class="dropdown-item" *ngFor="let emp of filteredEmployees" (click)="selectEmployee(emp)">
         {{ emp }}

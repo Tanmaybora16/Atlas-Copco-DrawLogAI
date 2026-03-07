@@ -424,7 +424,8 @@ def submit_data():
                         pdf_bytes=pdf_bytes,
                         pdf_filename=pdf_filename,
                         file_path=None, # We have bytes, not path
-                        user_comments=form_data.get('comments')
+                        user_comments=form_data.get('comments'),
+                        task_number=task_number
                     )
                 except TypeError as e:
                      print(f"⚠ email-send signature mismatch: {e}")
@@ -448,7 +449,7 @@ def submit_data():
 
     
     
-def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, error_codes, extracted_comments, decision, file_path, drawing_Type, creator_name, user_comments=None, pdf_bytes=None, pdf_filename=None):
+def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, error_codes, extracted_comments, decision, file_path, drawing_Type, creator_name, user_comments=None, pdf_bytes=None, pdf_filename=None, task_number=None):
     try:
         # Set up the SMTP server
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
@@ -472,6 +473,7 @@ def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, 
         Reviewer: {reviewer_name}
         Date: {reviewed_date}
         Drawing Type: {drawing_Type}
+        Task Number: {task_number or 'N/A'}
         
         Errors: {', '.join(error_codes) if error_codes else 'None'}
         Extracted Comments: {comments_text}
@@ -1929,8 +1931,11 @@ def get_employee_ids():
     cursor = g.db.cursor()
 
     try:
-        cursor.execute("SELECT emp_id FROM users WHERE is_active = TRUE ORDER BY emp_id;")
-        employees = [row[0] for row in cursor.fetchall()]
+        cursor.execute("SELECT emp_id, name FROM users WHERE is_active = TRUE ORDER BY emp_id;")
+        employees = [
+            f"{row[0]} - {row[1]}" if row[1] else row[0]
+            for row in cursor.fetchall()
+        ]
         return jsonify(employees)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2161,7 +2166,7 @@ def extract_revision_from_name(filename: str) -> int | None:
     except (ValueError, IndexError):
         return None
 
-def send_single_summary_email(to_email: str, items: list[tuple[str, int]], creator_emp_id: str, creator_name: str, user_comments: str = None):
+def send_single_summary_email(to_email: str, items: list[tuple[str, int]], creator_emp_id: str, creator_name: str, user_comments: str = None, task_number: str = None):
     """
     items: list of (drawing_id, revision)
     """
@@ -2182,6 +2187,7 @@ Multiple drawings have been submitted for your review.
 
 Creator EMP_ID: {creator_emp_id}
 Creator Name  : {creator_name}
+Task Number   : {task_number or 'N/A'}
 
 Drawing_ID - Revision Number:
 {pairs_str}
@@ -2355,7 +2361,8 @@ def submit_batch():
                         items=items_for_email,
                         creator_emp_id=creator_emp_id,
                         creator_name=creator_db_name,
-                        user_comments=comments
+                        user_comments=comments,
+                        task_number=task_number
                     )
                 except Exception as email_err:
                     print(f"    Email send error: {email_err}")

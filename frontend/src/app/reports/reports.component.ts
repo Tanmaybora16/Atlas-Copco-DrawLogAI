@@ -125,7 +125,8 @@ export class ReportsComponent implements OnInit {
   }
 
   selectEmployee(emp: string) {
-    this.selectedEmpId = emp;
+    // emp is "EMP_ID - Name", extract just the ID for API calls
+    this.selectedEmpId = emp.includes(' - ') ? emp.split(' - ')[0].trim() : emp;
     this.empSearch = emp;
     this.showEmployees = false;
   }
