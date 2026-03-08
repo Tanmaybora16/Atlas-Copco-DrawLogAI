@@ -10,6 +10,7 @@ import { ForgotPasswordComponent } from './components/forgot-password/forgot-pas
 import { RequestsComponent } from './requests/requests.component';
 import { SubmissionComponent } from './submission/submission.component';
 import { CanvasComponent } from './canvas/canvas.component';
+import { StructureComponent } from './structure/structure.component';
 
 const routes: Routes = [
   // Redirect root to explicit login route
@@ -27,14 +28,17 @@ const routes: Routes = [
   // Change password – must be logged in (both roles)
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [AuthGuard], data: { roles: ['HR', 'Employee'] } },
   {
-  path: 'submission',component: SubmissionComponent,canActivate: [AuthGuard], data: { roles: ['Employee'] } },
-{
-  path: 'requests', component: RequestsComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] }},
+    path: 'submission', component: SubmissionComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] }
+  },
+  {
+    path: 'requests', component: RequestsComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] }
+  },
   // Forgot password – public
   { path: 'forgot-password', component: ForgotPasswordComponent },
 
   // Employee page – HR only
   { path: 'employee', component: EmployeeComponent, canActivate: [AuthGuard], data: { roles: ['HR'] } },
+  { path: 'structure', component: StructureComponent, canActivate: [AuthGuard], data: { roles: ['HR'] } },
   { path: 'canvas', component: CanvasComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] } },
 
   // Fallback
@@ -45,4 +49,4 @@ const routes: Routes = [
   imports: [RouterModule.forRoot(routes)],
   exports: [RouterModule]
 })
-export class AppRoutingModule {}
+export class AppRoutingModule { }

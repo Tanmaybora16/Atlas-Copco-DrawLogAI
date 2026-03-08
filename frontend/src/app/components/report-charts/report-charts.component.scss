@@ -13,5 +13,36 @@
     margin-top: 20px;
   }
 
+/* Custom Tooltip Styles */
+.custom-tooltip {
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  min-width: 200px;
+}
+
+.tooltip-title {
+  display: block;
+  font-weight: bold;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.tooltip-count {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.tooltip-description {
+  font-size: 12px;
+  color: #444;
+  line-height: 1.4;
+}
+
 
   

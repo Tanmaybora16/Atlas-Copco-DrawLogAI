@@ -1,23 +1,28 @@
-import { Component, OnInit, HostListener, ChangeDetectorRef } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  HostListener,
+  ChangeDetectorRef,
+} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { NgForm } from '@angular/forms';
 import { debounceTime } from 'rxjs/operators';
 import { Subject } from 'rxjs';
-import { AuthService } from '../auth.service'; // ⬅️ NEW
+import { AuthService } from '../auth.service';
 import { environment } from 'src/environments/environment';
 
 declare const Swal: any;
 
 interface EmployeeOption {
-  id: string;      // EMP_ID
-  name: string;    // EMP_Name
+  id: string; // EMP_ID
+  name: string; // EMP_Name
   display: string; // "EMP_ID - EMP_Name"
 }
 
 @Component({
   selector: 'app-submission',
   templateUrl: './submission.component.html',
-  styleUrls: ['./submission.component.scss']
+  styleUrls: ['./submission.component.scss'],
 })
 export class SubmissionComponent implements OnInit {
   private readonly API = `${environment.apiUrl}`;
@@ -33,12 +38,18 @@ export class SubmissionComponent implements OnInit {
   employees: EmployeeOption[] = [];
 
   // CREATOR (now autofilled from login)
-  creatorDropdownOpen = false; // kept for compatibility; not used if you hide the UI
+  creatorDropdownOpen = false;
   creatorSearch = '';
   filteredCreators: EmployeeOption[] = [];
   selectedCreatorId = '';
   selectedCreatorDisplay = '';
-  selectedCreator: any = { emp_PC: '', emp_division: '', emp_team: '', emp_email: '', emp_name: '' };
+  selectedCreator: any = {
+    emp_PC: '',
+    emp_division: '',
+    emp_team: '',
+    emp_email: '',
+    emp_name: '',
+  };
 
   // REVIEWER dropdown
   reviewerDropdownOpen = false;
@@ -47,7 +58,7 @@ export class SubmissionComponent implements OnInit {
   selectedReviewerId = '';
   selectedReviewerDisplay = '';
   selectedFiles: File[] = [];
-  fileNamesDisplay = '';  // shows all names
+  fileNamesDisplay = '';
 
   selectedReviewer: any = { emp_email: '' };
   selectedReviewerEmail = '';
@@ -60,10 +71,21 @@ export class SubmissionComponent implements OnInit {
   // Drawing type
   drawingDropdownOpen = false;
   drawingTypes = [
-    'Casted Machined Drawing', 'Decal', 'Dimension Drawing', 'Ferrous Casting Drawing',
-    'Flexible', 'Foam', 'Hose', 'Installation Drawing', 'Instruction Drawing',
-    'Non-Casted Machined Drawing', 'Non-Ferrous Casting Drawing', 'Piping Other',
-    'Sheet Metal Drawing', 'Supplier Drawing', 'Welded Piping'
+    'Casted Machined Drawing',
+    'Decal',
+    'Dimension Drawing',
+    'Ferrous Casting Drawing',
+    'Flexible',
+    'Foam',
+    'Hose',
+    'Installation Drawing',
+    'Instruction Drawing',
+    'Non-Casted Machined Drawing',
+    'Non-Ferrous Casting Drawing',
+    'Piping Other',
+    'Sheet Metal Drawing',
+    'Supplier Drawing',
+    'Welded Piping',
   ];
   selectedDrawingType = '';
 
@@ -71,6 +93,8 @@ export class SubmissionComponent implements OnInit {
   designNo = '';
   decision: 'approve' | 'reject' = 'approve';
   creatorEmail = '';
+  taskNumber = ''; // NEW
+  comments = ''; // NEW
 
   // debouncers
   creatorSearch$ = new Subject<string>();
@@ -79,13 +103,17 @@ export class SubmissionComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private cdRef: ChangeDetectorRef,
-    private auth: AuthService // ⬅️ NEW
-  ) {}
+    private auth: AuthService,
+  ) { }
 
   ngOnInit() {
     // Debounced search (for Reviewer dropdown only)
-    this.creatorSearch$.pipe(debounceTime(250)).subscribe((txt) => this.filterCreators(txt));
-    this.reviewerSearch$.pipe(debounceTime(250)).subscribe((txt) => this.filterReviewers(txt));
+    this.creatorSearch$
+      .pipe(debounceTime(250))
+      .subscribe((txt) => this.filterCreators(txt));
+    this.reviewerSearch$
+      .pipe(debounceTime(250))
+      .subscribe((txt) => this.filterReviewers(txt));
 
     // 1) Get logged-in Creator ID
     const me = this.auth.getLoggedInUser?.();
@@ -102,9 +130,8 @@ export class SubmissionComponent implements OnInit {
     this.fetchEmployees();
   }
 
-  // Dropdown toggles (kept for Reviewer & Drawing type; you can ignore Creator toggle)
+  // Dropdown toggles
   toggleCreatorDropdown() {
-    // If you keep creator dropdown in HTML, this will preselect the current user
     this.creatorDropdownOpen = !this.creatorDropdownOpen;
     if (this.creatorDropdownOpen) this.filteredCreators = [...this.employees];
   }
@@ -112,7 +139,9 @@ export class SubmissionComponent implements OnInit {
     this.reviewerDropdownOpen = !this.reviewerDropdownOpen;
     if (this.reviewerDropdownOpen) this.filteredReviewers = [...this.employees];
   }
-  toggleDrawingDropdown() { this.drawingDropdownOpen = !this.drawingDropdownOpen; }
+  toggleDrawingDropdown() {
+    this.drawingDropdownOpen = !this.drawingDropdownOpen;
+  }
 
   // Close dropdowns when clicking elsewhere
   @HostListener('document:click', ['$event'])
@@ -125,44 +154,63 @@ export class SubmissionComponent implements OnInit {
     }
   }
 
-  // Fetch employees once (id+name) — used mainly for reviewer list
+  // Fetch employees once (id+name)
   fetchEmployees() {
     this.http.get<any[]>(`${this.API}/get-employees`).subscribe(
       (data) => {
-        this.employees = (data || []).map((row: any) => {
-          const id: string = (row.Emp_ID || row.emp_id || '').toString().trim();
-          const name: string = (row.Emp_Name || row.emp_name || '').toString().trim();
-          return { id, name, display: id && name ? `${id} - ${name}` : id || name };
-        }).filter(e => !!e.id);
+        this.employees = (data || [])
+          .map((row: any) => {
+            const id: string = (row.Emp_ID || row.emp_id || '')
+              .toString()
+              .trim();
+            const name: string = (row.Emp_Name || row.emp_name || '')
+              .toString()
+              .trim();
+            return {
+              id,
+              name,
+              display: id && name ? `${id} - ${name}` : id || name,
+            };
+          })
+          .filter((e) => !!e.id);
 
         this.filteredCreators = [...this.employees];
         this.filteredReviewers = [...this.employees];
 
         // If we already know the creator ID, try to show "ID - Name"
         if (this.selectedCreatorId && !this.selectedCreatorDisplay) {
-          const meRow = this.employees.find(e => e.id === this.selectedCreatorId);
+          const meRow = this.employees.find(
+            (e) => e.id === this.selectedCreatorId,
+          );
           if (meRow) this.selectedCreatorDisplay = meRow.display;
         }
 
         this.cdRef.detectChanges();
       },
-      (error) => console.error('Error fetching employees:', error)
+      (error) => console.error('Error fetching employees:', error),
     );
   }
 
   // Search
-  onCreatorSearchChange(text: string) { this.creatorSearch$.next(text); }
-  onReviewerSearchChange(text: string) { this.reviewerSearch$.next(text); }
+  onCreatorSearchChange(text: string) {
+    this.creatorSearch$.next(text);
+  }
+  onReviewerSearchChange(text: string) {
+    this.reviewerSearch$.next(text);
+  }
   private filterCreators(text: string) {
     const q = (text || '').toLowerCase();
-    this.filteredCreators = this.employees.filter(e => e.display.toLowerCase().includes(q));
+    this.filteredCreators = this.employees.filter((e) =>
+      e.display.toLowerCase().includes(q),
+    );
   }
   private filterReviewers(text: string) {
     const q = (text || '').toLowerCase();
-    this.filteredReviewers = this.employees.filter(e => e.display.toLowerCase().includes(q));
+    this.filteredReviewers = this.employees.filter((e) =>
+      e.display.toLowerCase().includes(q),
+    );
   }
 
-  // If you still show a Creator dropdown in the UI, this lets you override (optional)
   selectCreator(emp: EmployeeOption, event: Event) {
     event.stopPropagation();
     this.selectedCreatorId = emp.id;
@@ -175,18 +223,24 @@ export class SubmissionComponent implements OnInit {
     event.stopPropagation();
     this.selectedReviewerId = emp.id;
     this.selectedReviewerDisplay = emp.display;
+    this.reviewerSearch = emp.display; // Update input
     this.reviewerDropdownOpen = false;
     this.fetchReviewerDetails(emp.id);
   }
 
-  // Fetch creator’s full record
+  // Fetch creator's full record
   fetchCreatorDetails(empId: string) {
     if (!empId) return;
 
     this.http.get<any>(`${this.API}/get-employee/${empId}`).subscribe(
       (data) => {
-        // Expecting: { emp_PC, emp_division, emp_team, emp_email, emp_name? }
-        this.selectedCreator = data || { emp_PC: '', emp_division: '', emp_team: '', emp_email: '', emp_name: '' };
+        this.selectedCreator = data || {
+          emp_PC: '',
+          emp_division: '',
+          emp_team: '',
+          emp_email: '',
+          emp_name: '',
+        };
 
         // Build "ID - Name" label if we have a name
         if (!this.selectedCreatorDisplay) {
@@ -198,18 +252,21 @@ export class SubmissionComponent implements OnInit {
         this.creatorEmail = (this.selectedCreator.emp_email || '').toString();
 
         // Handle PC (single vs multi)
-        const rawPC = (this.selectedCreator.emp_PC || '').toString();
+        const rawPC = (this.selectedCreator.emp_PC || '').toString().trim();
         if (rawPC.includes(',')) {
-          this.pcList = rawPC.split(',').map((pc: string) => pc.trim()).filter(Boolean);
-          this.selectedPC = '';
+          this.pcList = rawPC
+            .split(',')
+            .map((pc: string) => pc.trim())
+            .filter((pc: string) => pc.length > 0);
           this.displaySinglePC = false;
+          this.selectedPC = this.pcList.length > 0 ? this.pcList[0] : '';
         } else {
-          this.selectedPC = rawPC;
-          this.pcList = [];
+          this.pcList = [rawPC];
           this.displaySinglePC = true;
+          this.selectedPC = rawPC;
         }
       },
-      (error) => console.error('Error fetching creator details:', error)
+      (error) => console.error('Error fetching creator details:', error),
     );
   }
 
@@ -219,13 +276,15 @@ export class SubmissionComponent implements OnInit {
     this.http.get<any>(`${this.API}/get-employee/${empId}`).subscribe(
       (data) => {
         this.selectedReviewer = data || { emp_email: '' };
-        this.selectedReviewerEmail = (this.selectedReviewer.emp_email || '').toString();
+        this.selectedReviewerEmail = (
+          this.selectedReviewer.emp_email || ''
+        ).toString();
       },
       (error) => {
         console.error('Error fetching reviewer details:', error);
         this.selectedReviewer = { emp_email: '' };
         this.selectedReviewerEmail = '';
-      }
+      },
     );
   }
 
@@ -233,23 +292,42 @@ export class SubmissionComponent implements OnInit {
   onFilesSelected(event: Event) {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) {
-      this.selectedFiles = [];
-      this.fileNamesDisplay = '';
       return;
     }
     // Only PDFs
-    const all = Array.from(input.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
-    this.selectedFiles = all;
-    this.fileNamesDisplay = all.map(f => f.name).join(', ');
+    const all = Array.from(input.files).filter((f) =>
+      f.name.toLowerCase().endsWith('.pdf'),
+    );
+    this.selectedFiles = [...this.selectedFiles, ...all];
+    this.updateFileNamesDisplay();
+
+    // Reset input so same file can be selected again
+    input.value = '';
   }
 
-  // Optional helper (kept)
+  // Remove individual file
+  removeFile(index: number) {
+    if (this.isBusy) return;
+    this.selectedFiles.splice(index, 1);
+    this.updateFileNamesDisplay();
+  }
+
+  // Update file names display
+  private updateFileNamesDisplay() {
+    this.fileNamesDisplay = this.selectedFiles.map((f) => f.name).join(', ');
+  }
+
   fetchCreatorEmail(creatorId: string) {
     if (!creatorId) return;
-    this.http.get<{ email: string }>(`${this.API}/get-creator-email/${creatorId}`)
+    this.http
+      .get<{ email: string }>(`${this.API}/get-creator-email/${creatorId}`)
       .subscribe(
-        (response) => { this.creatorEmail = response.email; },
-        () => { this.creatorEmail = ''; }
+        (response) => {
+          this.creatorEmail = response.email;
+        },
+        () => {
+          this.creatorEmail = '';
+        },
       );
   }
 
@@ -259,37 +337,67 @@ export class SubmissionComponent implements OnInit {
     this.drawingDropdownOpen = false;
   }
 
-  // Submit (multipart/form-data with the PDF)
+  // Submit
   onSubmit(form: NgForm) {
     if (this.isBusy) return;
 
     if (!this.selectedFiles?.length) {
-      Swal.fire({ icon: 'error', title: 'No Files Selected', text: 'Please select one or more PDFs.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'No Files Selected',
+        text: 'Please select one or more PDFs.',
+      });
       return;
     }
     if (!this.selectedCreatorId) {
-      Swal.fire({ icon: 'error', title: 'Missing Creator', text: 'Creator could not be determined from your session.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Creator',
+        text: 'Creator could not be determined from your session.',
+      });
       return;
     }
     if (!this.selectedReviewerId) {
-      Swal.fire({ icon: 'error', title: 'Missing Reviewer', text: 'Please select a reviewer.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Reviewer',
+        text: 'Please select a reviewer.',
+      });
       return;
     }
     if (!this.selectedReviewerEmail) {
-      Swal.fire({ icon: 'error', title: 'Reviewer Email', text: 'Reviewer email could not be fetched.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Reviewer Email',
+        text: 'Reviewer email could not be fetched.',
+      });
+      return;
+    }
+    if (!this.selectedPC) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing PC',
+        text: 'Please select a Profit Center (PC).',
+      });
       return;
     }
     if (!this.selectedDrawingType) {
-      Swal.fire({ icon: 'error', title: 'Missing Drawing Type', text: 'Please choose a drawing type.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Missing Drawing Type',
+        text: 'Please choose a drawing type.',
+      });
       return;
     }
+    this.submitBatch(form);
+  }
 
+  private submitBatch(form: NgForm) {
     this.isBusy = true;
 
     const fd = new FormData();
-    this.selectedFiles.forEach(f => fd.append('pdfs', f, f.name));
+    this.selectedFiles.forEach((f) => fd.append('pdfs', f, f.name));
 
-    // shared metadata
     fd.append('creator_emp_id', this.selectedCreatorId);
     fd.append('reviewer_emp_id', this.selectedReviewerId);
     fd.append('reviewer_email', this.selectedReviewerEmail);
@@ -300,43 +408,110 @@ export class SubmissionComponent implements OnInit {
     fd.append('drawing_type', this.selectedDrawingType);
     fd.append('decision', this.decision);
 
-    // optional legacy fields
+    fd.append('task_number', (form.value.taskNumber || '').toString());
+    fd.append('comments', (form.value.comments || '').toString());
     fd.append('design_no', (form.value.designNo || '').toString());
     fd.append('client_revision_no', (form.value.revisionNo || '').toString());
 
     this.http.post(`${this.API}/submit-batch`, fd).subscribe({
       next: (res: any) => {
-        const lines = (res?.results || []).map((r: any) => `${r.drawing_id} - ${r.revision}`).join(', ');
-        Swal.fire({
-          icon: 'success',
-          title: 'Submission Successful',
-          html: res?.message || `Processed files.<br/>Revisions: ${lines}`
-        });
+        this.isBusy = false;
+        const results: any[] = res?.results || [];
+
+        // Reset form immediately
         form.resetForm();
         this.resetFormState();
-
-        // Restore creator autofill after reset
         this.selectedCreatorId = this.auth.getLoggedInUser?.() || '';
-        if (this.selectedCreatorId) {
-          this.fetchCreatorDetails(this.selectedCreatorId);
-        }
+        if (this.selectedCreatorId) this.fetchCreatorDetails(this.selectedCreatorId);
 
-        this.isBusy = false;
+        // Show summary popup
+        this.showSummaryPopup(results, res?.rejected);
       },
       error: (err) => {
         const msg = err?.error?.message || 'Submission failed. Please try again.';
         Swal.fire({ icon: 'error', title: 'Submission Failed', text: msg });
         this.isBusy = false;
-      }
+      },
+    });
+  }
+
+  private showSummaryPopup(results: any[], rejected?: string[]) {
+    const newFiles = results.filter((r: any) => r.type === 'new');
+    const updatedFiles = results.filter((r: any) => r.type === 'updated');
+
+    let html = `<div class="sum-popup-body">`;
+
+    if (newFiles.length > 0) {
+      const rows = newFiles
+        .map((r: any) => `
+          <div class="sum-row">
+            <span class="sum-draw">📄 ${r.drawing_id}</span>
+            <span class="sum-badge-new">New · Rev 1</span>
+          </div>`)
+        .join('');
+      html += `
+        <div class="sum-section">
+          <div class="sum-title sum-title-new">✅ New Drawings Added (${newFiles.length})</div>
+          <div class="sum-list">${rows}</div>
+        </div>`;
+    }
+
+    if (updatedFiles.length > 0) {
+      const rows = updatedFiles
+        .map((r: any) => `
+          <div class="sum-row">
+            <span class="sum-draw">📄 ${r.drawing_id}</span>
+            <div class="sum-rev-col">
+              <span class="sum-badge-upd">Updated · Rev ${r.revision}</span>
+              <div class="sum-prev">Previous: Rev ${r.previous_revision}</div>
+            </div>
+          </div>`)
+        .join('');
+      html += `
+        <div class="sum-section">
+          <div class="sum-title sum-title-upd">🔄 Existing Drawings Updated (${updatedFiles.length})</div>
+          <div class="sum-list">${rows}</div>
+        </div>`;
+    }
+
+    if (rejected && rejected.length > 0) {
+      const rows = rejected
+        .map((fname: string) => `
+          <div class="sum-row">
+            <span class="sum-draw">📄 ${fname}</span>
+            <span class="sum-badge-skip">Skipped</span>
+          </div>`)
+        .join('');
+      html += `
+        <div class="sum-section">
+          <div class="sum-title sum-title-skip">⚠️ Skipped — Invalid Naming (${rejected.length})</div>
+          <div class="sum-list">${rows}</div>
+        </div>`;
+    }
+
+    html += '</div>';
+
+    Swal.fire({
+      icon: results.length > 0 ? 'success' : 'warning',
+      title: 'Submission Complete',
+      html,
+      width: '580px',
+      confirmButtonColor: '#2563eb',
+      confirmButtonText: 'OK',
     });
   }
 
   private resetFormState(): void {
     this.selectedFile = null;
     this.fileName = '';
-    // Keep creator ID sourced from session — do not clear it here
     this.selectedCreatorDisplay = '';
-    this.selectedCreator = { emp_PC: '', emp_division: '', emp_team: '', emp_email: '', emp_name: '' };
+    this.selectedCreator = {
+      emp_PC: '',
+      emp_division: '',
+      emp_team: '',
+      emp_email: '',
+      emp_name: '',
+    };
 
     this.selectedReviewerId = '';
     this.selectedReviewerDisplay = '';
@@ -353,5 +528,9 @@ export class SubmissionComponent implements OnInit {
 
     this.selectedFiles = [];
     this.fileNamesDisplay = '';
+
+    // Reset new fields
+    this.taskNumber = '';
+    this.comments = '';
   }
 }

@@ -3,33 +3,28 @@
     <img src="assets/logo.png" alt="Logo">
 
     <div class="headerLinks">
-      <!-- Employee-only -->
-      <a *ngIf="isLoggedIn() && userRole === 'Employee'"
-         routerLink="/uploads"
-         routerLinkActive="active-link"
-         [routerLinkActiveOptions]="{ exact: true }">Uploads</a>
-
-      <a *ngIf="isLoggedIn() && userRole === 'Employee'"
-         routerLink="/submission"
-         routerLinkActive="active-link">Submission</a>
-
-      <a *ngIf="isLoggedIn() && userRole === 'Employee'"
-         routerLink="/requests"
-         routerLinkActive="active-link">Requests</a>
-
-      <!-- Both roles -->
-      <a *ngIf="isLoggedIn()"
-         routerLink="/reports"
-         routerLinkActive="active-link">Reports</a>
-
-         <a *ngIf="isLoggedIn() && userRole === 'Employee'"
-         routerLink="/canvas"
-         routerLinkActive="active-link">Canvas</a>
 
       <!-- HR-only -->
-      <a *ngIf="isLoggedIn() && userRole === 'HR'"
-         routerLink="/employee"
-         routerLinkActive="active-link">Employee</a>
+      <a *ngIf="isLoggedIn() && userRole === 'HR'" routerLink="/employee" routerLinkActive="active-link">Employee</a>
+
+      <a *ngIf="isLoggedIn() && userRole === 'HR'" routerLink="/structure" routerLinkActive="active-link">Structure</a>
+
+      <!-- Employee-only -->
+
+      <a *ngIf="isLoggedIn() && userRole === 'Employee'" routerLink="/submission" routerLinkActive="active-link"
+        [routerLinkActiveOptions]="{ exact: true }">Submission</a>
+
+      <a *ngIf="isLoggedIn() && userRole === 'Employee'" routerLink="/requests"
+        routerLinkActive="active-link">Requests</a>
+
+      <a *ngIf="isLoggedIn() && userRole === 'Employee'" routerLink="/uploads"
+        routerLinkActive="active-link">Uploads</a>
+
+      <a *ngIf="isLoggedIn() && userRole === 'Employee'" routerLink="/canvas" routerLinkActive="active-link">Canvas</a>
+
+      <!-- Both roles -->
+      <a *ngIf="isLoggedIn()" routerLink="/reports" routerLinkActive="active-link">Reports</a>
+
     </div>
 
     <div class="profile" *ngIf="authService.isLoggedIn(); else guestBlock">

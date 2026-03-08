@@ -1,4 +1,4 @@
-import { HttpClientModule } from '@angular/common/http'; 
+import { HttpClientModule } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { LineChartComponent } from './components/line-chart/line-chart.component';
@@ -23,6 +23,8 @@ import { ForgotPasswordComponent } from './components/forgot-password/forgot-pas
 import { SubmissionComponent } from './submission/submission.component';
 import { RequestsComponent } from './requests/requests.component';
 import { CanvasComponent } from './canvas/canvas.component';
+import { FooterComponent } from './footer/footer.component';
+import { StructureComponent } from './structure/structure.component';
 
 
 @NgModule({
@@ -44,7 +46,9 @@ import { CanvasComponent } from './canvas/canvas.component';
     ForgotPasswordComponent,
     SubmissionComponent,
     RequestsComponent,
-    CanvasComponent
+    CanvasComponent,
+    FooterComponent,
+    StructureComponent
 
   ],
   imports: [
@@ -53,8 +57,8 @@ import { CanvasComponent } from './canvas/canvas.component';
     FormsModule,
     NgApexchartsModule,
     HttpClientModule,
-],
-providers: [AuthService],
+  ],
+  providers: [AuthService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

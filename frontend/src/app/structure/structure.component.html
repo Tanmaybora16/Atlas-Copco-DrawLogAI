@@ -1,0 +1,91 @@
+<div class="structure-container">
+    <h2>Organization Structure Management</h2>
+
+    <div class="tabs">
+        <button [class.active]="activeTab === 'divisions'" (click)="setActiveTab('divisions')">Divisions</button>
+        <button [class.active]="activeTab === 'pcs'" (click)="setActiveTab('pcs')">PCs</button>
+        <button [class.active]="activeTab === 'teams'" (click)="setActiveTab('teams')">Teams</button>
+    </div>
+
+    <div class="tab-content" *ngIf="activeTab === 'divisions'">
+        <div class="add-section">
+            <input type="text" [(ngModel)]="newDivisionName" placeholder="New Division Name" [disabled]="isLoading">
+            <button (click)="addDivision()" [disabled]="isLoading || !newDivisionName">Add Division</button>
+        </div>
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let div of divisions">
+                    <td>{{ div.id }}</td>
+                    <td>{{ div.name }}</td>
+                    <td>
+                        <button class="delete-btn" (click)="deleteDivision(div.id)"
+                            [disabled]="isLoading">Delete</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-content" *ngIf="activeTab === 'pcs'">
+        <div class="add-section">
+            <input type="text" [(ngModel)]="newPCName" placeholder="New PC Name" [disabled]="isLoading">
+            <select [(ngModel)]="newPCDivisionId" [disabled]="isLoading">
+                <option [ngValue]="null" disabled>Select Division</option>
+                <option *ngFor="let div of divisions" [value]="div.id">{{ div.name }}</option>
+            </select>
+            <button (click)="addPC()" [disabled]="isLoading || !newPCName || !newPCDivisionId">Add PC</button>
+        </div>
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Division</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let pc of pcs">
+                    <td>{{ pc.id }}</td>
+                    <td>{{ pc.name }}</td>
+                    <td>{{ getDivisionName(pc.division_id) }}</td>
+                    <td>
+                        <button class="delete-btn" (click)="deletePC(pc.id)" [disabled]="isLoading">Delete</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-content" *ngIf="activeTab === 'teams'">
+        <div class="add-section">
+            <input type="text" [(ngModel)]="newTeamName" placeholder="New Team Name" [disabled]="isLoading">
+            <button (click)="addTeam()" [disabled]="isLoading || !newTeamName">Add Team</button>
+        </div>
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let team of teams">
+                    <td>{{ team.id }}</td>
+                    <td>{{ team.name }}</td>
+                    <td>
+                        <button class="delete-btn" (click)="deleteTeam(team.id)" [disabled]="isLoading">Delete</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
