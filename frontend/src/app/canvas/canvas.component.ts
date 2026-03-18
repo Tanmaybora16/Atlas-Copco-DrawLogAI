@@ -11,6 +11,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import * as pdfjsLib from 'pdfjs-dist';
 import { environment } from 'src/environments/environment';
+import { AuthService } from '../auth.service';
 
 type CanvasMode = 'view' | 'add-text' | 'select' | 'add-stamp';
 
@@ -28,6 +29,7 @@ export interface Annotation {
   type?: 'text' | 'stamp';
   stampType?: 'reviewed' | 'approved' | 'rejected';
   reviewDate?: string;
+  reviewerName?: string;
 }
 
 @Component({
@@ -87,11 +89,15 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
   // Internal
   private pdfContext!: CanvasRenderingContext2D;
+  // Canvas dimensions (updated after each render to trigger annotation repositioning)
+  canvasWidth = 0;
+  canvasHeight = 0;
 
   constructor(
     private router: Router,
     private route: ActivatedRoute,
-    private http: HttpClient
+    private http: HttpClient,
+    private authService: AuthService
   ) {
     // PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -187,12 +193,15 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
       await page.render({ canvasContext: this.pdfContext, viewport }).promise;
 
-      // Resize overlay to match canvas
+      // Resize overlay to match canvas and update stored dimensions for annotation positioning
       const layer = this.annotationLayerRef?.nativeElement;
       if (layer) {
         layer.style.width = `${viewport.width}px`;
         layer.style.height = `${viewport.height}px`;
       }
+      // Update stored dimensions so Angular CD repositions all annotations
+      this.canvasWidth = viewport.width;
+      this.canvasHeight = viewport.height;
     } catch (e) {
       console.error('Error rendering PDF page:', e);
       this.renderMockPage();
@@ -217,6 +226,8 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       layer.style.width = `${W}px`;
       layer.style.height = `${H}px`;
     }
+    this.canvasWidth = W;
+    this.canvasHeight = H;
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -284,6 +295,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       type: 'stamp',
       stampType: this.selectedStampType,
       reviewDate: dateStr,
+      reviewerName: this.authService.getLoggedInUserFullName() || 'Unknown',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -449,13 +461,14 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   // Positioning helper
   // ───────────────────────────────────────────────────────────────────────────
   getAnnotationStyle(a: Annotation): any {
-    const layer = this.annotationLayerRef?.nativeElement;
-    if (!layer) {
+    // Use stored canvas dimensions so Angular re-renders annotations on zoom changes
+    const w = this.canvasWidth;
+    const h = this.canvasHeight;
+    if (!w || !h) {
       return {};
     }
-    const rect = layer.getBoundingClientRect();
-    const left = a.x * rect.width;
-    const top = a.y * rect.height;
+    const left = a.x * w;
+    const top = a.y * h;
     const isSelected = a.id === this.selectedAnnotationId;
 
     // Different styling for stamps vs text annotations
@@ -463,16 +476,18 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       return {
         left: `${left}px`,
         top: `${top}px`,
+        transform: `scale(${this.scale})`,
+        transformOrigin: 'top left',
         border: isSelected ? '2px solid #0ea5e9' : 'none'
       };
     } else {
-      // Text annotation styling
+      // Text annotation styling — scale font size with zoom
       const color = a.color ?? this.textColor;
-      const fontSize = a.fontSize ?? this.fontSize;
+      const baseFontSize = a.fontSize ?? this.fontSize;
       return {
         left: `${left}px`,
         top: `${top}px`,
-        fontSize: `${fontSize}px`,
+        fontSize: `${baseFontSize * this.scale}px`,
         color,
         border: isSelected ? '1px solid #0ea5e9' : '1px solid transparent'
       };

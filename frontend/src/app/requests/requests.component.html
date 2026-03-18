@@ -72,7 +72,6 @@
               {{ sortDirection === 'asc' ? '▲' : sortDirection === 'desc' ? '▼' : '' }}
             </span>
           </th>
-          <th>View</th>
           <th>Edit</th>
           <th>Download</th>
           <th>Delete</th>
@@ -95,9 +94,6 @@
               }">
               {{ req.status }}
             </p>
-          </td>
-          <td>
-            <img src="assets/eye.svg" alt="View" class="action-icon" (click)="viewDrawing(i)" />
           </td>
           <td>
             <button class="icon-btn" [disabled]="req.status === 'Reviewed'"
@@ -169,7 +165,6 @@
             </span>
           </th>
           <th>Status</th>
-          <th>View</th>
           <th>Download</th>
           <th>Delete</th>
         </tr>
@@ -191,9 +186,6 @@
               }">
               {{ req.status }}
             </p>
-          </td>
-          <td>
-            <img src="assets/eye.svg" alt="View" class="action-icon" (click)="viewDrawing(i)" />
           </td>
           <td>
             <img src="assets/download.svg" alt="Download" class="action-icon" (click)="downloadDrawing(i)" />
