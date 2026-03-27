@@ -11,11 +11,12 @@ import { environment } from 'src/environments/environment';
   styleUrls: ['./report-table.component.scss'],
 })
 export class ReportTableComponent implements OnChanges {
-  @Input() reportType!: 'employeeReport' | 'drawingReport';
+  @Input() reportType!: 'employeeReport' | 'drawingReport' | 'taskReport';
   @Input() employeeId?: string;
   @Input() drawingId?: string;
   @Input() startDate?: string;
   @Input() endDate?: string;
+  @Input() selectedTeam: string[] = [];
 
   employeeSummary: {
     id?: string;
@@ -30,9 +31,10 @@ export class ReportTableComponent implements OnChanges {
   tableData: any[] = [];
   tableHeaders: string[] = [];
 
-  private apiUrls = {
+  private apiUrls: { [key: string]: string } = {
     employeeReport: `${environment.apiUrl}/api/employee-report`,
     drawingReport: `${environment.apiUrl}/api/drawing-report`,
+    taskReport: `${environment.apiUrl}/api/task-report`,
   };
 
   constructor(private http: HttpClient) { }
@@ -43,7 +45,8 @@ export class ReportTableComponent implements OnChanges {
       changes['drawingId'] ||
       changes['reportType'] ||
       changes['startDate'] ||
-      changes['endDate']
+      changes['endDate'] ||
+      changes['selectedTeam']
     ) {
       this.fetchTableData();
     }
@@ -66,6 +69,9 @@ export class ReportTableComponent implements OnChanges {
     if (this.endDate) {
       let formattedEnd = new Date(this.endDate).toISOString().split('T')[0];
       params = params.set('end_date', formattedEnd);
+    }
+    if (this.selectedTeam && this.selectedTeam.length > 0) {
+      this.selectedTeam.forEach(t => params = params.append('team', t));
     }
 
     console.log('🚀 API Request:', apiUrl, 'Params:', params.toString());
@@ -143,6 +149,17 @@ export class ReportTableComponent implements OnChanges {
         'Drawing Type',
         'Decision',
       ];
+    } else if (this.reportType === 'taskReport') {
+      this.tableHeaders = [
+        'Team',
+        'Task Number',
+        'Drawing ID',
+        'Revision Number',
+        'Creator Emp ID',
+        'Reviewer Emp ID',
+        'Error Codes',
+        'Decision',
+      ];
     }
   }
 
@@ -174,6 +191,15 @@ export class ReportTableComponent implements OnChanges {
     } else if (this.reportType === 'drawingReport') {
       // Sort by Revision_num for drawing data
       this.tableData.sort((a, b) => a.Revision_num - b.Revision_num);
+    } else if (this.reportType === 'taskReport') {
+      // Sort by Task Number natively
+      this.tableData.sort((a, b) => {
+        if (a.Task_Number === b.Task_Number) {
+          return a.Drawing_ID === b.Drawing_ID ? 
+            a.Revision_num - b.Revision_num : a.Drawing_ID.localeCompare(b.Drawing_ID);
+        }
+        return (a.Task_Number || '').localeCompare(b.Task_Number || '');
+      });
     }
   }
 

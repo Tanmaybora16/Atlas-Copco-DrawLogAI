@@ -27,7 +27,7 @@ export interface Annotation {
   color?: string;
   fontSize?: number;
   type?: 'text' | 'stamp';
-  stampType?: 'reviewed' | 'approved' | 'rejected';
+  stampType?: 'reviewed' | 'approved' | 'rejected' | 'correct' | 'wrong';
   reviewDate?: string;
   reviewerName?: string;
 }

@@ -264,6 +264,13 @@
   background: rgba(239, 68, 68, 0.05);
 }
 
+.annotation.stamp-correct,
+.annotation.stamp-wrong {
+  border-color: transparent;
+  background: transparent;
+  padding: 0;
+}
+
 .annotation.stamp-annotation.selected {
   box-shadow: 0 0 0 2px #0ea5e9;
 }
@@ -301,6 +308,31 @@
   color: #4b5563;
   font-style: italic;
   white-space: nowrap;
+}
+
+.stamp-icon-content {
+  line-height: 1;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.stamp-svg-icon {
+  width: 36px;
+  height: 36px;
+  display: block;
+}
+
+.stamp-icon-correct .stamp-svg-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.stamp-icon-wrong .stamp-svg-icon {
+  width: 36px;
+  height: 36px;
 }
 
 /* Cursor styles for different modes */

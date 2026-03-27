@@ -55,6 +55,8 @@
         <option value="reviewed">Reviewed</option>
         <option value="approved">Approved</option>
         <option value="rejected">Rejected</option>
+        <option value="correct">Correct (✓)</option>
+        <option value="wrong">Wrong (✗)</option>
       </select>
     </div>
 
@@ -133,7 +135,9 @@
             'stamp-annotation': a.type === 'stamp',
             'stamp-reviewed': a.type === 'stamp' && a.stampType === 'reviewed',
             'stamp-approved': a.type === 'stamp' && a.stampType === 'approved',
-            'stamp-rejected': a.type === 'stamp' && a.stampType === 'rejected'
+            'stamp-rejected': a.type === 'stamp' && a.stampType === 'rejected',
+            'stamp-correct': a.type === 'stamp' && a.stampType === 'correct',
+            'stamp-wrong': a.type === 'stamp' && a.stampType === 'wrong'
           }" [ngStyle]="getAnnotationStyle(a)" (click)="onAnnotationClick(a, $event)"
           (mousedown)="onAnnotationMouseDown(a, $event)">
           <!-- Display text for text annotations -->
@@ -143,13 +147,19 @@
 
           <!-- Display stamp for stamp annotations -->
           <ng-container *ngIf="a.type === 'stamp'">
-            <div class="stamp-content">
+            <div class="stamp-content" *ngIf="a.stampType !== 'correct' && a.stampType !== 'wrong'">
               <div class="stamp-header">
                 {{ a.stampType?.toUpperCase() }}
               </div>
               <div class="stamp-details">
                 at {{ a.reviewDate }}
               </div>
+            </div>
+            <div class="stamp-icon-content stamp-icon-correct" *ngIf="a.stampType === 'correct'">
+              <img src="assets/check.svg" alt="Correct" class="stamp-svg-icon" />
+            </div>
+            <div class="stamp-icon-content stamp-icon-wrong" *ngIf="a.stampType === 'wrong'">
+              <img src="assets/cross.svg" alt="Wrong" class="stamp-svg-icon" />
             </div>
           </ng-container>
         </div>

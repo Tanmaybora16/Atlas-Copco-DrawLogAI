@@ -1791,6 +1791,76 @@ def drawing_report():
         print(f"Error in drawing_report: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/task-report', methods=['GET'])
+def task_report():
+    """
+    Returns a list of tasks (drawings/revisions) filtered by Date and optionally Team.
+    Used for the Task Report table.
+    """
+    start_date = (request.args.get('start_date') or '').strip()
+    end_date   = (request.args.get('end_date') or '').strip()
+    teams      = request.args.getlist('team')
+
+    try:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({'error': 'Database connection error'}), 500
+
+        cursor = g.db.cursor()
+
+        # Build query using normalized schema
+        query = """
+            SELECT
+                u_cre.team as Team,
+                dr.task_number as Task_Number,
+                d.drawing_no as Drawing_ID,
+                dr.revision_no as Revision_num,
+                u_cre.emp_id as Creator_EMP_ID,
+                u_rev.emp_id as Reviewer_EMP_ID,
+                dr.reviewed_date as Date,
+                CASE WHEN dr.approved = TRUE THEN 'Approve' ELSE 'Reject' END as Decision,
+                GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes
+            FROM drawings d
+            JOIN drawing_revisions dr ON d.id = dr.drawing_id
+            JOIN users u_cre ON d.creator_id = u_cre.id
+            LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
+            LEFT JOIN revision_error_codes rec ON dr.id = rec.revision_id
+            LEFT JOIN error_codes ec ON rec.error_code_id = ec.id
+            WHERE dr.task_number IS NOT NULL AND dr.task_number != ''
+        """
+
+        params = []
+
+        if start_date:
+            query += " AND DATE(dr.reviewed_date) >= %s"
+            params.append(start_date)
+        if end_date:
+            query += " AND DATE(dr.reviewed_date) <= %s"
+            params.append(end_date)
+        if teams:
+            format_strings = ','.join(['%s'] * len(teams))
+            query += f" AND u_cre.team IN ({format_strings})"
+            params.extend(teams)
+
+        query += " GROUP BY dr.id ORDER BY dr.reviewed_date DESC"
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
+
+        result = []
+        for tup in rows:
+            row = dict(zip(cols, tup))
+            row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
+            result.append(row)
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"Error in task_report: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 
 @app.route('/api/employee-report', methods=['GET'])
 def employee_report():
@@ -2713,12 +2783,46 @@ def download_annotated_pdf(drawing_id, revision):
                     reviewer_name = ann.get("reviewerName", "Unknown")
                     review_date = ann.get("reviewDate", "")
                     
-                    # Define stamp dimensions
+                    if stamp_type in ("correct", "wrong"):
+                        # Draw geometric shapes (flattened permanently onto the page)
+                        if stamp_type == "correct":
+                            # Draw a green checkmark — two separate strokes to avoid closing into a triangle
+                            color = (16/255, 185/255, 129/255)
+                            p1 = fitz.Point(x + 4,  y + 16)
+                            p2 = fitz.Point(x + 12, y + 24)
+                            p3 = fitz.Point(x + 26, y + 6)
+                            # First leg: bottom-left to pivot
+                            s1 = page.new_shape()
+                            s1.draw_line(p1, p2)
+                            s1.finish(color=color, width=4)
+                            s1.commit()
+                            # Second leg: pivot to top-right
+                            s2 = page.new_shape()
+                            s2.draw_line(p2, p3)
+                            s2.finish(color=color, width=4)
+                            s2.commit()
+                        else:
+                            # Draw a red X — two separate diagonal strokes
+                            color = (239/255, 68/255, 68/255)
+                            s1 = page.new_shape()
+                            s1.draw_line(fitz.Point(x + 6,  y + 6),  fitz.Point(x + 26, y + 26))
+                            s1.finish(color=color, width=4)
+                            s1.commit()
+                            s2 = page.new_shape()
+                            s2.draw_line(fitz.Point(x + 26, y + 6),  fitz.Point(x + 6,  y + 26))
+                            s2.finish(color=color, width=4)
+                            s2.commit()
+
+                        stamps_added += 1
+                        print(f"✅ Added flattened {stamp_type} stamp on page {page_index+1}")
+                        continue
+
+                    # Define stamp dimensions for regular textual stamps
                     stamp_width = 200
                     stamp_height = 45
                     stamp_rect = fitz.Rect(x, y, x + stamp_width, y + stamp_height)
                     
-                    # Choose color based on stamp type
+                    # Choose color based on regular stamp type
                     if stamp_type == "approved":
                         border_color = (16/255, 185/255, 129/255)  # Green
                         text_color = (16/255, 185/255, 129/255)

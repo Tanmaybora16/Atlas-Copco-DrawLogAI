@@ -8,11 +8,12 @@
       <option value="passRatio">Pass Ratio Report</option>
       <option value="employeeReport">Employee Report</option>
       <option value="drawingReport">Drawing Report</option>
+      <option value="taskReport">Task Report</option>
     </select>
   </div>
 
   <!-- Team Dropdown -->
-  <div class="dropdown-container" *ngIf="showDefaultDropdowns">
+  <div class="dropdown-container" *ngIf="showTeamDropdown">
     <label>Team</label>
     <div class="dropdown-box" (click)="showTeams = !showTeams; showPCs = false">
       {{ getSelectedTeamsDisplay() }}
@@ -33,7 +34,7 @@
   </div>
 
   <!-- PC Dropdown -->
-  <div class="dropdown-container" *ngIf="showDefaultDropdowns">
+  <div class="dropdown-container" *ngIf="showPCDropdown">
     <label>PC</label>
     <div class="dropdown-box" (click)="showPCs = !showPCs; showTeams = false">
       {{ getSelectedPCsDisplay() }}
@@ -97,9 +98,9 @@
       [startDate]="startDate" [endDate]="endDate">
     </app-column-chart>
 
-    <app-report-table *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport'"
+    <app-report-table *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport' || selectedReport === 'taskReport'"
       [reportType]="selectedReport" [employeeId]="selectedEmpId" [drawingId]="selectedDrawingId" [startDate]="startDate"
-      [endDate]="endDate">
+      [endDate]="endDate" [selectedTeam]="selectedTeams">
     </app-report-table>
 
     <app-line-chart *ngIf="selectedReport === 'trend'" [selectedTeam]="selectedTeams" [selectedPC]="selectedPCs"

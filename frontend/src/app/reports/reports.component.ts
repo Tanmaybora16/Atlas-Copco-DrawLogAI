@@ -8,7 +8,7 @@ import { environment } from 'src/environments/environment';
   styleUrls: ['./reports.component.scss'],
 })
 export class ReportsComponent implements OnInit {
-  selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' = 'monthly';
+  selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' | 'taskReport' = 'monthly';
 
   teams: any[] = [];
   pcs: any[] = [];
@@ -26,11 +26,12 @@ export class ReportsComponent implements OnInit {
   endDate: string = '';
   showTeams: boolean = false;
   showPCs: boolean = false;
+  showTeamDropdown: boolean = true;
+  showPCDropdown: boolean = true;
   showEmployeeDropdown: boolean = false;
   showDrawingIdDropdown: boolean = false;
   showEmployees: boolean = false;
   showDrawings: boolean = false;
-  showDefaultDropdowns: boolean = true;
 
   constructor(private http: HttpClient) { }
 
@@ -159,9 +160,11 @@ export class ReportsComponent implements OnInit {
     const value = (event.target as HTMLSelectElement).value;
     this.selectedReport = value as any;
 
-    this.showDefaultDropdowns = ['monthly', 'trend', 'passRatio'].includes(this.selectedReport);
+    this.showTeamDropdown = ['monthly', 'trend', 'passRatio', 'taskReport'].includes(this.selectedReport);
+    this.showPCDropdown = ['monthly', 'trend', 'passRatio'].includes(this.selectedReport);
     this.showEmployeeDropdown = this.selectedReport === 'employeeReport';
     this.showDrawingIdDropdown = this.selectedReport === 'drawingReport';
+    // For taskReport, all above are false, which naturally hides them.
   }
 
   filterEmployees() {
