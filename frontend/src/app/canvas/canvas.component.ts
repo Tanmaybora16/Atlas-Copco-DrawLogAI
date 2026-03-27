@@ -27,7 +27,7 @@ export interface Annotation {
   color?: string;
   fontSize?: number;
   type?: 'text' | 'stamp';
-  stampType?: 'reviewed' | 'approved' | 'rejected' | 'correct' | 'wrong';
+  stampType?: 'reviewed' | 'correct' | 'wrong';
   reviewDate?: string;
   reviewerName?: string;
 }
@@ -76,7 +76,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   fontSize = 16;
 
   // Stamp properties
-  selectedStampType: 'reviewed' | 'approved' | 'rejected' = 'reviewed';
+  selectedStampType: 'reviewed' | 'correct' | 'wrong' = 'reviewed';
 
   // Dragging state
   private isDragging = false;
@@ -240,7 +240,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     this.editingAnnotationId = null;
   }
 
-  setStampType(type: 'reviewed' | 'approved' | 'rejected'): void {
+  setStampType(type: 'reviewed' | 'correct' | 'wrong'): void {
     this.selectedStampType = type;
   }
 

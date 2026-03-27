@@ -34,6 +34,7 @@ const errorDescriptions: { [key: string]: string } = {
   P18: 'Material  comment added (T for thickness) if not dimensioned',
   P19: 'Treatment assigned, or not applicable. Should be given in title block of the drawing. Exception for tabular drawing',
   P20: 'Treatment see drawing',
+  P21: 'Surface treatment - see drawing',
   P22: 'Latest edition of Atlas Copco template used. Exception US: Latest edition of ANSI templates used',
   P23: 'Check for spelling mistake',
   P24: 'Page numbering if applicable  ',
@@ -75,9 +76,8 @@ export type ChartOptions = {
   plotOptions: ApexPlotOptions;
   xaxis: ApexXAxis;
   title: any;
-  colors?: string[]; // ← add this
+  colors?: string[];
   tooltip?: ApexTooltip;
-
 };
 
 @Component({
@@ -86,14 +86,17 @@ export type ChartOptions = {
   styleUrls: ['./report-charts.component.scss']
 })
 export class ReportChartsComponent implements OnChanges {
-  @Input() reportType: 'employeeReport' | 'drawingReport' = 'employeeReport';
+  @Input() reportType: 'employeeReport' | 'drawingReport' | 'taskReport' = 'employeeReport';
   @Input() employeeId: string = '';
   @Input() drawingId: string = '';
+  @Input() taskNumber: string = '';
   @Input() startDate: string = ''; // expect YYYY-MM-DD
   @Input() endDate: string = '';   // expect YYYY-MM-DD
+  @Input() selectedTeams: string[] = []; // for task report filtering
 
   public chartOptionsErrors!: Partial<ChartOptions>;
   public chartOptionsDrawings!: Partial<ChartOptions>;
+  public chartOptionsTasks!: any; // Use any for pie chart options
   loading = false;
   error: string | null = null;
 
@@ -112,7 +115,7 @@ export class ReportChartsComponent implements OnChanges {
       return;
     }
 
-    if (this.reportType && (this.employeeId || this.drawingId)) {
+    if (this.reportType) {
       this.fetchChartData();
     }
   }
@@ -120,6 +123,7 @@ export class ReportChartsComponent implements OnChanges {
   private resetCharts(): void {
     this.chartOptionsErrors = { series: [], chart: { type: 'bar', height: 0 } };
     this.chartOptionsDrawings = { series: [], chart: { type: 'bar', height: 0 } };
+    this.chartOptionsTasks = { series: [], labels: [], chart: { type: 'pie', height: 0 } };
   }
 
   fetchChartData(): void {
@@ -135,6 +139,11 @@ export class ReportChartsComponent implements OnChanges {
       params = params.set('employeeId', this.employeeId);
     } else if (this.reportType === 'drawingReport' && this.drawingId) {
       params = params.set('drawingId', this.drawingId);
+    } else if (this.reportType === 'taskReport') {
+      if (this.taskNumber) params = params.set('task_number', this.taskNumber);
+      if (this.selectedTeams && this.selectedTeams.length > 0) {
+        this.selectedTeams.forEach(t => params = params.append('team', t));
+      }
     }
 
     if (this.startDate) params = params.set('start_date', this.normalizeDate(this.startDate));
@@ -157,7 +166,7 @@ export class ReportChartsComponent implements OnChanges {
           this.loading = false;
         }
       });
-    } else {
+    } else if (this.reportType === 'drawingReport') {
       // Only need: top errors for drawing
       this.http.get<any[]>(trendApiUrl, { params })
         .pipe(catchError(() => of([])))
@@ -169,6 +178,22 @@ export class ReportChartsComponent implements OnChanges {
           error: (err) => {
             console.error('❌ Charts (drawing) error:', err);
             this.error = 'Failed to fetch data';
+            this.resetCharts();
+            this.loading = false;
+          }
+        });
+    } else if (this.reportType === 'taskReport') {
+      const taskApiUrl = `${this.API_BASE}/api/task-summary`;
+      this.http.get<any[]>(taskApiUrl, { params })
+        .pipe(catchError(() => of([])))
+        .subscribe({
+          next: (data) => {
+            this.updateTaskCharts(data || []);
+            this.loading = false;
+          },
+          error: (err) => {
+            console.error('❌ Charts (task) error:', err);
+            this.error = 'Failed to fetch task data';
             this.resetCharts();
             this.loading = false;
           }
@@ -215,9 +240,7 @@ export class ReportChartsComponent implements OnChanges {
                 font-weight: 500;
               ">
                 <div style="
-                  
                   margin-bottom: 6px;
-                  
                 ">
                   ${errorCode}
                 </div>
@@ -251,7 +274,6 @@ export class ReportChartsComponent implements OnChanges {
   }
 
   private updateEmployeeCharts(trendData: any[], monthlyData: any): void {
-    // Top error codes (server already limits; we sort again defensively)
     if (!Array.isArray(trendData) || trendData.length === 0) {
       this.chartOptionsErrors = this.createErrorChart([], 'No Data Available');
     } else {
@@ -263,9 +285,8 @@ export class ReportChartsComponent implements OnChanges {
       this.chartOptionsErrors = this.createErrorChart(errors, `Top 10 Errors for ${this.employeeId}`);
     }
 
-    // Monthly Approved vs Rejected
     const keys = Object.keys(monthlyData || {})
-      .filter(k => /^ec_\d{2}_\d{4}$/i.test(k)) // matches EC_MM_YYYY (case-insensitive)
+      .filter(k => /^ec_\d{2}_\d{4}$/i.test(k))
       .sort((a, b) => {
         const parse = (k: string) => {
           const [, mm, yyyy] = k.match(/^ec_(\d{2})_(\d{4})$/i) || [];
@@ -315,5 +336,45 @@ export class ReportChartsComponent implements OnChanges {
 
     this.chartOptionsErrors = this.createErrorChart(errors, `Top 5 Errors for Drawing ${this.drawingId}`);
     this.chartOptionsDrawings = { series: [], chart: { type: 'bar', height: 0 } };
+  }
+
+  private updateTaskCharts(data: any[]): void {
+    if (!Array.isArray(data) || data.length === 0) {
+      this.chartOptionsTasks = { series: [], labels: [], chart: { type: 'pie', height: 0 } };
+      return;
+    }
+
+    const labels = data.map(item => item.team || 'Unknown');
+    const series = data.map(item => Number(item.count) || 0);
+    const totalTasks = series.reduce((a, b) => a + b, 0);
+
+    this.chartOptionsTasks = {
+      series: series,
+      chart: {
+        type: 'pie',
+        height: 380
+      },
+      labels: labels,
+      title: {
+        text: `Task Distribution by Team (Total: ${totalTasks})`,
+        align: 'center'
+      },
+      responsive: [
+        {
+          breakpoint: 480,
+          options: {
+            chart: { width: 200 },
+            legend: { position: 'bottom' }
+          }
+        }
+      ],
+      dataLabels: {
+        enabled: true,
+        formatter: (val: any, opts: any) => {
+          return opts.w.globals.series[opts.seriesIndex];
+        }
+      },
+      legend: { position: 'right' }
+    };
   }
 }

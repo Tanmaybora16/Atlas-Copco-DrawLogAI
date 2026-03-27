@@ -53,8 +53,6 @@
     <div class="tool-group" *ngIf="mode === 'add-stamp'">
       <select [value]="selectedStampType" (change)="setStampType($any($event.target).value)" title="Stamp Type">
         <option value="reviewed">Reviewed</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
         <option value="correct">Correct (✓)</option>
         <option value="wrong">Wrong (✗)</option>
       </select>
@@ -134,8 +132,6 @@
             'text-annotation': a.type === 'text',
             'stamp-annotation': a.type === 'stamp',
             'stamp-reviewed': a.type === 'stamp' && a.stampType === 'reviewed',
-            'stamp-approved': a.type === 'stamp' && a.stampType === 'approved',
-            'stamp-rejected': a.type === 'stamp' && a.stampType === 'rejected',
             'stamp-correct': a.type === 'stamp' && a.stampType === 'correct',
             'stamp-wrong': a.type === 'stamp' && a.stampType === 'wrong'
           }" [ngStyle]="getAnnotationStyle(a)" (click)="onAnnotationClick(a, $event)"

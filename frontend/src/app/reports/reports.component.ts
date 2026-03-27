@@ -1,5 +1,5 @@
 import { Component, OnInit, HostListener } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
 
 @Component({
@@ -8,7 +8,7 @@ import { environment } from 'src/environments/environment';
   styleUrls: ['./reports.component.scss'],
 })
 export class ReportsComponent implements OnInit {
-  selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' | 'taskReport' = 'monthly';
+  selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' | 'taskReport' | 'overview' = 'monthly';
 
   teams: any[] = [];
   pcs: any[] = [];
@@ -22,6 +22,9 @@ export class ReportsComponent implements OnInit {
   filteredDrawings: string[] = [];
   drawingSearch: string = '';
   selectedDrawingId: string = '';
+  tasks: string[] = [];
+  filteredTasks: string[] = [];
+  taskNumberSearch: string = '';
   startDate: string = '';
   endDate: string = '';
   showTeams: boolean = false;
@@ -30,8 +33,10 @@ export class ReportsComponent implements OnInit {
   showPCDropdown: boolean = true;
   showEmployeeDropdown: boolean = false;
   showDrawingIdDropdown: boolean = false;
+  showTaskNumberInput: boolean = false;
   showEmployees: boolean = false;
   showDrawings: boolean = false;
+  showTasks: boolean = false;
 
   constructor(private http: HttpClient) { }
 
@@ -39,6 +44,7 @@ export class ReportsComponent implements OnInit {
     this.fetchInitialData();
     this.fetchEmployees();
     this.fetchDrawings();
+    this.fetchTasks();
   }
 
   fetchInitialData() {
@@ -68,7 +74,14 @@ export class ReportsComponent implements OnInit {
   }
 
   fetchDrawings() {
-    this.http.get<string[]>(`${environment.apiUrl}/api/drawings-dropdown`).subscribe({
+    let params = new HttpParams();
+    if (this.startDate) params = params.set('start_date', this.startDate);
+    if (this.endDate) params = params.set('end_date', this.endDate);
+    if (this.selectedTeams && this.selectedTeams.length > 0) {
+      this.selectedTeams.forEach(t => params = params.append('team', t));
+    }
+
+    this.http.get<string[]>(`${environment.apiUrl}/api/drawings-dropdown`, { params }).subscribe({
       next: (data) => {
         this.drawings = data || [];
         this.filteredDrawings = [...this.drawings];
@@ -79,28 +92,66 @@ export class ReportsComponent implements OnInit {
     });
   }
 
-  toggleTeam(team: string) {
-    if (this.selectedTeams.includes(team)) {
-      this.selectedTeams = this.selectedTeams.filter(t => t !== team);
-    } else {
-      this.selectedTeams = [...this.selectedTeams, team];
+  fetchTasks() {
+    let params = new HttpParams();
+    if (this.startDate) params = params.set('start_date', this.startDate);
+    if (this.endDate) params = params.set('end_date', this.endDate);
+    if (this.selectedTeams && this.selectedTeams.length > 0) {
+      this.selectedTeams.forEach(t => params = params.append('team', t));
     }
+
+    this.http.get<string[]>(`${environment.apiUrl}/api/tasks-dropdown`, { params }).subscribe({
+      next: (data) => {
+        this.tasks = data || [];
+        this.filteredTasks = [...this.tasks];
+      },
+      error: (err) => {
+        console.error('Failed to fetch tasks', err);
+      }
+    });
   }
 
-  togglePC(pc: string) {
-    if (this.selectedPCs.includes(pc)) {
-      this.selectedPCs = this.selectedPCs.filter(p => p !== pc);
+  toggleTeam(team: string, event?: Event) {
+    const isMultiSelect = event ? ((event as MouseEvent).ctrlKey || (event as MouseEvent).metaKey) : false;
+
+    if (isMultiSelect) {
+      if (this.selectedTeams.includes(team)) {
+        this.selectedTeams = this.selectedTeams.filter(t => t !== team);
+      } else {
+        this.selectedTeams = [...this.selectedTeams, team];
+      }
     } else {
-      this.selectedPCs = [...this.selectedPCs, pc];
+      // Radio behavior: single pick
+      this.selectedTeams = [team];
+    }
+    this.fetchTasks();
+    this.fetchDrawings();
+  }
+
+  togglePC(pc: string, event?: Event) {
+    const isMultiSelect = event ? ((event as MouseEvent).ctrlKey || (event as MouseEvent).metaKey) : false;
+
+    if (isMultiSelect) {
+      if (this.selectedPCs.includes(pc)) {
+        this.selectedPCs = this.selectedPCs.filter(p => p !== pc);
+      } else {
+        this.selectedPCs = [...this.selectedPCs, pc];
+      }
+    } else {
+      this.selectedPCs = [pc];
     }
   }
 
   selectAllTeams() {
     this.selectedTeams = this.teams.map(t => t.name);
+    this.fetchTasks();
+    this.fetchDrawings();
   }
 
   deselectAllTeams() {
     this.selectedTeams = [];
+    this.fetchTasks();
+    this.fetchDrawings();
   }
 
   selectAllPCs() {
@@ -138,6 +189,11 @@ export class ReportsComponent implements OnInit {
     this.showDrawings = false;
   }
 
+  selectTask(task: string) {
+    this.taskNumberSearch = task;
+    this.showTasks = false;
+  }
+
   toggleSelection(value: string, category: string) {
     if (category === 'team') {
       this.toggleTeam(value);
@@ -153,6 +209,7 @@ export class ReportsComponent implements OnInit {
       this.showPCs = false;
       this.showEmployees = false;
       this.showDrawings = false;
+      this.showTasks = false;
     }
   }
 
@@ -164,7 +221,23 @@ export class ReportsComponent implements OnInit {
     this.showPCDropdown = ['monthly', 'trend', 'passRatio'].includes(this.selectedReport);
     this.showEmployeeDropdown = this.selectedReport === 'employeeReport';
     this.showDrawingIdDropdown = this.selectedReport === 'drawingReport';
+    this.showTaskNumberInput = this.selectedReport === 'taskReport';
+    // Overview only shows Date Range filters (handled by exclusion)
+
     // For taskReport, all above are false, which naturally hides them.
+    
+    // Clear selections when switching reports
+    this.selectedTeams = [];
+    this.selectedPCs = [];
+    this.empSearch = '';
+    this.selectedEmpId = '';
+    this.drawingSearch = '';
+    this.selectedDrawingId = '';
+    this.taskNumberSearch = '';
+
+    // Re-fetch dependent dropdown items with cleared team/date filters
+    this.fetchTasks();
+    this.fetchDrawings();
   }
 
   filterEmployees() {
@@ -187,8 +260,20 @@ export class ReportsComponent implements OnInit {
     }
   }
 
+  filterTasks() {
+    if (!this.taskNumberSearch) {
+      this.filteredTasks = this.tasks;
+    } else {
+      this.filteredTasks = this.tasks.filter(task =>
+        task.toLowerCase().includes(this.taskNumberSearch.toLowerCase())
+      );
+    }
+  }
+
   onDateChange(event: Event, type: string) {
     const value = (event.target as HTMLInputElement).value;
     type === 'start' ? (this.startDate = value) : (this.endDate = value);
+    this.fetchTasks();
+    this.fetchDrawings();
   }
 }

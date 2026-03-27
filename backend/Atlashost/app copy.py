@@ -1799,6 +1799,7 @@ def task_report():
     """
     start_date = (request.args.get('start_date') or '').strip()
     end_date   = (request.args.get('end_date') or '').strip()
+    task_number = (request.args.get('task_number') or '').strip()
     teams      = request.args.getlist('team')
 
     try:
@@ -1837,6 +1838,9 @@ def task_report():
         if end_date:
             query += " AND DATE(dr.reviewed_date) <= %s"
             params.append(end_date)
+        if task_number:
+            query += " AND dr.task_number LIKE %s"
+            params.append(f"%{task_number}%")
         if teams:
             format_strings = ','.join(['%s'] * len(teams))
             query += f" AND u_cre.team IN ({format_strings})"
@@ -2021,19 +2025,274 @@ def get_employee_ids():
 def get_drawing_ids():
     """
     Returns list of drawing IDs for dropdown.
-    Queries drawings table (already using new schema).
+    Queries drawings table joined with drawing_revisions and users, filtered by date and team.
     """
-    # Use g.db instead of creating a new connection
+    start_date = (request.args.get('start_date') or '').strip()
+    end_date   = (request.args.get('end_date') or '').strip()
+    teams      = request.args.getlist('team')
+
     if not hasattr(g, 'db') or g.db is None:
         return jsonify({"error": "Database connection error"}), 500
 
     cursor = g.db.cursor()
 
     try:
-        cursor.execute("SELECT drawing_no FROM drawings ORDER BY drawing_no;")
+        query = """
+            SELECT DISTINCT d.drawing_no 
+            FROM drawings d
+        """
+        
+        # Only join if we need to filter by date or team
+        if start_date or end_date or teams:
+            query += """
+                JOIN drawing_revisions dr ON d.id = dr.drawing_id
+                JOIN users u_cre ON d.creator_id = u_cre.id
+                WHERE 1=1
+            """
+        else:
+            query += " WHERE 1=1 "
+            
+        params = []
+
+        if start_date:
+            query += " AND DATE(dr.reviewed_date) >= %s"
+            params.append(start_date)
+        if end_date:
+            query += " AND DATE(dr.reviewed_date) <= %s"
+            params.append(end_date)
+        if teams:
+            format_strings = ','.join(['%s'] * len(teams))
+            query += f" AND u_cre.team IN ({format_strings})"
+            params.extend(teams)
+
+        query += " ORDER BY d.drawing_no;"
+
+        cursor.execute(query, tuple(params))
         drawings = [row[0] for row in cursor.fetchall()]
         return jsonify(drawings)
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+
+# Get dropdown data for task numbers in report page
+@app.route('/api/tasks-dropdown', methods=['GET'])
+def get_task_numbers():
+    """
+    Returns list of unique task numbers for dropdown.
+    Queries drawing_revisions table filtered by date and team.
+    """
+    start_date = (request.args.get('start_date') or '').strip()
+    end_date   = (request.args.get('end_date') or '').strip()
+    teams      = request.args.getlist('team')
+
+    if not hasattr(g, 'db') or g.db is None:
+        return jsonify({"error": "Database connection error"}), 500
+
+    cursor = g.db.cursor()
+
+    try:
+        query = """
+            SELECT DISTINCT dr.task_number 
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u_cre ON d.creator_id = u_cre.id
+            WHERE dr.task_number IS NOT NULL AND dr.task_number != ''
+        """
+        params = []
+
+        if start_date:
+            query += " AND DATE(dr.reviewed_date) >= %s"
+            params.append(start_date)
+        if end_date:
+            query += " AND DATE(dr.reviewed_date) <= %s"
+            params.append(end_date)
+        if teams:
+            format_strings = ','.join(['%s'] * len(teams))
+            query += f" AND u_cre.team IN ({format_strings})"
+            params.extend(teams)
+
+        query += " ORDER BY dr.task_number;"
+
+        cursor.execute(query, tuple(params))
+        tasks = [row[0] for row in cursor.fetchall()]
+        return jsonify(tasks)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+
+@app.route('/api/task-summary', methods=['GET'])
+def task_summary():
+    """
+    Returns task counts grouped by Team, filtered by Date and Team.
+    Used for the Task Report pie chart.
+    """
+    start_date = (request.args.get('start_date') or '').strip()
+    end_date   = (request.args.get('end_date') or '').strip()
+    teams      = request.args.getlist('team')
+
+    try:
+        # Use g.db instead of creating a new connection
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({'error': 'Database connection error'}), 500
+
+        cursor = g.db.cursor()
+
+        # Build query
+        query = """
+            SELECT u_cre.team, COUNT(dr.id) as count
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u_cre ON d.creator_id = u_cre.id
+            WHERE dr.task_number IS NOT NULL AND dr.task_number != ''
+        """
+        params = []
+
+        if start_date:
+            query += " AND DATE(dr.reviewed_date) >= %s"
+            params.append(start_date)
+        if end_date:
+            query += " AND DATE(dr.reviewed_date) <= %s"
+            params.append(end_date)
+        if teams:
+            format_strings = ','.join(['%s'] * len(teams))
+            query += f" AND u_cre.team IN ({format_strings})"
+            params.extend(teams)
+
+        query += " GROUP BY u_cre.team ORDER BY count DESC"
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        
+        result = [{"team": row[0], "count": row[1]} for row in rows]
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error in task_summary: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+
+@app.route('/api/overview-dashboard', methods=['GET'])
+def overview_dashboard():
+    """
+    Returns a consolidated JSON for the Overview Dashboard.
+    Includes KPIs, Team distribution, Status breakdown, Monthly Trend, Auditor Ranking, and Recent Feed.
+    """
+    start_date = (request.args.get('start_date') or '').strip()
+    end_date   = (request.args.get('end_date') or '').strip()
+
+    try:
+        if not hasattr(g, 'db') or g.db is None:
+            return jsonify({'error': 'Database connection error'}), 500
+        cursor = g.db.cursor(pymysql.cursors.DictCursor)
+
+        # 1. KPIs & Status Distribution
+        # We'll fetch status, auditor, team, and date for all relevant revisions in the range
+        where_clause = "WHERE dr.task_number IS NOT NULL AND dr.task_number != ''"
+        where_params = []
+        if start_date:
+            where_clause += " AND DATE(dr.reviewed_date) >= %s"
+            where_params.append(start_date)
+        if end_date:
+            where_clause += " AND DATE(dr.reviewed_date) <= %s"
+            where_params.append(end_date)
+
+        # KPI & Status Query
+        query_all = f"""
+            SELECT 
+                dr.id, 
+                dr.approved, 
+                u_cre.team, 
+                u_rev.name as auditor_name,
+                dr.reviewed_date as audit_date
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u_cre ON d.creator_id = u_cre.id
+            LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
+            {where_clause}
+        """
+        cursor.execute(query_all, tuple(where_params))
+        all_data = cursor.fetchall()
+
+        total_audits = len(all_data)
+        approved_count = sum(1 for r in all_data if r['approved'])
+        pass_ratio = (approved_count / total_audits * 100) if total_audits > 0 else 0
+
+        # Status distribution - mapping 'approved' boolean to labels
+        # Assuming for now 'approved'=True is 'Correct', 'approved'=False is 'Wrong'
+        # If there's an 'In Progress' status, we'd need another column. 
+        # For now let's use Decision as status.
+        status_map = {"Correct": 0, "Wrong": 0, "In Progress": 0}
+        for r in all_data:
+            label = "Correct" if r['approved'] else "Wrong"
+            status_map[label] += 1
+        
+        status_distribution = [{"status": k, "count": v} for k, v in status_map.items()]
+
+        # 2. Team Distribution (Treemap)
+        team_map = {}
+        for r in all_data:
+            t = r['team'] or 'Unknown'
+            team_map[t] = team_map.get(t, 0) + 1
+        team_distribution = [{"team": k, "count": v} for k, v in team_map.items()]
+
+        # 3. Auditor Leaderboard
+        auditor_map = {}
+        for r in all_data:
+            a = r['auditor_name'] or 'Unknown'
+            auditor_map[a] = auditor_map.get(a, 0) + 1
+        auditor_leaderboard = sorted([{"name": k, "count": v} for k, v in auditor_map.items()], key=lambda x: x['count'], reverse=True)[:10]
+
+        # 4. Monthly Trend
+        # Group by Month-Year
+        month_map = {}
+        for r in all_data:
+            if r['audit_date']:
+                m_key = r['audit_date'].strftime('%b') # Jan, Feb ...
+                # We also need indexing for sort
+                m_idx = r['audit_date'].month
+                if m_key not in month_map:
+                    month_map[m_key] = {"month": m_key, "total": 0, "approved": 0, "sort_idx": m_idx}
+                month_map[m_key]["total"] += 1
+                if r['approved']: month_map[m_key]["approved"] += 1
+        
+        monthly_trend = sorted(month_map.values(), key=lambda x: x['sort_idx'])
+        for m in monthly_trend:
+            m['pass_ratio'] = (m['approved'] / m['total'] * 100) if m['total'] > 0 else 0
+
+        # 5. Recent Audit Feed
+        query_recent = f"""
+            SELECT 
+                dr.task_number as task_no,
+                d.drawing_no as task_name,
+                u_rev.name as auditor_name,
+                CASE WHEN dr.approved = TRUE THEN 'Correct' ELSE 'Wrong' END as decision
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
+            {where_clause}
+            ORDER BY dr.reviewed_date DESC
+            LIMIT 10
+        """
+        cursor.execute(query_recent, tuple(where_params))
+        recent_audits = cursor.fetchall()
+
+        return jsonify({
+            "kpis": {
+                "totalAudits": total_audits,
+                "passRatio": round(pass_ratio, 1),
+                "pendingReviews": 0 # Placeholder if no specific column
+            },
+            "statusDistribution": status_distribution,
+            "teamDistribution": team_distribution,
+            "auditorLeaderboard": auditor_leaderboard,
+            "monthlyTrend": monthly_trend,
+            "recentAudits": recent_audits
+        })
+
+    except Exception as e:
+        print(f"Error in overview_dashboard: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()

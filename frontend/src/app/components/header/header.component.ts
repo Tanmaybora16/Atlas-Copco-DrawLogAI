@@ -34,8 +34,10 @@ export class HeaderComponent implements OnInit {
     this.authService.logout();
     this.loggedInUser = null;
     this.userRole = undefined;
-    this.router.navigate(['/admin-login']);
     this.showDropdown = false;
+    this.router.navigate(['/admin-login']).then(() => {
+      window.location.reload();
+    });
   }
 
   isLoggedIn(): boolean {

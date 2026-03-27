@@ -14,6 +14,7 @@ export class ReportTableComponent implements OnChanges {
   @Input() reportType!: 'employeeReport' | 'drawingReport' | 'taskReport';
   @Input() employeeId?: string;
   @Input() drawingId?: string;
+  @Input() taskNumber?: string;
   @Input() startDate?: string;
   @Input() endDate?: string;
   @Input() selectedTeam: string[] = [];
@@ -43,6 +44,7 @@ export class ReportTableComponent implements OnChanges {
     if (
       changes['employeeId'] ||
       changes['drawingId'] ||
+      changes['taskNumber'] ||
       changes['reportType'] ||
       changes['startDate'] ||
       changes['endDate'] ||
@@ -60,6 +62,9 @@ export class ReportTableComponent implements OnChanges {
 
     if (this.employeeId) params = params.set('employeeId', this.employeeId);
     if (this.drawingId) params = params.set('drawingId', this.drawingId);
+    if (this.reportType === 'taskReport' && this.taskNumber) {
+      params = params.set('task_number', this.taskNumber);
+    }
     if (this.startDate) {
       let formattedStart = new Date(this.startDate)
         .toISOString()
@@ -204,6 +209,7 @@ export class ReportTableComponent implements OnChanges {
   }
 
   columnMapping: { [key: string]: string } = {
+    'Team': 'Team',
     'Drawing ID': 'Drawing_ID',
     'Revision Number': 'Revision_num',
     'Error Codes': 'Error_codes',

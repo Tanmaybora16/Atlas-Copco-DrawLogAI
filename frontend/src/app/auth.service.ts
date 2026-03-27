@@ -15,8 +15,8 @@ interface SessionState {
 export class AuthService {
   // Use sessionStorage so the session dies when the tab/window closes.
   private readonly KEY = 'session';
-  // Hard session cap: 1 hour
-  private readonly SESSION_MAX_AGE_MS = 60 * 60 * 1000;
+  // Hard session cap: 8 hours
+  private readonly SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
   /** Call this after a successful login */
   login(username: string, accessType?: AccessType, fullName?: string): void {
