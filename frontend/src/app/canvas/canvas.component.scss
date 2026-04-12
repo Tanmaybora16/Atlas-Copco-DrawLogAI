@@ -17,12 +17,14 @@
 }
 
 .toolbar {
-  position: sticky; /* stays visible when page scrolls */
+  position: sticky;
+  /* stays visible when page scrolls */
   top: 0;
   z-index: 50;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;    /* <-- vertical centering for everything inside */
+  align-items: center;
+  /* <-- vertical centering for everything inside */
 
   gap: 12px;
   padding: 10px 26px;
@@ -70,8 +72,10 @@
 }
 
 .tool-group button.active img {
-  filter: brightness(0) invert(1); /* make the icon white */
+  filter: brightness(0) invert(1);
+  /* make the icon white */
 }
+
 .tool-group button img {
   transition: filter 0.2s ease;
 }
@@ -116,6 +120,7 @@
 .tool-group input[type="color"]::-webkit-color-swatch-wrapper {
   padding: 4px;
 }
+
 .tool-group input[type="color"]::-webkit-color-swatch {
   border: 0;
   border-radius: 6px;
@@ -144,9 +149,12 @@
 
 
 .pagination-floating {
-  position: fixed;          /* stays in place */
-  bottom: 20px;             /* distance from bottom */
-  right: 20px;              /* distance from right */
+  position: fixed;
+  /* stays in place */
+  bottom: 20px;
+  /* distance from bottom */
+  right: 20px;
+  /* distance from right */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -154,9 +162,11 @@
   background: #ffffff;
   border: 1px solid #d7d7dc;
   border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  z-index: 100;             /* above canvas */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  /* above canvas */
 }
+
 .pagination-floating button {
   display: inline-flex;
   align-items: center;
@@ -168,6 +178,7 @@
   border-radius: 8px;
   cursor: pointer;
 }
+
 .pagination-floating span {
   font-size: 14px;
   color: #4b5563;
@@ -179,7 +190,8 @@
   position: relative;
   flex: 1;
   display: flex;
-  justify-content: center; /* center canvases horizontally */
+  justify-content: center;
+  /* center canvases horizontally */
   align-items: flex-start;
   padding: 16px;
   background: #f2f3f5;
@@ -370,48 +382,66 @@
   position: fixed;
   top: 40px;
   left: 50%;
-  transform: translateX(-50%);    /* for top-right corner */
-  margin: 0;       /* remove margins so it doesn't shift layout */
+  transform: translateX(-50%);
+  /* for top-right corner */
+  margin: 0;
+  /* remove margins so it doesn't shift layout */
   padding: 8px 12px;
   border-radius: 8px;
   background: #ecfeff;
   color: #075985;
   border: 1px solid #a5f3fc;
   font-size: 14px;
-  z-index: 100; /* higher than toolbar */
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  z-index: 100;
+  /* higher than toolbar */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .next-step {
-  margin-left: auto;              /* push it to the far right if toolbar uses flex */
+  margin-left: auto;
+  /* push it to the far right if toolbar uses flex */
 }
 
 .next-step button {
-  display: flex;                  /* align text + icon nicely */
-  align-items: center;            /* vertically center text and icon */
-  gap: 8px;                       /* space between text and icon */
-  background-color: #0ea5e9;      /* blue background */
-  color: #ffffff;                 /* white text */
-  border: none;                   /* remove default border */
-  padding: 10px 14px;              /* padding for click area */
-  border-radius: 4px;             /* slight rounded corners */
-  cursor: pointer;                /* pointer cursor */
+  display: flex;
+  /* align text + icon nicely */
+  align-items: center;
+  /* vertically center text and icon */
+  gap: 8px;
+  /* space between text and icon */
+  background-color: #0ea5e9;
+  /* blue background */
+  color: #ffffff;
+  /* white text */
+  border: none;
+  /* remove default border */
+  padding: 10px 14px;
+  /* padding for click area */
+  border-radius: 4px;
+  /* slight rounded corners */
+  cursor: pointer;
+  /* pointer cursor */
   transition: background 0.2s ease;
 }
 
 .next-step button:hover {
-  background-color: #0284c7;      /* slightly darker on hover */
+  background-color: #0284c7;
+  /* slightly darker on hover */
 }
 
 .next-step span {
-  font-weight: 500;               /* make text slightly bold */
+  font-weight: 500;
+  /* make text slightly bold */
 }
 
 .next-step button img {
-  width: 16px;                    /* set a consistent size */
+  width: 16px;
+  /* set a consistent size */
   height: 16px;
-  filter: brightness(0) invert(1);/* turn dark icon to white */
-  display: block;                 /* remove inline gap */
+  filter: brightness(0) invert(1);
+  /* turn dark icon to white */
+  display: block;
+  /* remove inline gap */
 }
 
 
@@ -421,29 +451,32 @@
     gap: 8px;
     padding: 8px;
   }
+
   .tool-group {
     gap: 6px;
     padding: 4px;
   }
+
   .tool-group button {
     padding: 6px 8px;
     height: 34px;
   }
+
   .tool-group input[type="color"],
   .tool-group select {
     height: 34px;
   }
-  
+
   .annotation.stamp-annotation {
     width: fit-content;
     max-width: 220px;
     padding: 5px 8px;
   }
-  
+
   .stamp-header {
     font-size: 12px;
   }
-  
+
   .stamp-details {
     font-size: 9px;
   }
@@ -455,11 +488,15 @@
   gap: 12px;
   padding: 10px 12px;
   margin: 8px 0 14px;
-  background: #f8fafc; /* slate-50 */
-  border: 1px solid #e5e7eb; /* gray-200 */
+  background: #f8fafc;
+  /* slate-50 */
+  border: 1px solid #e5e7eb;
+  /* gray-200 */
   border-radius: 12px;
-  width: max-content;       /* or fit-content */
-  margin: 8px auto 14px;    /* center the bar itself */
+  width: max-content;
+  /* or fit-content */
+  margin: 8px auto 14px;
+  /* center the bar itself */
   justify-content: center;
 }
 
@@ -469,7 +506,8 @@
   gap: 2px;
   padding: 8px 12px;
   background: #ffffff;
-  border: 1px solid #e5e7eb; /* gray-200 */
+  border: 1px solid #e5e7eb;
+  /* gray-200 */
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   min-width: 180px;
@@ -482,13 +520,15 @@
   line-height: 1;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #6b7280; /* gray-500 */
+  color: #6b7280;
+  /* gray-500 */
 }
 
 .meta-value {
   font-size: 14px;
   font-weight: 600;
-  color: #111827; /* gray-900 */
+  color: #111827;
+  /* gray-900 */
 }
 
 @media (max-width: 640px) {
@@ -496,6 +536,7 @@
     flex-wrap: wrap;
     gap: 8px;
   }
+
   .meta-pill {
     min-width: unset;
     flex: 1 1 auto;

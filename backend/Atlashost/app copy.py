@@ -3127,6 +3127,23 @@ def download_annotated_pdf(drawing_id, revision):
                     stamps_added += 1
                     print(f"✅ Added {stamp_type} stamp on page {page_index+1}")
                     
+                elif ann_type == "pen":
+                    points = ann.get("points", [])
+                    if len(points) > 1:
+                        color_hex = ann.get("color", "#000000").lstrip("#")
+                        if len(color_hex) == 6:
+                            color = (int(color_hex[0:2], 16)/255, int(color_hex[2:4], 16)/255, int(color_hex[4:6], 16)/255)
+                        else:
+                            color = (0,0,0)
+                        width = float(ann.get("strokeWidth", 4))
+                        s = page.new_shape()
+                        pt_list = [fitz.Point(rect.x0 + (x_norm + pt.get("x", 0.0)) * rect.width, 
+                                              rect.y0 + (y_norm + pt.get("y", 0.0)) * rect.height) for pt in points]
+                        s.draw_polyline(pt_list)
+                        s.finish(color=color, fill=None, width=width, lineCap=1, lineJoin=1, closePath=False)
+                        s.commit()
+                        annotations_added += 1
+                        print(f"✅ Added pen stroke on page {page_index+1}")
                 else:
                     # Handle text annotation (existing code)
                     text = str(ann.get("text") or "").strip()
