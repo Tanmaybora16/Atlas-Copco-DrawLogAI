@@ -1,6 +1,6 @@
 <div class="charts-container">
-  <!-- ✅ Top Errors Chart -->
-  <div id="error-chart">
+  <!-- ✅ Top Errors Chart (Hidden for Task Reports) -->
+  <div id="error-chart" *ngIf="reportType === 'employeeReport' || reportType === 'drawingReport'">
     <apx-chart
       *ngIf="(chartOptionsErrors?.series || []).length > 0"
       [title]="chartOptionsErrors.title!"
@@ -32,6 +32,23 @@
     ></apx-chart>
     <p class="no-data" *ngIf="(chartOptionsDrawings?.series || []).length === 0">
       No drawing data to display.
+    </p>
+  </div>
+
+  <!-- ✅ Task Distribution Chart (Pie Chart) -->
+  <div id="task-distribution-chart" *ngIf="reportType === 'taskReport'">
+    <apx-chart
+      *ngIf="(chartOptionsTasks?.series || []).length > 0"
+      [title]="chartOptionsTasks.title!"
+      [series]="chartOptionsTasks.series!"
+      [chart]="chartOptionsTasks.chart!"
+      [labels]="chartOptionsTasks.labels!"
+      [dataLabels]="chartOptionsTasks.dataLabels!"
+      [responsive]="chartOptionsTasks.responsive!"
+      [legend]="chartOptionsTasks.legend!"
+    ></apx-chart>
+    <p class="no-data" *ngIf="(chartOptionsTasks?.series || []).length === 0">
+      No task data to display.
     </p>
   </div>
 

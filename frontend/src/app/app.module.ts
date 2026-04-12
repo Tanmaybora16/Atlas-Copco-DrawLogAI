@@ -1,4 +1,4 @@
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { LineChartComponent } from './components/line-chart/line-chart.component';
@@ -25,6 +25,8 @@ import { RequestsComponent } from './requests/requests.component';
 import { CanvasComponent } from './canvas/canvas.component';
 import { FooterComponent } from './footer/footer.component';
 import { StructureComponent } from './structure/structure.component';
+import { AuthInterceptor } from './auth.interceptor';
+import { ReportDashboardComponent } from './components/report-dashboard/report-dashboard.component';
 
 
 @NgModule({
@@ -48,7 +50,8 @@ import { StructureComponent } from './structure/structure.component';
     RequestsComponent,
     CanvasComponent,
     FooterComponent,
-    StructureComponent
+    StructureComponent,
+    ReportDashboardComponent
 
   ],
   imports: [
@@ -58,7 +61,10 @@ import { StructureComponent } from './structure/structure.component';
     NgApexchartsModule,
     HttpClientModule,
   ],
-  providers: [AuthService],
+  providers: [
+    AuthService,
+    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }
+  ],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

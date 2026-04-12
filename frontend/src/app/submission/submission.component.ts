@@ -451,7 +451,7 @@ export class SubmissionComponent implements OnInit {
         .join('');
       html += `
         <div class="sum-section">
-          <div class="sum-title sum-title-new">✅ New Drawings Added (${newFiles.length})</div>
+          <div class="sum-title sum-title-new"><span style="color:#16a34a;font-weight:bold;">✓</span> New Drawings Added (${newFiles.length})</div>
           <div class="sum-list">${rows}</div>
         </div>`;
     }

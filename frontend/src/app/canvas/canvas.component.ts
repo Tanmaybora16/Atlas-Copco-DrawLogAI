@@ -11,8 +11,9 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import * as pdfjsLib from 'pdfjs-dist';
 import { environment } from 'src/environments/environment';
+import { AuthService } from '../auth.service';
 
-type CanvasMode = 'view' | 'add-text' | 'select' | 'add-stamp';
+type CanvasMode = 'view' | 'add-text' | 'select' | 'add-stamp' | 'pen';
 
 export interface Annotation {
   id: string;
@@ -25,9 +26,12 @@ export interface Annotation {
   updatedAt?: string;
   color?: string;
   fontSize?: number;
-  type?: 'text' | 'stamp';
-  stampType?: 'reviewed' | 'approved' | 'rejected';
+  type?: 'text' | 'stamp' | 'pen';
+  stampType?: 'reviewed' | 'correct' | 'wrong';
   reviewDate?: string;
+  reviewerName?: string;
+  points?: {x: number, y: number}[];
+  strokeWidth?: number;
 }
 
 @Component({
@@ -74,12 +78,17 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   fontSize = 16;
 
   // Stamp properties
-  selectedStampType: 'reviewed' | 'approved' | 'rejected' = 'reviewed';
+  selectedStampType: 'reviewed' | 'correct' | 'wrong' = 'reviewed';
 
   // Dragging state
   private isDragging = false;
   private dragAnnotationId: string | null = null;
   private dragOffset = { x: 0, y: 0 }; // normalized offset
+
+  // Pen state
+  isDrawingPen = false;
+  currentPenId: string | null = null;
+  currentPenPoints: {x: number, y: number}[] = [];
 
   // HUD
   statusMessage = '';
@@ -87,11 +96,15 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
   // Internal
   private pdfContext!: CanvasRenderingContext2D;
+  // Canvas dimensions (updated after each render to trigger annotation repositioning)
+  canvasWidth = 0;
+  canvasHeight = 0;
 
   constructor(
     private router: Router,
     private route: ActivatedRoute,
-    private http: HttpClient
+    private http: HttpClient,
+    private authService: AuthService
   ) {
     // PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -187,12 +200,15 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
       await page.render({ canvasContext: this.pdfContext, viewport }).promise;
 
-      // Resize overlay to match canvas
+      // Resize overlay to match canvas and update stored dimensions for annotation positioning
       const layer = this.annotationLayerRef?.nativeElement;
       if (layer) {
         layer.style.width = `${viewport.width}px`;
         layer.style.height = `${viewport.height}px`;
       }
+      // Update stored dimensions so Angular CD repositions all annotations
+      this.canvasWidth = viewport.width;
+      this.canvasHeight = viewport.height;
     } catch (e) {
       console.error('Error rendering PDF page:', e);
       this.renderMockPage();
@@ -217,6 +233,8 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       layer.style.width = `${W}px`;
       layer.style.height = `${H}px`;
     }
+    this.canvasWidth = W;
+    this.canvasHeight = H;
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -229,7 +247,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     this.editingAnnotationId = null;
   }
 
-  setStampType(type: 'reviewed' | 'approved' | 'rejected'): void {
+  setStampType(type: 'reviewed' | 'correct' | 'wrong'): void {
     this.selectedStampType = type;
   }
 
@@ -284,6 +302,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       type: 'stamp',
       stampType: this.selectedStampType,
       reviewDate: dateStr,
+      reviewerName: this.authService.getLoggedInUserFullName() || 'Unknown',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -385,6 +404,15 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     }
   }
 
+  undoLastAnnotation(): void {
+    if (this.annotations.length > 0) {
+      this.annotations.pop();
+      this.toast('Last annotation removed.');
+    } else {
+      this.toast('Nothing to undo.');
+    }
+  }
+
   // ───────────────────────────────────────────────────────────────────────────
   // Zoom & navigation
   // ───────────────────────────────────────────────────────────────────────────
@@ -449,13 +477,14 @@ export class CanvasComponent implements AfterViewInit, OnInit {
   // Positioning helper
   // ───────────────────────────────────────────────────────────────────────────
   getAnnotationStyle(a: Annotation): any {
-    const layer = this.annotationLayerRef?.nativeElement;
-    if (!layer) {
+    // Use stored canvas dimensions so Angular re-renders annotations on zoom changes
+    const w = this.canvasWidth;
+    const h = this.canvasHeight;
+    if (!w || !h) {
       return {};
     }
-    const rect = layer.getBoundingClientRect();
-    const left = a.x * rect.width;
-    const top = a.y * rect.height;
+    const left = a.x * w;
+    const top = a.y * h;
     const isSelected = a.id === this.selectedAnnotationId;
 
     // Different styling for stamps vs text annotations
@@ -463,16 +492,25 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       return {
         left: `${left}px`,
         top: `${top}px`,
+        transform: `scale(${this.scale})`,
+        transformOrigin: 'top left',
         border: isSelected ? '2px solid #0ea5e9' : 'none'
       };
-    } else {
-      // Text annotation styling
-      const color = a.color ?? this.textColor;
-      const fontSize = a.fontSize ?? this.fontSize;
+    } else if (a.type === 'pen') {
+      // Bounding box style for selection highlight when dragging
       return {
         left: `${left}px`,
         top: `${top}px`,
-        fontSize: `${fontSize}px`,
+        pointerEvents: 'none'  // selection is handled by svg polyline click
+      };
+    } else {
+      // Text annotation styling — scale font size with zoom
+      const color = a.color ?? this.textColor;
+      const baseFontSize = a.fontSize ?? this.fontSize;
+      return {
+        left: `${left}px`,
+        top: `${top}px`,
+        fontSize: `${baseFontSize * this.scale}px`,
         color,
         border: isSelected ? '1px solid #0ea5e9' : '1px solid transparent'
       };
@@ -573,6 +611,25 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
   @HostListener('document:mousemove', ['$event'])
   onDocumentMouseMove(event: MouseEvent): void {
+    if (this.mode === 'pen' && this.isDrawingPen && this.currentPenId) {
+      const layer = this.annotationLayerRef?.nativeElement;
+      if (!layer) return;
+      const rect = layer.getBoundingClientRect();
+      const xNorm = (event.clientX - rect.left) / rect.width;
+      const yNorm = (event.clientY - rect.top) / rect.height;
+
+      // Find the base x,y of the annotation
+      const ann = this.annotations.find(a => a.id === this.currentPenId);
+      if (ann) {
+        // We push point relative to the base x,y
+        this.currentPenPoints.push({ x: xNorm - ann.x, y: yNorm - ann.y });
+        this.annotations = this.annotations.map(a =>
+          a.id === this.currentPenId ? { ...a, points: [...this.currentPenPoints] } : a
+        );
+      }
+      return;
+    }
+
     if (!this.isDragging || !this.dragAnnotationId) {
       return;
     }
@@ -594,8 +651,55 @@ export class CanvasComponent implements AfterViewInit, OnInit {
 
   @HostListener('document:mouseup')
   onDocumentMouseUp(): void {
+    if (this.mode === 'pen' && this.isDrawingPen) {
+      this.isDrawingPen = false;
+      this.currentPenId = null;
+      return;
+    }
+
     this.isDragging = false;
     this.dragAnnotationId = null;
+  }
+
+  onAnnotationLayerMouseDown(event: MouseEvent): void {
+    if (this.mode === 'pen') {
+      const layer = this.annotationLayerRef?.nativeElement;
+      if (!layer) return;
+      const rect = layer.getBoundingClientRect();
+      const xNorm = (event.clientX - rect.left) / rect.width;
+      const yNorm = (event.clientY - rect.top) / rect.height;
+
+      this.isDrawingPen = true;
+      this.currentPenId = this.generateId();
+      this.currentPenPoints = [{ x: 0, y: 0 }]; // first point is relative 0,0
+
+      const penAnn: Annotation = {
+        id: this.currentPenId,
+        documentId: this.drawingNumber,
+        page: this.pageNum,
+        x: xNorm,
+        y: yNorm,
+        text: '',
+        type: 'pen',
+        points: this.currentPenPoints,
+        color: this.textColor,
+        strokeWidth: this.fontSize / 4, // use font size to determine stroke width somewhat
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      this.annotations.push(penAnn);
+      event.preventDefault();
+    }
+  }
+
+  getPolylinePoints(a: Annotation): string {
+    const w = this.canvasWidth;
+    const h = this.canvasHeight;
+    if (!a.points || w === 0 || h === 0) return '';
+    // SVG points need to be absolute relative to the SVG container (which spans the whole canvas)
+    // The relative points + the base position * canvas dimension
+    return a.points.map(pt => `${(a.x + pt.x) * w},${(a.y + pt.y) * h}`).join(' ');
   }
 
   // ───────────────────────────────────────────────────────────────────────────
