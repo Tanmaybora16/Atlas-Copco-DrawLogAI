@@ -1,0 +1,143 @@
+<div class="dashboard-wrapper">
+  <div class="dashboard-header">
+    <h1>AUDIT OVERVIEW DASHBOARD</h1>
+    <p class="subtitle">Real-time aggregate data across all teams and auditors</p>
+  </div>
+
+  <div *ngIf="loading" class="loader-container">
+    <div class="spinner"></div>
+    <p>Loading Analytics...</p>
+  </div>
+
+  <div *ngIf="error" class="error-container">
+    <p>{{ error }}</p>
+  </div>
+
+  <div *ngIf="!loading && data" class="dashboard-grid">
+    
+    <!-- KPI Section -->
+    <div class="kpi-row">
+      <div class="card kpi-card">
+        <div class="card-header">
+          <h3>TOTAL AUDIT GAUGE (Total Tasks Audited)</h3>
+        </div>
+        <div class="card-content kpi-content">
+          <div class="kpi-value">
+            <span class="number">{{ data.kpis.totalAudits }}</span>
+            <span class="label">Total number of tasks audited.</span>
+          </div>
+          <div class="kpi-chart" id="gauge-total">
+            <apx-chart
+              [series]="gaugeTotalOptions.series!"
+              [chart]="gaugeTotalOptions.chart!"
+              [plotOptions]="gaugeTotalOptions.plotOptions!"
+              [fill]="gaugeTotalOptions.fill!"
+              [labels]="gaugeTotalOptions.labels!"
+            ></apx-chart>
+          </div>
+        </div>
+      </div>
+
+      <div class="card kpi-card">
+        <div class="card-header">
+          <h3>AVERAGE QUALITY SCORE GAUGE (Overall Pass Ratio %)</h3>
+        </div>
+        <div class="card-content kpi-content">
+          <div class="kpi-value">
+            <span class="number quality">{{ data.kpis.passRatio }}%</span>
+            <span class="label">Average Pass Ratio across all teams.</span>
+          </div>
+          <div class="kpi-chart" id="gauge-quality">
+            <apx-chart
+              [series]="gaugeQualityOptions.series!"
+              [chart]="gaugeQualityOptions.chart!"
+              [plotOptions]="gaugeQualityOptions.plotOptions!"
+              [fill]="gaugeQualityOptions.fill!"
+            ></apx-chart>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Middle Charts Row -->
+    <div class="charts-row">
+      <div class="card treemap-card">
+          <apx-chart
+            [series]="treemapOptions.series!"
+            [chart]="treemapOptions.chart!"
+            [title]="treemapOptions.title!"
+            [colors]="treemapOptions.colors!"
+          ></apx-chart>
+      </div>
+
+      <div class="card status-card">
+          <apx-chart
+            [series]="statusOptions.series!"
+            [chart]="statusOptions.chart!"
+            [plotOptions]="statusOptions.plotOptions!"
+            [xaxis]="statusOptions.xaxis!"
+            [dataLabels]="statusOptions.dataLabels!"
+            [title]="statusOptions.title!"
+            [colors]="statusOptions.colors!"
+          ></apx-chart>
+      </div>
+
+      <div class="card leaderboard-card">
+          <apx-chart
+            [series]="leaderboardOptions.series!"
+            [chart]="leaderboardOptions.chart!"
+            [plotOptions]="leaderboardOptions.plotOptions!"
+            [xaxis]="leaderboardOptions.xaxis!"
+            [title]="leaderboardOptions.title!"
+            [legend]="leaderboardOptions.legend!"
+          ></apx-chart>
+      </div>
+    </div>
+
+    <!-- Bottom Row (Trend & Table) -->
+    <div class="bottom-row">
+      <div class="card trend-card">
+        <apx-chart
+          [series]="trendOptions.series!"
+          [chart]="trendOptions.chart!"
+          [xaxis]="trendOptions.xaxis!"
+          [yaxis]="trendOptions.yaxis!"
+          [stroke]="trendOptions.stroke!"
+          [markers]="trendOptions.markers!"
+          [dataLabels]="trendOptions.dataLabels!"
+          [title]="trendOptions.title!"
+        ></apx-chart>
+      </div>
+
+      <div class="card table-card">
+        <div class="card-header">
+          <h3>RECENT AUDIT FEED (SUMMARY TABLE)</h3>
+        </div>
+        <div class="recent-table-wrapper">
+          <table class="recent-table">
+            <thead>
+              <tr>
+                <th>Task #</th>
+                <th>Drawing Name</th>
+                <th>Auditor Name</th>
+                <th>Final Decision</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let audit of data.recentAudits">
+                <td>{{ audit.task_no }}</td>
+                <td class="task-name">{{ audit.task_name }}</td>
+                <td>{{ audit.auditor_name }}</td>
+                <td class="decision" [class.wrong]="audit.decision === 'Wrong'">
+                  <span class="decision-icon"></span>
+                  {{ audit.decision }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

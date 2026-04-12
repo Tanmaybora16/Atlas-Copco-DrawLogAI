@@ -55,6 +55,7 @@
     <table
       class="styled-table"
       *ngIf="
+        reportType === 'taskReport' ||
         (reportType === 'employeeReport' && employeeId) ||
         (reportType === 'drawingReport' && drawingId)
       "

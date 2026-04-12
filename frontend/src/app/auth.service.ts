@@ -4,6 +4,7 @@ type AccessType = 'HR' | 'Employee';
 
 interface SessionState {
   username: string;
+  fullName?: string;
   accessType?: AccessType;
   loginTime: number; // epoch ms
 }
@@ -14,13 +15,14 @@ interface SessionState {
 export class AuthService {
   // Use sessionStorage so the session dies when the tab/window closes.
   private readonly KEY = 'session';
-  // Hard session cap: 1 hour
-  private readonly SESSION_MAX_AGE_MS = 60 * 60 * 1000;
+  // Hard session cap: 8 hours
+  private readonly SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
   /** Call this after a successful login */
-  login(username: string, accessType?: AccessType): void {
+  login(username: string, accessType?: AccessType, fullName?: string): void {
     const state: SessionState = {
       username: username.trim(),
+      fullName: fullName?.trim() || username.trim(),
       accessType,
       loginTime: Date.now()
     };
@@ -50,6 +52,12 @@ export class AuthService {
   getLoggedInUser(): string | null {
     const s = this.getState();
     return s?.username ?? null;
+  }
+
+  /** Full name of the current session user (falls back to username if not set) */
+  getLoggedInUserFullName(): string | null {
+    const s = this.getState();
+    return s?.fullName ?? s?.username ?? null;
   }
 
   /** Access type (HR | Employee) of the current session (or undefined) */

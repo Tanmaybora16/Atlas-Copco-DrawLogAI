@@ -41,6 +41,9 @@
       <button (click)="setMode('add-stamp')" [class.active]="mode === 'add-stamp'" title="Add stamp">
         <img src="assets/stamp.svg" alt="" />
       </button>
+      <button (click)="setMode('pen')" [class.active]="mode === 'pen'" title="Draw Freehand">
+        <img src="assets/pen-tool.svg" alt="Pen" onerror="this.src='assets/edit.svg'" />
+      </button>
       <button (click)="setMode('select')" [class.active]="mode === 'select'" title="Select">
         <img src="assets/selection.svg" alt="" />
       </button>
@@ -53,13 +56,13 @@
     <div class="tool-group" *ngIf="mode === 'add-stamp'">
       <select [value]="selectedStampType" (change)="setStampType($any($event.target).value)" title="Stamp Type">
         <option value="reviewed">Reviewed</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
+        <option value="correct">Correct (✓)</option>
+        <option value="wrong">Wrong (✗)</option>
       </select>
     </div>
 
-    <!-- Text style -->
-    <div class="tool-group" *ngIf="mode === 'add-text'">
+    <!-- Text & Pen style -->
+    <div class="tool-group" *ngIf="mode === 'add-text' || mode === 'pen'">
       <input type="color" [value]="textColor" (change)="setColor($event)" title="Text Color" />
       <select [value]="fontSize" (change)="setFontSize($event)" title="Font Size">
         <option value="12">12px</option>
@@ -84,6 +87,9 @@
 
     <!-- Persistence -->
     <div class="tool-group">
+      <button (click)="undoLastAnnotation()" title="Undo Last">
+        <img src="assets/undo.svg" alt="Undo" onerror="this.src='assets/delete.svg'" />
+      </button>
       <button (click)="saveAnnotations()" title="Save Annotations">
         <img src="assets/save.svg" alt="" />
       </button>
@@ -122,18 +128,35 @@
   </div>
 
   <div class="canvas-container"
-    [ngClass]="{'select-mode': mode === 'select', 'add-text-mode': mode === 'add-text', 'add-stamp-mode': mode === 'add-stamp'}">
+    [ngClass]="{'select-mode': mode === 'select', 'add-text-mode': mode === 'add-text', 'add-stamp-mode': mode === 'add-stamp', 'pen-mode': mode === 'pen'}">
     <div class="page-wrapper">
       <canvas #pdfCanvas class="pdf-canvas"></canvas>
-      <div #annotationLayer class="annotation-layer" (click)="onPdfClick($event)">
-        <!-- Text annotations -->
+      <div #annotationLayer class="annotation-layer" (click)="onPdfClick($event)" (mousedown)="onAnnotationLayerMouseDown($event)">
+        
+        <!-- Freehand Drawing SVG Layer -->
+        <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+          <ng-container *ngFor="let a of pageAnnotations">
+            <polyline *ngIf="a.type === 'pen'"
+                      [attr.points]="getPolylinePoints(a)"
+                      fill="none" 
+                      [attr.stroke]="a.id === selectedAnnotationId ? '#0ea5e9' : (a.color || textColor)" 
+                      [attr.stroke-width]="(a.strokeWidth || 4) * scale"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      style="pointer-events: visibleStroke; cursor: pointer;"
+                      (mousedown)="onAnnotationMouseDown(a, $event)"
+                      (click)="onAnnotationClick(a, $event)" />
+          </ng-container>
+        </svg>
+
+        <!-- Text/Stamp annotations -->
         <div *ngFor="let a of pageAnnotations" class="annotation" [ngClass]="{
             'selected': a.id === selectedAnnotationId,
             'text-annotation': a.type === 'text',
             'stamp-annotation': a.type === 'stamp',
             'stamp-reviewed': a.type === 'stamp' && a.stampType === 'reviewed',
-            'stamp-approved': a.type === 'stamp' && a.stampType === 'approved',
-            'stamp-rejected': a.type === 'stamp' && a.stampType === 'rejected'
+            'stamp-correct': a.type === 'stamp' && a.stampType === 'correct',
+            'stamp-wrong': a.type === 'stamp' && a.stampType === 'wrong'
           }" [ngStyle]="getAnnotationStyle(a)" (click)="onAnnotationClick(a, $event)"
           (mousedown)="onAnnotationMouseDown(a, $event)">
           <!-- Display text for text annotations -->
@@ -143,13 +166,19 @@
 
           <!-- Display stamp for stamp annotations -->
           <ng-container *ngIf="a.type === 'stamp'">
-            <div class="stamp-content">
+            <div class="stamp-content" *ngIf="a.stampType !== 'correct' && a.stampType !== 'wrong'">
               <div class="stamp-header">
                 {{ a.stampType?.toUpperCase() }}
               </div>
               <div class="stamp-details">
                 at {{ a.reviewDate }}
               </div>
+            </div>
+            <div class="stamp-icon-content stamp-icon-correct" *ngIf="a.stampType === 'correct'">
+              <img src="assets/check.svg" alt="Correct" class="stamp-svg-icon" />
+            </div>
+            <div class="stamp-icon-content stamp-icon-wrong" *ngIf="a.stampType === 'wrong'">
+              <img src="assets/cross.svg" alt="Wrong" class="stamp-svg-icon" />
             </div>
           </ng-container>
         </div>
