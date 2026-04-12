@@ -189,10 +189,8 @@
 .canvas-container {
   position: relative;
   flex: 1;
-  display: flex;
-  justify-content: center;
-  /* center canvases horizontally */
-  align-items: flex-start;
+  display: block;
+  text-align: center; /* center canvases horizontally */
   padding: 16px;
   background: #f2f3f5;
   overflow: auto;
@@ -200,6 +198,8 @@
 
 .page-wrapper {
   position: relative;
+  display: inline-block;
+  text-align: left; /* reset text alignment for inner content */
 }
 
 .pdf-canvas {
