@@ -118,7 +118,17 @@ export class ColumnChartComponent implements OnChanges {
           ],
           chart: { type: 'bar', height: 350, stacked: true },
           title: { text: 'Monthly Drawing Status', align: 'center' },
-          plotOptions: { bar: { dataLabels: { position: 'center' } } },
+          plotOptions: { 
+            bar: { 
+              dataLabels: { 
+                position: 'center',
+                total: {
+                  enabled: true,
+                  style: { color: '#000', fontSize: '13px', fontWeight: 600 }
+                }
+              } 
+            } 
+          },
           dataLabels: { enabled: true },
           xaxis: { categories: this.months },
           yaxis: { title: { text: 'Count' } },
