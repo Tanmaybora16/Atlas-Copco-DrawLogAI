@@ -152,12 +152,20 @@ export class ReportDashboardComponent implements OnChanges, OnInit {
       }
     };
 
-    // 3. Team Treemap
+    // 3. Team Contribution (formerly Treemap)
     this.treemapOptions = {
       series: [{
-        data: this.data.teamDistribution.map((t: any) => ({ x: t.team, y: t.count }))
+        name: 'Contribution',
+        data: this.data.teamDistribution.map((t: any) => t.count)
       }],
-      chart: { type: 'treemap', height: 350, toolbar: { show: false } },
+      chart: { type: 'bar', height: 350, toolbar: { show: false } },
+      plotOptions: { bar: { columnWidth: '45%', distributed: true } },
+      dataLabels: { enabled: true },
+      legend: { show: false },
+      xaxis: {
+        categories: this.data.teamDistribution.map((t: any) => t.team),
+        labels: { style: { fontSize: '12px' } }
+      },
       title: { text: 'TEAM CONTRIBUTION', align: 'left', style: { fontSize: '14px', color: '#666' } },
       colors: ['#2E93fA', '#66DA26', '#546E7A', '#E91E63', '#FF9800']
     };
