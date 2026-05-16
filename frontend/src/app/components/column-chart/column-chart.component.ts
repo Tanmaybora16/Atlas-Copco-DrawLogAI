@@ -116,7 +116,7 @@ export class ColumnChartComponent implements OnChanges {
             { name: 'Approved', data: approvedData },
             { name: 'Rejected', data: rejectedData },
           ],
-          chart: { type: 'bar', height: 350 },
+          chart: { type: 'bar', height: 350, stacked: true },
           title: { text: 'Monthly Drawing Status', align: 'center' },
           plotOptions: { bar: { dataLabels: { position: 'center' } } },
           dataLabels: { enabled: true },
