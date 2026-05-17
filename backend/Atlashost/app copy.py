@@ -2458,13 +2458,13 @@ def error_summary():
 
 
 # Submission page start .............
-def extract_drawing_id_from_name(filename: str) -> str | None:
+def extract_drawing_id_from_name(filename: str, allow_special_case: bool = False) -> str | None:
     """
     Accept any PDF whose name starts with exactly 10 digits.
     '7058609753-01.pdf'    -> 'DR_7058609753'
     '7058609753.pdf'       -> 'DR_7058609753'
     '7058609753 desc.pdf'  -> 'DR_7058609753'
-    'SomeName.pdf'         -> None  (does NOT start with 10 digits)
+    'SomeName.pdf'         -> None  (does NOT start with 10 digits, unless allow_special_case is True)
     """
     if not filename:
         return None
@@ -2472,6 +2472,12 @@ def extract_drawing_id_from_name(filename: str) -> str | None:
     base = filename.rsplit('/', 1)[-1]
     base = base.rsplit('\\', 1)[-1]  # Windows paths too
     base = base.rsplit('.', 1)[0]    # remove .pdf
+    
+    if allow_special_case:
+        if base.startswith("DR_"):
+            return base
+        return f"DR_{base}"
+
     # First 10 chars must ALL be digits
     if len(base) < 10 or not base[:10].isdigit():
         return None
@@ -2576,6 +2582,7 @@ def submit_batch():
         drawing_type = (request.form.get('drawing_type') or '').strip()
         task_number  = (request.form.get('task_number') or '').strip()
         comments     = (request.form.get('comments') or '').strip()
+        allow_special_case = (request.form.get('allow_special_case') == 'true')
 
         if not hasattr(g, 'db') or g.db is None:
             return jsonify({"success": False, "message": "DB connection failed"}), 500
@@ -2603,7 +2610,7 @@ def submit_batch():
                     if not f or not f.filename.lower().endswith('.pdf'):
                         continue
 
-                    drawing_no = extract_drawing_id_from_name(f.filename)
+                    drawing_no = extract_drawing_id_from_name(f.filename, allow_special_case)
                     if not drawing_no:
                         rejected.append(f.filename)
                         print(f"    REJECTED (bad name): {f.filename}")
