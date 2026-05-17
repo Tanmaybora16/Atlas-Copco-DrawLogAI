@@ -513,6 +513,33 @@ export class SubmissionComponent implements OnInit {
         this.resetFormState();
         this.selectedCreatorId = this.auth.getLoggedInUser?.() || '';
         if (this.selectedCreatorId) this.fetchCreatorDetails(this.selectedCreatorId);
+
+        // Show a final confirmation if they chose to discard the alphanumerical PDFs
+        if (hasRejected) {
+          const rejectedNames = rejected.join(', ');
+          const acceptedNames = originalFiles
+            .filter(f => !rejected.includes(f.name))
+            .map(f => f.name)
+            .join(', ');
+
+          if (results.length > 0) {
+            Swal.fire({
+              icon: 'info',
+              title: 'Action Confirmed',
+              text: `Standard PDFs (${acceptedNames}) have been successfully saved. The alphanumerical PDFs (${rejectedNames}) have been permanently skipped and discarded.`,
+              confirmButtonColor: '#2563eb',
+              confirmButtonText: 'Understood'
+            });
+          } else {
+            Swal.fire({
+              icon: 'info',
+              title: 'Action Confirmed',
+              text: `All alphanumerical PDFs (${rejectedNames}) have been skipped and discarded. Nothing was saved.`,
+              confirmButtonColor: '#2563eb',
+              confirmButtonText: 'Understood'
+            });
+          }
+        }
       }
     });
   }
