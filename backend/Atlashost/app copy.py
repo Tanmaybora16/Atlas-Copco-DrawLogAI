@@ -2234,8 +2234,21 @@ def overview_dashboard():
         team_map = {}
         for r in all_data:
             t = r['team'] or 'Unknown'
-            team_map[t] = team_map.get(t, 0) + 1
-        team_distribution = [{"team": k, "count": v} for k, v in team_map.items()]
+            if t not in team_map:
+                team_map[t] = {"accept": 0, "reject": 0}
+            if r['approved']:
+                team_map[t]["accept"] += 1
+            else:
+                team_map[t]["reject"] += 1
+        team_distribution = [
+            {
+                "team": k,
+                "accept": v["accept"],
+                "reject": v["reject"],
+                "count": v["accept"] + v["reject"]
+            }
+            for k, v in team_map.items()
+        ]
 
         # 3. Auditor Leaderboard
         auditor_map = {}

@@ -154,20 +154,40 @@ export class ReportDashboardComponent implements OnChanges, OnInit {
 
     // 3. Team Contribution (formerly Treemap)
     this.treemapOptions = {
-      series: [{
-        name: 'Contribution',
-        data: this.data.teamDistribution.map((t: any) => t.count)
-      }],
-      chart: { type: 'bar', height: 350, toolbar: { show: false } },
-      plotOptions: { bar: { columnWidth: '45%', distributed: true } },
+      series: [
+        {
+          name: 'Accept',
+          data: this.data.teamDistribution.map((t: any) => t.accept)
+        },
+        {
+          name: 'Reject',
+          data: this.data.teamDistribution.map((t: any) => t.reject)
+        }
+      ],
+      chart: { type: 'bar', height: 350, stacked: true, toolbar: { show: false } },
+      plotOptions: {
+        bar: {
+          columnWidth: '45%',
+          dataLabels: {
+            total: {
+              enabled: true,
+              style: {
+                fontSize: '12px',
+                fontWeight: 900,
+                color: '#333'
+              }
+            }
+          }
+        }
+      },
       dataLabels: { enabled: true },
-      legend: { show: false },
+      legend: { show: true, position: 'top', horizontalAlign: 'right' },
       xaxis: {
         categories: this.data.teamDistribution.map((t: any) => t.team),
         labels: { style: { fontSize: '12px' } }
       },
       title: { text: 'TEAM CONTRIBUTION', align: 'left', style: { fontSize: '14px', color: '#666' } },
-      colors: ['#2E93fA', '#66DA26', '#546E7A', '#E91E63', '#FF9800']
+      colors: ['#00E396', '#FF4560']
     };
 
     // 4. Status Distribution (Horizontal Bar)
