@@ -19,7 +19,7 @@
   </div>
 
   <!-- ✅ Approved vs Rejected Drawings Chart (Only for Employee Report) -->
-  <div id="drawings-chart" *ngIf="reportType === 'employeeReport'">
+  <div id="drawings-chart" *ngIf="reportType === 'employeeReport' && employeeId">
     <apx-chart
       *ngIf="(chartOptionsDrawings?.series || []).length > 0"
       [title]="chartOptionsDrawings.title!"
