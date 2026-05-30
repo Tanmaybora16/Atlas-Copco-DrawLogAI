@@ -448,10 +448,13 @@ iframe { border: none; }
 
   &[disabled] {
     cursor: not-allowed;
+    pointer-events: none;
 
     .action-icon {
       opacity: 0.2;
-      filter: grayscale(100%);
+      filter: grayscale(100%) !important;
+      transform: none !important;
+      pointer-events: none;
     }
   }
 }

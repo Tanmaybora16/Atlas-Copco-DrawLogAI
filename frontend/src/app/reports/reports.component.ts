@@ -62,7 +62,12 @@ export class ReportsComponent implements OnInit {
   }
 
   fetchEmployees() {
-    this.http.get<string[]>(`${environment.apiUrl}/api/employees-dropdown`).subscribe({
+    let params = new HttpParams();
+    if (this.selectedTeams && this.selectedTeams.length > 0) {
+      this.selectedTeams.forEach(t => params = params.append('team', t));
+    }
+
+    this.http.get<string[]>(`${environment.apiUrl}/api/employees-dropdown`, { params }).subscribe({
       next: (data) => {
         this.employees = data || [];
         this.filteredEmployees = [...this.employees];
@@ -126,6 +131,7 @@ export class ReportsComponent implements OnInit {
     }
     this.fetchTasks();
     this.fetchDrawings();
+    this.fetchEmployees();
   }
 
   togglePC(pc: string, event?: Event) {
@@ -146,12 +152,14 @@ export class ReportsComponent implements OnInit {
     this.selectedTeams = this.teams.map(t => t.name);
     this.fetchTasks();
     this.fetchDrawings();
+    this.fetchEmployees();
   }
 
   deselectAllTeams() {
     this.selectedTeams = [];
     this.fetchTasks();
     this.fetchDrawings();
+    this.fetchEmployees();
   }
 
   selectAllPCs() {
@@ -217,7 +225,7 @@ export class ReportsComponent implements OnInit {
     const value = (event.target as HTMLSelectElement).value;
     this.selectedReport = value as any;
 
-    this.showTeamDropdown = ['monthly', 'trend', 'passRatio', 'taskReport'].includes(this.selectedReport);
+    this.showTeamDropdown = ['monthly', 'trend', 'passRatio', 'taskReport', 'employeeReport', 'drawingReport'].includes(this.selectedReport);
     this.showPCDropdown = ['monthly', 'trend', 'passRatio'].includes(this.selectedReport);
     this.showEmployeeDropdown = this.selectedReport === 'employeeReport';
     this.showDrawingIdDropdown = this.selectedReport === 'drawingReport';
@@ -238,6 +246,7 @@ export class ReportsComponent implements OnInit {
     // Re-fetch dependent dropdown items with cleared team/date filters
     this.fetchTasks();
     this.fetchDrawings();
+    this.fetchEmployees();
   }
 
   filterEmployees() {

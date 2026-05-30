@@ -150,22 +150,40 @@ export class ReportChartsComponent implements OnChanges {
     if (this.endDate)   params = params.set('end_date',   this.normalizeDate(this.endDate));
 
     if (this.reportType === 'employeeReport') {
-      // Need both: top errors + monthly approved/rejected
-      forkJoin({
-        trend: this.http.get<any[]>(trendApiUrl, { params }).pipe(catchError(() => of([]))),
-        monthly: this.http.get<any>(drawingApiUrl, { params }).pipe(catchError(() => of({})))
-      }).subscribe({
-        next: ({ trend, monthly }) => {
-          this.updateEmployeeCharts(trend || [], monthly || {});
-          this.loading = false;
-        },
-        error: (err) => {
-          console.error('❌ Charts (employee) error:', err);
-          this.error = 'Failed to fetch data';
-          this.resetCharts();
-          this.loading = false;
-        }
-      });
+      if (this.employeeId) {
+        // Need both: top errors + monthly approved/rejected
+        forkJoin({
+          trend: this.http.get<any[]>(trendApiUrl, { params }).pipe(catchError(() => of([]))),
+          monthly: this.http.get<any>(drawingApiUrl, { params }).pipe(catchError(() => of({})))
+        }).subscribe({
+          next: ({ trend, monthly }) => {
+            this.updateEmployeeCharts(trend || [], monthly || {});
+            this.loading = false;
+          },
+          error: (err) => {
+            console.error('❌ Charts (employee) error:', err);
+            this.error = 'Failed to fetch data';
+            this.resetCharts();
+            this.loading = false;
+          }
+        });
+      } else {
+        // Only need top errors for team
+        this.http.get<any[]>(trendApiUrl, { params })
+          .pipe(catchError(() => of([])))
+          .subscribe({
+            next: (trend) => {
+              this.updateEmployeeCharts(trend || [], {});
+              this.loading = false;
+            },
+            error: (err) => {
+              console.error('❌ Charts (employee team) error:', err);
+              this.error = 'Failed to fetch data';
+              this.resetCharts();
+              this.loading = false;
+            }
+          });
+      }
     } else if (this.reportType === 'drawingReport') {
       // Only need: top errors for drawing
       this.http.get<any[]>(trendApiUrl, { params })

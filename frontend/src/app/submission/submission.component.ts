@@ -392,11 +392,12 @@ export class SubmissionComponent implements OnInit {
     this.submitBatch(form);
   }
 
-  private submitBatch(form: NgForm) {
+  private submitBatch(form: NgForm, isSpecialCase: boolean = false, filesToSubmit?: File[]) {
     this.isBusy = true;
 
     const fd = new FormData();
-    this.selectedFiles.forEach((f) => fd.append('pdfs', f, f.name));
+    const files = filesToSubmit || this.selectedFiles;
+    files.forEach((f) => fd.append('pdfs', f, f.name));
 
     fd.append('creator_emp_id', this.selectedCreatorId);
     fd.append('reviewer_emp_id', this.selectedReviewerId);
@@ -413,19 +414,18 @@ export class SubmissionComponent implements OnInit {
     fd.append('design_no', (form.value.designNo || '').toString());
     fd.append('client_revision_no', (form.value.revisionNo || '').toString());
 
+    if (isSpecialCase) {
+      fd.append('allow_special_case', 'true');
+    }
+
     this.http.post(`${this.API}/submit-batch`, fd).subscribe({
       next: (res: any) => {
         this.isBusy = false;
         const results: any[] = res?.results || [];
+        const rejected: string[] = res?.rejected || [];
 
-        // Reset form immediately
-        form.resetForm();
-        this.resetFormState();
-        this.selectedCreatorId = this.auth.getLoggedInUser?.() || '';
-        if (this.selectedCreatorId) this.fetchCreatorDetails(this.selectedCreatorId);
-
-        // Show summary popup
-        this.showSummaryPopup(results, res?.rejected);
+        // Show summary popup first, reset form after they click OK
+        this.showSummaryPopup(results, rejected, form, files);
       },
       error: (err) => {
         const msg = err?.error?.message || 'Submission failed. Please try again.';
@@ -435,7 +435,7 @@ export class SubmissionComponent implements OnInit {
     });
   }
 
-  private showSummaryPopup(results: any[], rejected?: string[]) {
+  private showSummaryPopup(results: any[], rejected: string[], form: NgForm, originalFiles: File[]) {
     const newFiles = results.filter((r: any) => r.type === 'new');
     const updatedFiles = results.filter((r: any) => r.type === 'updated');
 
@@ -491,13 +491,56 @@ export class SubmissionComponent implements OnInit {
 
     html += '</div>';
 
+    const hasRejected = rejected && rejected.length > 0;
+
     Swal.fire({
       icon: results.length > 0 ? 'success' : 'warning',
       title: 'Submission Complete',
       html,
       width: '580px',
+      showDenyButton: hasRejected,
+      denyButtonText: 'Special Case Accept',
       confirmButtonColor: '#2563eb',
       confirmButtonText: 'OK',
+    }).then((result: any) => {
+      if (result.isDenied && hasRejected) {
+        // User clicked Special Case Accept
+        const rejectedFiles = originalFiles.filter(f => rejected.includes(f.name));
+        this.submitBatch(form, true, rejectedFiles);
+      } else {
+        // User clicked OK or dismissed, reset form now
+        form.resetForm();
+        this.resetFormState();
+        this.selectedCreatorId = this.auth.getLoggedInUser?.() || '';
+        if (this.selectedCreatorId) this.fetchCreatorDetails(this.selectedCreatorId);
+
+        // Show a final confirmation if they chose to discard the alphanumerical PDFs
+        if (hasRejected) {
+          const rejectedNames = rejected.join(', ');
+          const acceptedNames = originalFiles
+            .filter(f => !rejected.includes(f.name))
+            .map(f => f.name)
+            .join(', ');
+
+          if (results.length > 0) {
+            Swal.fire({
+              icon: 'info',
+              title: 'Action Confirmed',
+              text: `Standard PDFs (${acceptedNames}) have been successfully saved. The alphanumerical PDFs (${rejectedNames}) have been permanently skipped and discarded.`,
+              confirmButtonColor: '#2563eb',
+              confirmButtonText: 'Understood'
+            });
+          } else {
+            Swal.fire({
+              icon: 'info',
+              title: 'Action Confirmed',
+              text: `All alphanumerical PDFs (${rejectedNames}) have been skipped and discarded. Nothing was saved.`,
+              confirmButtonColor: '#2563eb',
+              confirmButtonText: 'Understood'
+            });
+          }
+        }
+      }
     });
   }
 

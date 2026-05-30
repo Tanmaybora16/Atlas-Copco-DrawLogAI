@@ -191,8 +191,9 @@
             <img src="assets/download.svg" alt="Download" class="action-icon" (click)="downloadDrawing(i)" />
           </td>
           <td>
-            <img src="assets/delete.svg" alt="Delete" class="action-icon delete-icon"
-              (click)="deleteRequest(i, 'outgoing')" title="Delete request" />
+            <button class="icon-btn" [disabled]="true" [attr.aria-disabled]="true" title="Delete request">
+              <img src="assets/delete.svg" alt="Delete" class="action-icon delete-icon" />
+            </button>
           </td>
         </tr>
       </tbody>

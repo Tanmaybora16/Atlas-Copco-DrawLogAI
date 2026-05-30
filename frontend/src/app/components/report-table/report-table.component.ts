@@ -57,6 +57,16 @@ export class ReportTableComponent implements OnChanges {
   fetchTableData() {
     if (!this.reportType) return;
 
+    if (this.reportType === 'employeeReport' && !this.employeeId && (!this.selectedTeam || this.selectedTeam.length === 0)) {
+      this.tableData = [];
+      this.employeeSummary = {};
+      return;
+    }
+    if (this.reportType === 'drawingReport' && !this.drawingId && (!this.selectedTeam || this.selectedTeam.length === 0)) {
+      this.tableData = [];
+      return;
+    }
+
     const apiUrl = this.apiUrls[this.reportType];
     let params = new HttpParams().set('reportType', this.reportType);
 
@@ -93,8 +103,8 @@ export class ReportTableComponent implements OnChanges {
         this.sortTableData();
         this.setTableHeaders();
 
-        // 🆕 Build employee summary if employeeReport
-        if (this.reportType === 'employeeReport' && this.employeeId) {
+        // Build employee/team summary if employeeReport
+        if (this.reportType === 'employeeReport' && (this.employeeId || (this.selectedTeam && this.selectedTeam.length > 0))) {
           const accepted = this.tableData.filter(
             (r) => r.Decision?.toLowerCase() === 'approve'
           ).length;
@@ -106,10 +116,10 @@ export class ReportTableComponent implements OnChanges {
             total > 0 ? ((accepted / total) * 100).toFixed(1) + '%' : '0%';
 
           this.employeeSummary = {
-            id: this.employeeId,
-            name: data[0]?.Employee_name || '', // depends on your API field
-            pc: data[0]?.PC || '', // adjust based on backend
-            division: data[0]?.Division || '', // adjust based on backend
+            id: this.employeeId || this.selectedTeam.join(', '),
+            name: this.employeeId ? (data[0]?.Employee_name || '') : 'Team Summary',
+            pc: this.employeeId ? (data[0]?.PC || '') : 'Multiple PCs',
+            division: this.employeeId ? (data[0]?.Division || '') : (data[0]?.Division || ''),
             totalAccepted: accepted,
             totalRejected: rejected,
             passRatio: ratio,
@@ -137,23 +147,47 @@ export class ReportTableComponent implements OnChanges {
 
   setTableHeaders() {
     if (this.reportType === 'employeeReport') {
-      this.tableHeaders = [
-        'Drawing ID',
-        'Revision Number',
-        'Error Codes',
-        'Task Number',
-        'Reviewer Emp ID',
-        'Decision',
-      ];
+      if (!this.employeeId && this.selectedTeam && this.selectedTeam.length > 0) {
+        this.tableHeaders = [
+          'Creator Emp ID',
+          'Drawing ID',
+          'Revision Number',
+          'Error Codes',
+          'Task Number',
+          'Reviewer Emp ID',
+          'Decision',
+        ];
+      } else {
+        this.tableHeaders = [
+          'Drawing ID',
+          'Revision Number',
+          'Error Codes',
+          'Task Number',
+          'Reviewer Emp ID',
+          'Decision',
+        ];
+      }
     } else if (this.reportType === 'drawingReport') {
-      this.tableHeaders = [
-        'Revision Number',
-        'Creator Emp ID',
-        'Reviewer Emp ID',
-        'Error Codes',
-        'Drawing Type',
-        'Decision',
-      ];
+      if (!this.drawingId && this.selectedTeam && this.selectedTeam.length > 0) {
+        this.tableHeaders = [
+          'Drawing ID',
+          'Revision Number',
+          'Creator Emp ID',
+          'Reviewer Emp ID',
+          'Error Codes',
+          'Drawing Type',
+          'Decision',
+        ];
+      } else {
+        this.tableHeaders = [
+          'Revision Number',
+          'Creator Emp ID',
+          'Reviewer Emp ID',
+          'Error Codes',
+          'Drawing Type',
+          'Decision',
+        ];
+      }
     } else if (this.reportType === 'taskReport') {
       this.tableHeaders = [
         'Team',
