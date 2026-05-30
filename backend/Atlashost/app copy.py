@@ -1725,11 +1725,12 @@ def _parse_error_codes(val):
 @app.route('/api/drawing-report', methods=['GET'])
 def drawing_report():
     drawing_id = (request.args.get('drawingId') or '').strip()
+    teams = request.args.getlist('team')
     start_date = (request.args.get('start_date') or '').strip()
     end_date   = (request.args.get('end_date') or '').strip()
 
-    if not drawing_id:
-        return jsonify({"error": "Drawing ID is required"}), 400
+    if not drawing_id and not teams:
+        return jsonify({"error": "Drawing ID or Team is required"}), 400
 
     try:
         # Use g.db instead of creating a new connection
@@ -1739,9 +1740,10 @@ def drawing_report():
         cursor = g.db.cursor()
 
         # Build query using normalized schema
-        # We need: Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Error_codes, Date, Drawing_type, Decision
+        # We need: Drawing_ID, Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date, Drawing_type, Decision, Error_codes
         query = """
             SELECT
+                d.drawing_no as Drawing_ID,
                 dr.revision_no as Revision_num,
                 u_rev.emp_id as Reviewer_EMP_ID,
                 u_cre.emp_id as Creator_EMP_ID,
@@ -1755,10 +1757,18 @@ def drawing_report():
             LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
             LEFT JOIN revision_error_codes rec ON dr.id = rec.revision_id
             LEFT JOIN error_codes ec ON rec.error_code_id = ec.id
-            WHERE d.drawing_no = %s
+            WHERE 1=1
         """
 
-        params = [drawing_id]
+        params = []
+
+        if drawing_id:
+            query += " AND d.drawing_no = %s"
+            params.append(drawing_id)
+        elif teams:
+            placeholders = ','.join(['%s'] * len(teams))
+            query += f" AND u_cre.team IN ({placeholders})"
+            params.extend(teams)
 
         if start_date:
             query += " AND dr.reviewed_date >= %s"
@@ -1776,13 +1786,7 @@ def drawing_report():
         result = []
         for tup in rows:
             row = dict(zip(cols, tup))
-            # Format Error_codes as list or string depending on frontend need.
-            # Legacy expected string/list. _parse_error_codes usually handles string.
-            # Here we returned a string "P1, P2".
-            # The original code did: row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
-            # Let's match that behavior.
             row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
-            row["Drawing_ID"] = drawing_id
             result.append(row)
 
         return jsonify(result)
@@ -1869,15 +1873,16 @@ def task_report():
 @app.route('/api/employee-report', methods=['GET'])
 def employee_report():
     """
-    Returns list of drawings/revisions for a specific employee (creator).
+    Returns list of drawings/revisions for a specific employee (creator) or a team.
     Used for the Employee Report table and metrics (Accepted/Rejected counts).
     """
     employee_id = (request.args.get('employeeId') or '').strip()
+    teams = request.args.getlist('team')
     start_date = (request.args.get('start_date') or '').strip()
     end_date   = (request.args.get('end_date') or '').strip()
 
-    if not employee_id:
-        return jsonify({"error": "Employee ID is required"}), 400
+    if not employee_id and not teams:
+        return jsonify({"error": "Employee ID or Team is required"}), 400
 
     try:
         # Use g.db instead of creating a new connection
@@ -1886,15 +1891,7 @@ def employee_report():
 
         cursor = g.db.cursor()
 
-        # Get user details first (for name, pc, division)
-        cursor.execute("SELECT id, name, pc, division FROM users WHERE emp_id = %s", (employee_id,))
-        user_row = cursor.fetchone()
-        if not user_row:
-            return jsonify([]), 200 # No such user
-
-        user_id, user_name, user_pc, user_division = user_row
-
-        # Build query
+        # Build query using joined creator details for consistency
         query = """
             SELECT
                 d.drawing_no as Drawing_ID,
@@ -1906,16 +1903,28 @@ def employee_report():
                      ELSE 'Pending' END as Decision,
                 GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes,
                 dr.task_number as Task_Number,
-                d.pc as drawing_pc
+                d.pc as drawing_pc,
+                u_cre.name as Employee_name,
+                u_cre.pc as user_pc,
+                u_cre.division as Division,
+                u_cre.emp_id as Creator_EMP_ID
             FROM drawings d
             JOIN drawing_revisions dr ON d.id = dr.drawing_id
+            JOIN users u_cre ON d.creator_id = u_cre.id
             LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
             LEFT JOIN revision_error_codes rec ON dr.id = rec.revision_id
             LEFT JOIN error_codes ec ON rec.error_code_id = ec.id
-            WHERE d.creator_id = %s
+            WHERE 1=1
         """
+        params = []
 
-        params = [user_id]
+        if employee_id:
+            query += " AND u_cre.emp_id = %s"
+            params.append(employee_id)
+        elif teams:
+            placeholders = ','.join(['%s'] * len(teams))
+            query += f" AND u_cre.team IN ({placeholders})"
+            params.extend(teams)
 
         if start_date:
             query += " AND dr.reviewed_date >= %s"
@@ -1924,7 +1933,7 @@ def employee_report():
             query += " AND dr.reviewed_date <= %s"
             params.append(end_date)
 
-        query += " GROUP BY dr.id, d.pc ORDER BY dr.reviewed_date DESC"
+        query += " GROUP BY dr.id, d.pc, u_cre.id ORDER BY dr.reviewed_date DESC"
 
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
@@ -1934,12 +1943,10 @@ def employee_report():
         for tup in rows:
             row = dict(zip(cols, tup))
             row["Error_codes"] = _parse_error_codes(row.get("Error_codes"))
-            # Add employee metadata to every row
-            row["Employee_name"] = user_name
             # Use the drawing-specific PC if available, otherwise fallback to the user's default PC
             drawing_pc_val = row.pop("drawing_pc", None)
-            row["PC"] = drawing_pc_val if drawing_pc_val else user_pc
-            row["Division"] = user_division
+            user_pc_val = row.pop("user_pc", None)
+            row["PC"] = drawing_pc_val if drawing_pc_val else user_pc_val
             result.append(row)
 
         return jsonify(result)
@@ -1999,7 +2006,7 @@ def download_drawing(drawing_id, revision):
 @app.route('/api/employees-dropdown', methods=['GET'])
 def get_employee_ids():
     """
-    Returns list of employee IDs for dropdown.
+    Returns list of employee IDs for dropdown, optionally filtered by team.
     Now queries users table instead of employees table.
     """
     # Use g.db instead of creating a new connection
@@ -2009,7 +2016,16 @@ def get_employee_ids():
     cursor = g.db.cursor()
 
     try:
-        cursor.execute("SELECT emp_id, name FROM users WHERE is_active = TRUE ORDER BY emp_id;")
+        teams = request.args.getlist('team')
+        query = "SELECT emp_id, name FROM users WHERE is_active = TRUE"
+        params = []
+        if teams:
+            placeholders = ','.join(['%s'] * len(teams))
+            query += f" AND team IN ({placeholders})"
+            params.extend(teams)
+        query += " ORDER BY emp_id;"
+
+        cursor.execute(query, tuple(params))
         employees = [
             f"{row[0]} - {row[1]}" if row[1] else row[0]
             for row in cursor.fetchall()
@@ -2315,7 +2331,7 @@ def overview_dashboard():
 @app.route('/api/employee-drawing-status', methods=['GET'])
 def employee_drawing_status():
     """
-    Returns monthly approved/rejected counts for a specific employee.
+    Returns monthly approved/rejected counts for a specific employee or team.
     Now queries drawing_revisions table instead of per-employee tables.
     """
     # Use g.db instead of creating a new connection
@@ -2324,19 +2340,12 @@ def employee_drawing_status():
     cursor = g.db.cursor()
     try:
         employee_id = request.args.get('employeeId')
+        teams = request.args.getlist('team')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
-        if not employee_id:
-            return jsonify({'error': 'Missing employee_id'}), 400
-
-        # Get user_id from emp_id
-        cursor.execute("SELECT id FROM users WHERE emp_id = %s AND is_active = TRUE", (employee_id,))
-        user_row = cursor.fetchone()
-        if not user_row:
-            return jsonify({}), 200  # Return empty if employee not found
-
-        user_id = user_row[0]
+        if not employee_id and not teams:
+            return jsonify({'error': 'Missing employeeId or team'}), 400
 
         # Set date range
         if start_date and end_date:
@@ -2348,7 +2357,7 @@ def employee_drawing_status():
             start_month = max(1, end_dt.month - 5)
             start_dt = end_dt.replace(month=start_month)
 
-        # Query drawing_revisions for this employee
+        # Query drawing_revisions for this employee or team
         query = """
             SELECT
                 DATE_FORMAT(dr.reviewed_date, '%%m-%%Y') as month,
@@ -2357,14 +2366,26 @@ def employee_drawing_status():
             FROM drawing_revisions dr
             JOIN drawings d ON dr.drawing_id = d.id
             JOIN users u ON d.creator_id = u.id
-            WHERE u.emp_id = %s
+            WHERE 1=1
+        """
+        params = []
+        if employee_id:
+            query += " AND u.emp_id = %s"
+            params.append(employee_id)
+        elif teams:
+            placeholders = ','.join(['%s'] * len(teams))
+            query += f" AND u.team IN ({placeholders})"
+            params.extend(teams)
+
+        query += """
             AND dr.reviewed_date >= %s
             AND dr.reviewed_date <= %s
             GROUP BY month
-            ORDER BY dr.reviewed_date
+            ORDER BY MIN(dr.reviewed_date)
         """
+        params.extend([start_dt, end_dt])
 
-        cursor.execute(query, (employee_id, start_dt, end_dt))
+        cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
 
         results = {}
@@ -2376,8 +2397,8 @@ def employee_drawing_status():
             # Format key as EC_MM_YYYY
             key = f"EC_{month.replace('-', '_')}"
             results[key] = {
-                "approve": int(approved),
-                "reject": int(rejected)
+                "approve": int(approved or 0),
+                "reject": int(rejected or 0)
             }
 
         return jsonify(results)
@@ -2392,7 +2413,7 @@ def employee_drawing_status():
 @app.route('/api/error-summary', methods=['GET'])
 def error_summary():
     """
-    Returns top error codes for an employee or drawing.
+    Returns top error codes for an employee, drawing, or team.
     Now queries revision_error_codes table instead of per-employee/drawing tables.
     """
     # Use g.db instead of creating a new connection
@@ -2403,8 +2424,14 @@ def error_summary():
     try:
         employee_id = request.args.get('employeeId')
         drawing_id = request.args.get('drawingId')
+        teams = request.args.getlist('team')
+        report_type = request.args.get('reportType')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
+
+        limit = 10
+        if report_type == 'drawingReport' or drawing_id:
+            limit = 5
 
         if employee_id:
             # Get user_id from emp_id
@@ -2414,7 +2441,6 @@ def error_summary():
                 return jsonify([]), 200
 
             user_id = user_row[0]
-            limit = 10
 
             # Query for employee's error codes
             query = """
@@ -2428,8 +2454,6 @@ def error_summary():
             params = [user_id]
 
         elif drawing_id:
-            limit = 5
-
             # Query for drawing's error codes
             query = """
                 SELECT ec.code, COUNT(rec.error_code_id) as count
@@ -2440,8 +2464,23 @@ def error_summary():
                 WHERE d.drawing_no = %s
             """
             params = [drawing_id]
+
+        elif teams:
+            # Query for team's error codes (can be for employee report or drawing report)
+            query = """
+                SELECT ec.code, COUNT(rec.error_code_id) as count
+                FROM revision_error_codes rec
+                JOIN error_codes ec ON rec.error_code_id = ec.id
+                JOIN drawing_revisions dr ON rec.revision_id = dr.id
+                JOIN drawings d ON dr.drawing_id = d.id
+                JOIN users u_cre ON d.creator_id = u_cre.id
+                WHERE u_cre.team IN ({})
+            """
+            placeholders = ','.join(['%s'] * len(teams))
+            query = query.format(placeholders)
+            params = list(teams)
         else:
-            return jsonify({"error": "Missing employee_id or drawing_id"}), 400
+            return jsonify({"error": "Missing employeeId, drawingId, or team"}), 400
 
         # Add date filters
         if start_date and end_date:

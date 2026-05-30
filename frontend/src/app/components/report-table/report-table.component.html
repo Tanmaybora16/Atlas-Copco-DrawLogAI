@@ -1,13 +1,14 @@
 <div class="container">
-  <!-- Employee Summary Section -->
+  <!-- Employee/Team Summary Section -->
   <div
-    *ngIf="reportType === 'employeeReport' && employeeId"
+    *ngIf="reportType === 'employeeReport' && (employeeId || (selectedTeam && selectedTeam.length > 0))"
     class="employee-summary"
   >
     <div class="employee-row">
-      <div><strong>Employee ID:</strong> {{ employeeSummary.id || "-" }}</div>
-      <div><strong>Name:</strong> {{ employeeSummary.name || "-" }}</div>
-      <div><strong>PC:</strong> {{ employeeSummary.pc || "-" }}</div>
+      <div *ngIf="employeeId"><strong>Employee ID:</strong> {{ employeeSummary.id || "-" }}</div>
+      <div *ngIf="!employeeId"><strong>Team:</strong> {{ employeeSummary.id || "-" }}</div>
+      <div *ngIf="employeeId"><strong>Name:</strong> {{ employeeSummary.name || "-" }}</div>
+      <div *ngIf="employeeId"><strong>PC:</strong> {{ employeeSummary.pc || "-" }}</div>
       <div>
         <strong>Division:</strong> {{ employeeSummary.division || "-" }}
       </div>
@@ -40,13 +41,13 @@
 
   <div class="table-container">
     <div
-      *ngIf="reportType === 'employeeReport' && !employeeId"
+      *ngIf="reportType === 'employeeReport' && !employeeId && (!selectedTeam || selectedTeam.length === 0)"
       class="warning-message"
     >
       Please select Employee ID
     </div>
     <div
-      *ngIf="reportType === 'drawingReport' && !drawingId"
+      *ngIf="reportType === 'drawingReport' && !drawingId && (!selectedTeam || selectedTeam.length === 0)"
       class="warning-message"
     >
       Please select Drawing ID
@@ -56,8 +57,8 @@
       class="styled-table"
       *ngIf="
         reportType === 'taskReport' ||
-        (reportType === 'employeeReport' && employeeId) ||
-        (reportType === 'drawingReport' && drawingId)
+        (reportType === 'employeeReport' && (employeeId || (selectedTeam && selectedTeam.length > 0))) ||
+        (reportType === 'drawingReport' && (drawingId || (selectedTeam && selectedTeam.length > 0)))
       "
     >
       <thead>
