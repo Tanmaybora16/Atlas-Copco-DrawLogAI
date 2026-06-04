@@ -8,7 +8,7 @@ import { environment } from 'src/environments/environment';
   styleUrls: ['./reports.component.scss'],
 })
 export class ReportsComponent implements OnInit {
-  selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' | 'taskReport' | 'overview' = 'monthly';
+  selectedReport: 'monthly' | 'trend' | 'employeeReport' | 'drawingReport' | 'passRatio' | 'taskReport' | 'overview' = 'overview';
 
   teams: any[] = [];
   pcs: any[] = [];

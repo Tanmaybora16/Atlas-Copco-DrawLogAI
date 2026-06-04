@@ -1,4 +1,4 @@
-from tkinter import messagebox
+# from tkinter import messagebox
 from flask import Flask, jsonify, request, send_file, Response, g
 from flask_cors import CORS
 import os, base64, traceback
@@ -64,7 +64,7 @@ def connect_to_db():
             db = pymysql.connect(
                 host=os.getenv("DB_HOST", "localhost"),
                 user=os.getenv("DB_USER", "root"),
-                password=os.getenv("DB_PASSWORD", "root"),
+                password=os.getenv("DB_PASSWORD", "Root@1234"),
                 database=os.getenv("DB_NAME", "atlascopco_drawing_db"),
                 connect_timeout=5,
                 autocommit=False,
@@ -2330,10 +2330,9 @@ def employee_drawing_status():
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = datetime.strptime(end_date, "%Y-%m-%d")
         else:
-            # Default range: last ~6 months
+            # Default range: last 12 months
             end_dt = datetime.today()
-            start_month = max(1, end_dt.month - 5)
-            start_dt = end_dt.replace(month=start_month)
+            start_dt = end_dt - timedelta(days=365)
 
         # Query drawing_revisions for this employee
         query = """
@@ -3699,5 +3698,5 @@ def delete_team(id):
 
 # Canvas end
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8000)
     # serve(app, port=5000, threads=4)

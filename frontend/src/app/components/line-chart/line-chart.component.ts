@@ -164,12 +164,14 @@ export class LineChartComponent implements OnChanges, OnInit {
     this.http.get<any>(this.apiUrl, { params }).subscribe(
       (response) => {
         const categories = response?.categories ?? [];
-        const approvedData =
+        const approvedData = (
           response?.series?.find((s: any) => s.name === 'Approved Drawings')
-            ?.data ?? [];
-        const rejectedData =
+            ?.data ?? []
+        ).map((v: any) => Number(v));
+        const rejectedData = (
           response?.series?.find((s: any) => s.name === 'Rejected Drawings')
-            ?.data ?? [];
+            ?.data ?? []
+        ).map((v: any) => Number(v));
 
         this.chartOptions = {
           ...this.chartOptions,

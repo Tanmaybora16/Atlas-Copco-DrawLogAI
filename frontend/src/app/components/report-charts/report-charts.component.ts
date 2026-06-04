@@ -275,7 +275,7 @@ export class ReportChartsComponent implements OnChanges {
 
   private updateEmployeeCharts(trendData: any[], monthlyData: any): void {
     if (!Array.isArray(trendData) || trendData.length === 0) {
-      this.chartOptionsErrors = this.createErrorChart([], 'No Data Available');
+      this.chartOptionsErrors = { series: [], chart: { type: 'bar', height: 0 } };
     } else {
       const errors: [string, number][] = trendData
         .filter(i => i && i.error_code)
@@ -307,18 +307,22 @@ export class ReportChartsComponent implements OnChanges {
       rejectedData.push(Number(bucket.reject) || 0);
     });
 
-    this.chartOptionsDrawings = {
-      series: [
-        { name: 'Approved', data: approvedData },
-        { name: 'Rejected', data: rejectedData },
-      ],
-      chart: { type: 'bar', height: 350 },
-      title: { text: 'Approved vs Rejected Drawings per Month', align: 'center' },
-      xaxis: { categories: months },
-      dataLabels: { enabled: true },
-      plotOptions: { bar: { horizontal: false } },
-      colors: ['#1CC487', '#F45463'],
-    };
+    if (months.length === 0) {
+      this.chartOptionsDrawings = { series: [], chart: { type: 'bar', height: 0 } };
+    } else {
+      this.chartOptionsDrawings = {
+        series: [
+          { name: 'Approved', data: approvedData },
+          { name: 'Rejected', data: rejectedData },
+        ],
+        chart: { type: 'bar', height: 350 },
+        title: { text: 'Approved vs Rejected Drawings per Month', align: 'center' },
+        xaxis: { categories: months },
+        dataLabels: { enabled: true },
+        plotOptions: { bar: { horizontal: false } },
+        colors: ['#1CC487', '#F45463'],
+      };
+    }
   }
 
   private updateDrawingCharts(trendData: any[]): void {

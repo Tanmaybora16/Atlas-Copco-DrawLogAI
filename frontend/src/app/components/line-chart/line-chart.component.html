@@ -1,12 +1,11 @@
-<div id="chart">
+<div *ngIf="chartOptions?.series?.length && chartOptions?.chart" id="chart">
   <apx-chart 
-    *ngIf="chartOptions" 
-    [series]="chartOptions.series || []"
-    [chart]="chartOptions.chart || { type: 'line' }"
-    [xaxis]="chartOptions.xaxis || {}"
-    [dataLabels]="chartOptions.dataLabels || {}"
-    [stroke]="chartOptions.stroke || {}"
-    [title]="chartOptions.title || {}"
+    [series]="chartOptions.series!"
+    [chart]="chartOptions.chart!"
+    [xaxis]="chartOptions.xaxis!"
+    [dataLabels]="chartOptions.dataLabels!"
+    [stroke]="chartOptions.stroke!"
+    [title]="chartOptions.title!"
     [colors]="chartOptions.colors || []">
   </apx-chart>
 </div>
