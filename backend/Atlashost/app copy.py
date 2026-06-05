@@ -2732,39 +2732,7 @@ def submit_batch():
     
 # Requests start
 
-def table_exists(cur, table_name: str) -> bool:
-    cur.execute("""
-        SELECT COUNT(*)
-          FROM information_schema.tables
-         WHERE table_schema = DATABASE()
-           AND table_name = %s
-    """, (table_name,))
-    return cur.fetchone()[0] > 0
 
-def get_employee(cur, emp_id: str):
-    cur.execute("SELECT Emp_Name, EMP_Email FROM employees WHERE Emp_ID=%s LIMIT 1", (emp_id,))
-    row = cur.fetchone()
-    if not row:
-        return {"name": emp_id, "email": ""}
-    return {"name": row[0] or emp_id, "email": row[1] or ""}
-
-def get_dyn_row(cur, table_name: str, rev: int):
-    cur.execute(f"""
-        SELECT Revision_num, Reviewer_EMP_ID, Creator_EMP_ID, Date, Decision
-          FROM `{table_name}`
-         WHERE Revision_num=%s
-         LIMIT 1
-    """, (rev,))
-    row = cur.fetchone()
-    if not row:
-        return None
-    return {
-        "Revision_num": row[0],
-        "Reviewer_EMP_ID": row[1],
-        "Creator_EMP_ID": row[2],
-        "Date": row[3],
-        "Decision": (row[4] or '').strip()
-    }
 
 @app.route('/requests/creator/<emp_id>', methods=['GET'])
 def requests_creator(emp_id):
@@ -2932,11 +2900,7 @@ def delete_request(drawing_id, revision):
     finally:
         conn.close()
         
-def _safe_table_name(name: str) -> str:
-    # allow DR_ and alnums/underscore only
-    if not re.fullmatch(r'[A-Za-z0-9_]+', name or ''):
-        raise ValueError("Invalid table name")
-    return f"`{name}`"
+
 
 def _fetch_pdf_blob(conn, drawing_no: str, revision_no: int) -> bytes | None:
     with conn.cursor() as cur:
