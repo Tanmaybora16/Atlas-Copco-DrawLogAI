@@ -109,8 +109,8 @@ tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 # SMTP_SERVER = "smtp.onevirtualoffice.local"  
 # SMTP_PORT = 25  
 
-EMAIL_SENDER = "atlascopcotestmail2025@gmail.com"
-EMAIL_PASSWORD = "pwbd zgow smzm ywza"
+EMAIL_SENDER = os.getenv("EMAIL_SENDER", "atlascopcotestmail2025@gmail.com")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "pwbd zgow smzm ywza")
 SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
 SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
 
@@ -177,7 +177,8 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 2000
 
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(file_path)
     
     annotations = extract_annotations(file_path)
@@ -185,14 +186,14 @@ def upload_file():
 
     return jsonify({
         'message': 'File processed successfully',
-        'file_name': file.filename,
+        'file_name': filename,
         'file_path': file_path,
         'extracted_comments': annotations,
         'predicted_errors': predictions,
     })
 
 
-DEBUG_RETURN_ERRORS = True  # ← set False after you’re done diagnosing
+DEBUG_RETURN_ERRORS = False  # Set False in production to prevent leaking raw exceptions
 
 def dbg_fail(step, err, extra=None, code=500):
     msg = f"{step}: {err}"
@@ -3462,7 +3463,7 @@ def prefill_upload():
     except Exception as e:
         print(f"Error in prefill-upload: {e}")
         traceback.print_exc()
-        return jsonify({"ok": False, "error": f"Unexpected: {e}"}), 500
+        return jsonify({"ok": False, "error": "An unexpected error occurred"}), 500
     finally:
         try: cur.close()
         except: pass
@@ -3751,5 +3752,5 @@ def delete_team(id):
 
 # Canvas end
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
     # serve(app, port=5000, threads=4)
