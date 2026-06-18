@@ -1,7 +1,23 @@
+import os
+
+# Load environment variables from .env if it exists in current or parent directory
+for env_path in [".env", "../.env"]:
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, val = line.split("=", 1)
+                    key = key.strip()
+                    val = val.strip().strip("'\"")
+                    os.environ[key] = val
+
 from tkinter import messagebox
 from flask import Flask, jsonify, request, send_file, Response, g
 from flask_cors import CORS
-import os, base64, traceback
+import base64, traceback
 import fitz
 import joblib
 import pymysql
@@ -105,14 +121,20 @@ model = joblib.load(MODEL_PATH)
 tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 
 # SMTP Email Configuration (Use your SMTP server details)
-# EMAIL_SENDER = "Errorloggingportal@atlascopco.com"
-# SMTP_SERVER = "smtp.onevirtualoffice.local"  
-# SMTP_PORT = 25  
+EMAIL_SENDER = os.getenv("EMAIL_SENDER", "Errorloggingportal@atlascopco.com")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.onevirtualoffice.local")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 25))
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true" if SMTP_PORT == 587 else "false").lower() in ("true", "1", "yes")
 
-EMAIL_SENDER = os.getenv("EMAIL_SENDER", "atlascopcotestmail2025@gmail.com")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "pwbd zgow smzm ywza")
-SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
-SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
+def get_smtp_server():
+    server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+    # Commented out for production VM (uncomment if testing/using authentication):
+    # if SMTP_USE_TLS:
+    #     server.starttls()
+    # if EMAIL_PASSWORD:
+    #     server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+    return server
 
 
 # ============================================================================
@@ -456,9 +478,7 @@ def submit_data():
 def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, error_codes, extracted_comments, decision, file_path, drawing_Type, creator_name, user_comments=None, pdf_bytes=None, pdf_filename=None, task_number=None):
     try:
         # Set up the SMTP server
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         # Email content
         subject = f"Drawing Review Notification :- {drawing_id} (Revision number :- {revision_no})"
@@ -644,9 +664,7 @@ def send_otp_email(to_email: str, emp_id: str, otp_plain: str):
     Reuses your SMTP config to send the OTP.
     """
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         subject = "Your OTP for Password Reset (valid for 5 minutes)"
         body = f"""Dear User ({emp_id}),
@@ -929,9 +947,7 @@ def send_password_change_notification(to_email: str, emp_id: str):
     Does NOT include the password; advises to contact HR if it wasn't them.
     """
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         subject = "Your Atlas Copco AI Error Logging Portal account password was changed"
         body = f"""Dear User ({emp_id}),
@@ -1045,9 +1061,7 @@ def send_welcome_credentials_email(to_email: str, emp_id: str):
     Username is EMP_<id>; initial password is 'your registered office email address'.
     """
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         subject = "Welcome to Atlas Copco Error Logging"
         body = f"""Dear User,
@@ -2563,9 +2577,7 @@ def send_single_summary_email(to_email: str, items: list[tuple[str, int]], creat
     items: list of (drawing_id, revision)
     """
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         subject = "Drawings ready for review"
         pairs_str = ', '.join([f"{did} - {rev}" for did, rev in items])
