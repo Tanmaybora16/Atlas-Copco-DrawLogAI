@@ -190,6 +190,12 @@ def predict_error(comments):
 
 
 
+ALLOWED_EXTENSIONS = {'pdf'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -198,6 +204,9 @@ def upload_file():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 2000
+
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'File type not allowed. Only PDF files are permitted.'}), 400
 
     filename = secure_filename(file.filename)
     file_path = os.path.join(UPLOAD_FOLDER, filename)
