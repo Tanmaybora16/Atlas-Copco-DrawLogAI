@@ -47,3 +47,5 @@ testem.log
 Thumbs.db
 /.qoder/
 backend/uploads
+.env
+backend/Atlashost/.env
