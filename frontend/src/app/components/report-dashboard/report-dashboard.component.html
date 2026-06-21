@@ -1,6 +1,6 @@
 <div class="dashboard-wrapper">
   <div class="dashboard-header">
-    <h1>INTERNAL QUALITY OVERVIEW DASHBOARD</h1>
+    <h1>AUDIT OVERVIEW DASHBOARD</h1>
     <p class="subtitle">Real-time aggregate data across all teams and auditors</p>
   </div>
 
@@ -19,12 +19,12 @@
     <div class="kpi-row">
       <div class="card kpi-card">
         <div class="card-header">
-          <h3>TOTAL CHECKS PERFORMED</h3>
+          <h3>TOTAL AUDIT GAUGE (Total Tasks Audited)</h3>
         </div>
         <div class="card-content kpi-content">
           <div class="kpi-value">
             <span class="number">{{ data.kpis.totalAudits }}</span>
-            <span class="label">Total number of checks performed.</span>
+            <span class="label">Total number of tasks audited.</span>
           </div>
           <div class="kpi-chart" id="gauge-total">
             <apx-chart
@@ -40,7 +40,7 @@
 
       <div class="card kpi-card">
         <div class="card-header">
-          <h3>OVERALL PASS RATIO</h3>
+          <h3>AVERAGE QUALITY SCORE GAUGE (Overall Pass Ratio %)</h3>
         </div>
         <div class="card-content kpi-content">
           <div class="kpi-value">
@@ -83,7 +83,6 @@
             [dataLabels]="statusOptions.dataLabels!"
             [title]="statusOptions.title!"
             [colors]="statusOptions.colors!"
-            [legend]="statusOptions.legend!"
           ></apx-chart>
       </div>
 
@@ -116,7 +115,7 @@
 
       <div class="card table-card">
         <div class="card-header">
-          <h3>RECENT TASK FEED (SUMMARY TABLE)</h3>
+          <h3>RECENT AUDIT FEED (SUMMARY TABLE)</h3>
         </div>
         <div class="recent-table-wrapper">
           <table class="recent-table">
