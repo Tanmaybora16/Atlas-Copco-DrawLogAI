@@ -1,7 +1,23 @@
+import os
+
+# Load environment variables from .env if it exists in current or parent directory
+for env_path in [".env", "../.env"]:
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, val = line.split("=", 1)
+                    key = key.strip()
+                    val = val.strip().strip("'\"")
+                    os.environ[key] = val
+
 from tkinter import messagebox
 from flask import Flask, jsonify, request, send_file, Response, g
 from flask_cors import CORS
-import os, base64, traceback
+import base64, traceback
 import fitz
 import joblib
 import pymysql
@@ -12,6 +28,7 @@ import pytesseract as pyt
 import numpy as np
 from PIL import Image
 import smtplib
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -64,7 +81,7 @@ def connect_to_db():
             db = pymysql.connect(
                 host=os.getenv("DB_HOST", "localhost"),
                 user=os.getenv("DB_USER", "root"),
-                password=os.getenv("DB_PASSWORD", "root"),
+                password=os.getenv("DB_PASSWORD", ""),
                 database=os.getenv("DB_NAME", "atlascopco_drawing_db"),
                 connect_timeout=5,
                 autocommit=False,
@@ -105,14 +122,22 @@ model = joblib.load(MODEL_PATH)
 tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 
 # SMTP Email Configuration (Use your SMTP server details)
-# EMAIL_SENDER = "Errorloggingportal@atlascopco.com"
-# SMTP_SERVER = "smtp.onevirtualoffice.local"  
-# SMTP_PORT = 25  
+EMAIL_SENDER = os.getenv("EMAIL_SENDER", "Errorloggingportal@atlascopco.com")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.onevirtualoffice.local")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 25))
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true" if SMTP_PORT == 587 else "false").lower() in ("true", "1", "yes")
 
-EMAIL_SENDER = "atlascopcotestmail2025@gmail.com"
-EMAIL_PASSWORD = "pwbd zgow smzm ywza"
-SMTP_SERVER = "smtp.gmail.com"  # e.g., "smtp.gmail.com"
-SMTP_PORT = 587  # Use 465 for SSL, 587 for TLS
+def get_smtp_server():
+    server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+    # Commented out for production VM (uncomment if testing/using authentication):
+    # if SMTP_USE_TLS:
+    #     # Secure negotiation using modern TLS context (CWE-757)
+    #     context = ssl.create_default_context()
+    #     server.starttls(context=context)
+    # if EMAIL_PASSWORD:
+    #     server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+    return server
 
 
 # ============================================================================
@@ -168,6 +193,12 @@ def predict_error(comments):
 
 
 
+ALLOWED_EXTENSIONS = {'pdf'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -177,7 +208,11 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 2000
 
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'File type not allowed. Only PDF files are permitted.'}), 400
+
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(file_path)
     
     annotations = extract_annotations(file_path)
@@ -185,14 +220,14 @@ def upload_file():
 
     return jsonify({
         'message': 'File processed successfully',
-        'file_name': file.filename,
+        'file_name': filename,
         'file_path': file_path,
         'extracted_comments': annotations,
         'predicted_errors': predictions,
     })
 
 
-DEBUG_RETURN_ERRORS = True  # ← set False after you’re done diagnosing
+DEBUG_RETURN_ERRORS = False  # Set False in production to prevent leaking raw exceptions
 
 def dbg_fail(step, err, extra=None, code=500):
     msg = f"{step}: {err}"
@@ -256,7 +291,12 @@ def submit_data():
             else:
                 file_path = (payload.get("file_path") or "").strip()
                 if file_path and os.path.exists(file_path):
-                    with open(file_path, "rb") as f:
+                    # Prevent directory traversal attacks (CWE-22 / CWE-23)
+                    resolved_path = os.path.realpath(file_path)
+                    resolved_upload_folder = os.path.realpath(UPLOAD_FOLDER)
+                    if not resolved_path.startswith(resolved_upload_folder + os.path.sep) and resolved_path != resolved_upload_folder:
+                        return dbg_fail("pdf-load", "Path traversal detected", extra={"file_path": file_path}, code=400)
+                    with open(resolved_path, "rb") as f:
                         pdf_bytes = f.read()
         except Exception as e:
             return dbg_fail("pdf-load", e, extra={"have_b64": bool(payload.get("file_bytes_b64")), "file_path": payload.get("file_path")}, code=400)
@@ -431,10 +471,10 @@ def submit_data():
                         task_number=task_number
                     )
                 except TypeError as e:
-                     print(f"⚠ email-send signature mismatch: {e}")
+                     print(f"[WARNING] email-send signature mismatch: {e}")
         except Exception as e:
             # Don't fail the whole transaction because of email
-            print("⚠ email-send failed:", e)
+            print("[WARNING] email-send failed:", e)
 
         # Commit all changes
         try:
@@ -445,7 +485,7 @@ def submit_data():
         return jsonify({"ok": True, "message": "Data saved successfully", "drawing_id": drawing_no, "revision": revision_no_int})
 
     except Exception as e:
-        print("❌ Uncaught in /submit:", e)
+        print("[ERROR] Uncaught in /submit:", e)
         import traceback
         traceback.print_exc()
         return dbg_fail("uncaught", e, code=500)
@@ -455,9 +495,7 @@ def submit_data():
 def send_email(to_email, drawing_id, revision_no, reviewer_name, reviewed_date, error_codes, extracted_comments, decision, file_path, drawing_Type, creator_name, user_comments=None, pdf_bytes=None, pdf_filename=None, task_number=None):
     try:
         # Set up the SMTP server
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         # Email content
         subject = f"Drawing Review Notification :- {drawing_id} (Revision number :- {revision_no})"
@@ -643,9 +681,7 @@ def send_otp_email(to_email: str, emp_id: str, otp_plain: str):
     Reuses your SMTP config to send the OTP.
     """
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         subject = "Your OTP for Password Reset (valid for 5 minutes)"
         body = f"""Dear User ({emp_id}),
@@ -732,7 +768,7 @@ def forgot_password_initiate():
         otp_plain = str(otp_int)
 
         # 4) Hash OTP
-        otp_hash = bcrypt.hashpw(otp_plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        otp_hash = bcrypt.hashpw(otp_plain.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
 
         # 5) Upsert OTP row with user_id FK, expire in 5 minutes (use MySQL NOW() in IST)
         with g.db.cursor() as c:
@@ -901,7 +937,7 @@ def forgot_password_reset():
         user_email = row_email[0] if row_email else None
 
         # Update password in users table and delete OTP
-        new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
         with g.db.cursor() as c:
             c.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, user_id))
             c.execute("DELETE FROM login_otp WHERE user_id=%s", (user_id,))
@@ -928,9 +964,7 @@ def send_password_change_notification(to_email: str, emp_id: str):
     Does NOT include the password; advises to contact HR if it wasn't them.
     """
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         subject = "Your Atlas Copco AI Error Logging Portal account password was changed"
         body = f"""Dear User ({emp_id}),
@@ -1009,7 +1043,7 @@ def change_password():
             return jsonify({"success": False, "message": "New password cannot be the same as the previous password."}), 400
 
         # Update to new hash in users table
-        new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
         with g.db.cursor() as c:
             c.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, user_id))
         g.db.commit()
@@ -1044,9 +1078,7 @@ def send_welcome_credentials_email(to_email: str, emp_id: str):
     Username is EMP_<id>; initial password is 'your registered office email address'.
     """
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         subject = "Welcome to Atlas Copco Error Logging"
         body = f"""Dear User,
@@ -1119,7 +1151,7 @@ def add_employee():
             return jsonify({"success": False, "message": "Employee ID already exists"}), 4003
 
         # Create password hash from email
-        password_hash = bcrypt.hashpw(emp_email.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        password_hash = bcrypt.hashpw(emp_email.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
 
         # Insert into users table (new schema)
         cursor.execute("""
@@ -1127,7 +1159,7 @@ def add_employee():
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (emp_id, emp_name, emp_email, password_hash, 'user', emp_division, emp_pc, emp_team, True))
 
-        g.db.commit()  # ✅ commit DB changes before emailing
+        g.db.commit()  # [SUCCESS] commit DB changes before emailing
 
         # Send welcome email with username (EMP_<id>) and instructions
         try:
@@ -1897,10 +1929,10 @@ def employee_report():
                 d.drawing_no as Drawing_ID,
                 dr.revision_no as Revision_num,
                 u_rev.emp_id as Reviewer_EMP_ID,
-                dr.reviewed_date as Date,
-                CASE WHEN dr.approved = TRUE THEN 'Approve'
-                     WHEN dr.approved = FALSE THEN 'Reject'
-                     ELSE 'Pending' END as Decision,
+                COALESCE(dr.reviewed_date, dr.created_at) as Date,
+                CASE WHEN dr.reviewed_date IS NULL THEN 'Pending'
+                     WHEN dr.approved = TRUE THEN 'Approve'
+                     ELSE 'Reject' END as Decision,
                 GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes,
                 dr.task_number as Task_Number,
                 d.pc as drawing_pc,
@@ -1927,13 +1959,13 @@ def employee_report():
             params.extend(teams)
 
         if start_date:
-            query += " AND dr.reviewed_date >= %s"
+            query += " AND DATE(COALESCE(dr.reviewed_date, dr.created_at)) >= %s"
             params.append(start_date)
         if end_date:
-            query += " AND dr.reviewed_date <= %s"
+            query += " AND DATE(COALESCE(dr.reviewed_date, dr.created_at)) <= %s"
             params.append(end_date)
 
-        query += " GROUP BY dr.id, d.pc, u_cre.id ORDER BY dr.reviewed_date DESC"
+        query += " GROUP BY dr.id, d.pc, u_cre.id ORDER BY COALESCE(dr.reviewed_date, dr.created_at) DESC"
 
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
@@ -2562,9 +2594,7 @@ def send_single_summary_email(to_email: str, items: list[tuple[str, int]], creat
     items: list of (drawing_id, revision)
     """
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server = get_smtp_server()
 
         subject = "Drawings ready for review"
         pairs_str = ', '.join([f"{did} - {rev}" for did, rev in items])
@@ -3055,10 +3085,10 @@ def download_annotated_pdf(drawing_id, revision):
     payload = request.get_json(silent=True) or {}
     annotations = payload.get("annotations") or []
 
-    print(f"📝 Generating annotated PDF for {drawing_id} Rev {revision}")
-    print(f"📝 Received {len(annotations)} annotations")
+    print(f"[INFO] Generating annotated PDF for {drawing_id} Rev {revision}")
+    print(f"[INFO] Received {len(annotations)} annotations")
 
-    # ✅ g.db safety check
+    # [SUCCESS] g.db safety check
     if not hasattr(g, "db") or g.db is None:
         return dbg_fail("db-check", "Database connection is not established", code=500)
 
@@ -3071,7 +3101,7 @@ def download_annotated_pdf(drawing_id, revision):
 
         # Open original PDF from DB
         doc = fitz.open(stream=blob, filetype="pdf")
-        print(f"📄 Opened PDF with {len(doc)} pages")
+        print(f"[INFO] Opened PDF with {len(doc)} pages")
 
         annotations_added = 0
         stamps_added = 0
@@ -3080,7 +3110,7 @@ def download_annotated_pdf(drawing_id, revision):
             try:
                 page_index = int(ann.get("page", 1)) - 1
                 if page_index < 0 or page_index >= len(doc):
-                    print(f"⚠️ Skipping annotation - page {page_index+1} out of range")
+                    print(f"[WARNING] Skipping annotation - page {page_index+1} out of range")
                     continue
                 
                 page = doc[page_index]
@@ -3132,7 +3162,7 @@ def download_annotated_pdf(drawing_id, revision):
                             s2.commit()
 
                         stamps_added += 1
-                        print(f"✅ Added flattened {stamp_type} stamp on page {page_index+1}")
+                        print(f"[SUCCESS] Added flattened {stamp_type} stamp on page {page_index+1}")
                         continue
 
                     # Define stamp dimensions for regular textual stamps
@@ -3184,7 +3214,7 @@ def download_annotated_pdf(drawing_id, revision):
                         page.add_text_annot(fitz.Point(x, y), combined_text)
                     
                     stamps_added += 1
-                    print(f"✅ Added {stamp_type} stamp on page {page_index+1}")
+                    print(f"[SUCCESS] Added {stamp_type} stamp on page {page_index+1}")
                     
                 elif ann_type == "pen":
                     points = ann.get("points", [])
@@ -3202,33 +3232,33 @@ def download_annotated_pdf(drawing_id, revision):
                         s.finish(color=color, fill=None, width=width, lineCap=1, lineJoin=1, closePath=False)
                         s.commit()
                         annotations_added += 1
-                        print(f"✅ Added pen stroke on page {page_index+1}")
+                        print(f"[SUCCESS] Added pen stroke on page {page_index+1}")
                 else:
                     # Handle text annotation (existing code)
                     text = str(ann.get("text") or "").strip()
                     if not text:
-                        print(f"⚠️ Skipping annotation - empty text")
+                        print(f"[WARNING] Skipping annotation - empty text")
                         continue
 
                     # Add a standard text annotation icon at that point
                     page.add_text_annot(fitz.Point(x, y), text)
                     annotations_added += 1
-                    print(f"✅ Added text annotation on page {page_index+1}: '{text[:50]}...'")
+                    print(f"[SUCCESS] Added text annotation on page {page_index+1}: '{text[:50]}...'")
                     
             except Exception as e:
                 # Don't fail the whole export for a single bad annotation
-                print(f"❌ Failed to add annotation: {e}")
+                print(f"[ERROR] Failed to add annotation: {e}")
                 import traceback
                 traceback.print_exc()
                 continue
 
-        print(f"✅ Successfully added {annotations_added} text annotations and {stamps_added} stamps")
+        print(f"[SUCCESS] Successfully added {annotations_added} text annotations and {stamps_added} stamps")
 
         out_bytes = doc.write()
         doc.close()
 
         download_name = f"{drawing_id}_Rev{str(revision).zfill(2)}_annotated.pdf"
-        print(f"📦 Sending annotated PDF: {download_name} ({len(out_bytes)} bytes)")
+        print(f"[SUCCESS] Sending annotated PDF: {download_name} ({len(out_bytes)} bytes)")
         
         return send_file(
             io.BytesIO(out_bytes),
@@ -3237,7 +3267,7 @@ def download_annotated_pdf(drawing_id, revision):
             download_name=download_name
         )
     except Exception as e:
-        print(f"❌ FULL ERROR generating annotated PDF: {e}")
+        print(f"[ERROR] FULL ERROR generating annotated PDF: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
@@ -3455,14 +3485,14 @@ def prefill_upload():
             "task_number": task_number or ""
         }
         
-        print(f"📤 BACKEND /prefill-upload response: drawing_id={drawing_no}, revision={chosen_rev}")
+        print(f"[INFO] BACKEND /prefill-upload response: drawing_id={drawing_no}, revision={chosen_rev}")
         
         return jsonify(response_data)
 
     except Exception as e:
         print(f"Error in prefill-upload: {e}")
         traceback.print_exc()
-        return jsonify({"ok": False, "error": f"Unexpected: {e}"}), 500
+        return jsonify({"ok": False, "error": "An unexpected error occurred"}), 500
     finally:
         try: cur.close()
         except: pass
@@ -3556,7 +3586,8 @@ def save_annotations(drawing_id):
         annotations_dir = os.path.join(UPLOAD_FOLDER, 'annotations')
         os.makedirs(annotations_dir, exist_ok=True)
         
-        file_path = os.path.join(annotations_dir, f"{drawing_id}.json")
+        safe_drawing_id = secure_filename(drawing_id)
+        file_path = os.path.join(annotations_dir, f"{safe_drawing_id}.json")
         with open(file_path, 'w') as f:
             json.dump(annotations, f)
         
@@ -3574,7 +3605,8 @@ def load_annotations(drawing_id):
     """
     try:
         annotations_dir = os.path.join(UPLOAD_FOLDER, 'annotations')
-        file_path = os.path.join(annotations_dir, f"{drawing_id}.json")
+        safe_drawing_id = secure_filename(drawing_id)
+        file_path = os.path.join(annotations_dir, f"{safe_drawing_id}.json")
         
         if not os.path.exists(file_path):
             return jsonify({"annotations": []}), 200
@@ -3751,5 +3783,5 @@ def delete_team(id):
 
 # Canvas end
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
     # serve(app, port=5000, threads=4)

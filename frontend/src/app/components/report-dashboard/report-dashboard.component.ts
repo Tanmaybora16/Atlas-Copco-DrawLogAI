@@ -191,17 +191,25 @@ export class ReportDashboardComponent implements OnChanges, OnInit {
     };
 
     // 4. Status Distribution (Horizontal Bar)
+    const statusColors: { [key: string]: string } = {
+      'Correct': '#00E396',
+      'Wrong': '#FF4560',
+      'In Progress': '#FEB019'
+    };
+    const mappedColors = this.data.statusDistribution.map((s: any) => statusColors[s.status] || '#00E396');
+
     this.statusOptions = {
       series: [{
         name: 'Count',
         data: this.data.statusDistribution.map((s: any) => s.count)
       }],
       chart: { type: 'bar', height: 350, toolbar: { show: false } },
-      plotOptions: { bar: { horizontal: true, dataLabels: { position: 'top' } } },
+      plotOptions: { bar: { horizontal: true, distributed: true, dataLabels: { position: 'top' } } },
       dataLabels: { enabled: true, offsetX: -6, style: { fontSize: '12px', colors: ['#fff'] } },
       xaxis: { categories: this.data.statusDistribution.map((s: any) => s.status) },
-      colors: ['#00E396', '#FF4560', '#FEB019'],
-      title: { text: 'AUDIT STATUS DISTRIBUTION', align: 'left', style: { fontSize: '14px', color: '#666' } }
+      colors: mappedColors,
+      legend: { show: false },
+      title: { text: 'DRAWING STATUS DISTRIBUTIONS', align: 'left', style: { fontSize: '14px', color: '#666' } }
     };
 
     // 5. Auditor Leaderboard (Vertical Bar)
@@ -218,7 +226,7 @@ export class ReportDashboardComponent implements OnChanges, OnInit {
         categories: this.data.auditorLeaderboard.map((a: any) => a.name),
         labels: { rotate: -45, style: { fontSize: '10px' } }
       },
-      title: { text: 'AUDITOR PERFORMANCE', align: 'left', style: { fontSize: '14px', color: '#666' } }
+      title: { text: 'REVIEWER PERFORMANCE', align: 'left', style: { fontSize: '14px', color: '#666' } }
     };
 
     // 6. Monthly Trend (Line)

@@ -1,4 +1,6 @@
 backend/venv
+backend/.venv
+.venv
 __pycache__
 frontend/node_modules
 frontend/.angular
@@ -47,3 +49,6 @@ testem.log
 Thumbs.db
 /.qoder/
 backend/uploads
+.env
+backend/Atlashost/.env
+backend/Atlashost/uploads/

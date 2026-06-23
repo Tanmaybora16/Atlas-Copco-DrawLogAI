@@ -499,20 +499,19 @@ export class SubmissionComponent implements OnInit {
       html,
       width: '580px',
       showDenyButton: hasRejected,
-      denyButtonText: 'Special Case Accept',
+      denyButtonText: 'Non Standard Drawing Accept',
+      showCancelButton: hasRejected,
+      cancelButtonText: 'Cancel',
       confirmButtonColor: '#2563eb',
-      confirmButtonText: 'OK',
+      confirmButtonText: hasRejected ? 'Continue Anyway (Skip Non Standard)' : 'OK',
     }).then((result: any) => {
       if (result.isDenied && hasRejected) {
-        // User clicked Special Case Accept
+        // User clicked Non Standard Drawing Accept
         const rejectedFiles = originalFiles.filter(f => rejected.includes(f.name));
         this.submitBatch(form, true, rejectedFiles);
-      } else {
-        // User clicked OK or dismissed, reset form now
-        form.resetForm();
-        this.resetFormState();
-        this.selectedCreatorId = this.auth.getLoggedInUser?.() || '';
-        if (this.selectedCreatorId) this.fetchCreatorDetails(this.selectedCreatorId);
+      } else if (result.isConfirmed) {
+        // User clicked Continue Anyway or OK
+        this.performFormReset(form);
 
         // Show a final confirmation if they chose to discard the alphanumerical PDFs
         if (hasRejected) {
@@ -540,8 +539,24 @@ export class SubmissionComponent implements OnInit {
             });
           }
         }
+      } else {
+        // Cancel or dismissed
+        if (!hasRejected) {
+          // If all submissions were successful, dismiss should still reset the form
+          this.performFormReset(form);
+        } else {
+          // If there were rejections and they cancelled/dismissed, return to previous step without resetting
+          console.log('Submission canceled, returning to form with inputs preserved.');
+        }
       }
     });
+  }
+
+  private performFormReset(form: NgForm) {
+    form.resetForm();
+    this.resetFormState();
+    this.selectedCreatorId = this.auth.getLoggedInUser?.() || '';
+    if (this.selectedCreatorId) this.fetchCreatorDetails(this.selectedCreatorId);
   }
 
   private resetFormState(): void {

@@ -97,7 +97,7 @@ export class ReportTableComponent implements OnChanges {
 
         this.tableData = data.map((row) => ({
           ...row,
-          errorCodes: this.parseErrorCodes(row.errorCodes),
+          Error_codes: this.parseErrorCodes(row.Error_codes || row.errorCodes),
         }));
 
         this.sortTableData();

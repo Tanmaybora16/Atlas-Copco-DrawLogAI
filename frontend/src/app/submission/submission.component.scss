@@ -50,14 +50,14 @@ select {
   height: 50px;
   padding: 8px 24px;
   font-size: 16px;
-  background-color: #0087CB;
+  background-color: #0092BC;
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
 
   &:hover {
-    background-color: rgb(10, 158, 232);
+    background-color: #006F8F;
   }
 }
 
@@ -246,7 +246,7 @@ input {
 
   .file-icon {
     flex-shrink: 0;
-    color: #0087CB;
+    color: #0092BC;
   }
 
   .file-name {
@@ -320,7 +320,7 @@ textarea {
 
 
 #upload-button {
-  background-color: #0087CB;
+  background-color: #0092BC;
   color: white;
   height: 45px;
   padding: 0px 20px;
@@ -335,7 +335,7 @@ textarea {
   transition: all 0.2s ease;
 
   &:hover:not(.disabled) {
-    background-color: rgb(10, 158, 232);
+    background-color: #006F8F;
   }
 
   &.disabled {
@@ -702,7 +702,7 @@ footer {
   background: white;
 
   &:hover {
-    border-color: #0087CB;
+    border-color: #0092BC;
     background-color: #f8fbfd;
   }
 
@@ -712,8 +712,8 @@ footer {
     pointer-events: none;
 
     &:checked+.radio-custom {
-      border-color: #0087CB;
-      background-color: #0087CB;
+      border-color: #0092BC;
+      background-color: #0092BC;
 
       &::after {
         transform: translate(-50%, -50%) scale(1);
@@ -722,7 +722,7 @@ footer {
     }
 
     &:checked~.radio-text {
-      color: #0087CB;
+      color: #0092BC;
       font-weight: 600;
     }
   }
