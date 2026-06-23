@@ -28,6 +28,7 @@ import pytesseract as pyt
 import numpy as np
 from PIL import Image
 import smtplib
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -80,7 +81,7 @@ def connect_to_db():
             db = pymysql.connect(
                 host=os.getenv("DB_HOST", "localhost"),
                 user=os.getenv("DB_USER", "root"),
-                password=os.getenv("DB_PASSWORD", "root"),
+                password=os.getenv("DB_PASSWORD", ""),
                 database=os.getenv("DB_NAME", "atlascopco_drawing_db"),
                 connect_timeout=5,
                 autocommit=False,
@@ -122,7 +123,7 @@ tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 
 # SMTP Email Configuration (Use your SMTP server details)
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "Errorloggingportal@atlascopco.com")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.onevirtualoffice.local")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 25))
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true" if SMTP_PORT == 587 else "false").lower() in ("true", "1", "yes")
@@ -131,7 +132,9 @@ def get_smtp_server():
     server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
     # Commented out for production VM (uncomment if testing/using authentication):
     # if SMTP_USE_TLS:
-    #     server.starttls()
+    #     # Secure negotiation using modern TLS context (CWE-757)
+    #     context = ssl.create_default_context()
+    #     server.starttls(context=context)
     # if EMAIL_PASSWORD:
     #     server.login(EMAIL_SENDER, EMAIL_PASSWORD)
     return server
@@ -288,7 +291,12 @@ def submit_data():
             else:
                 file_path = (payload.get("file_path") or "").strip()
                 if file_path and os.path.exists(file_path):
-                    with open(file_path, "rb") as f:
+                    # Prevent directory traversal attacks (CWE-22 / CWE-23)
+                    resolved_path = os.path.realpath(file_path)
+                    resolved_upload_folder = os.path.realpath(UPLOAD_FOLDER)
+                    if not resolved_path.startswith(resolved_upload_folder + os.path.sep) and resolved_path != resolved_upload_folder:
+                        return dbg_fail("pdf-load", "Path traversal detected", extra={"file_path": file_path}, code=400)
+                    with open(resolved_path, "rb") as f:
                         pdf_bytes = f.read()
         except Exception as e:
             return dbg_fail("pdf-load", e, extra={"have_b64": bool(payload.get("file_bytes_b64")), "file_path": payload.get("file_path")}, code=400)
@@ -463,10 +471,10 @@ def submit_data():
                         task_number=task_number
                     )
                 except TypeError as e:
-                     print(f"⚠ email-send signature mismatch: {e}")
+                     print(f"[WARNING] email-send signature mismatch: {e}")
         except Exception as e:
             # Don't fail the whole transaction because of email
-            print("⚠ email-send failed:", e)
+            print("[WARNING] email-send failed:", e)
 
         # Commit all changes
         try:
@@ -477,7 +485,7 @@ def submit_data():
         return jsonify({"ok": True, "message": "Data saved successfully", "drawing_id": drawing_no, "revision": revision_no_int})
 
     except Exception as e:
-        print("❌ Uncaught in /submit:", e)
+        print("[ERROR] Uncaught in /submit:", e)
         import traceback
         traceback.print_exc()
         return dbg_fail("uncaught", e, code=500)
@@ -760,7 +768,7 @@ def forgot_password_initiate():
         otp_plain = str(otp_int)
 
         # 4) Hash OTP
-        otp_hash = bcrypt.hashpw(otp_plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        otp_hash = bcrypt.hashpw(otp_plain.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
 
         # 5) Upsert OTP row with user_id FK, expire in 5 minutes (use MySQL NOW() in IST)
         with g.db.cursor() as c:
@@ -929,7 +937,7 @@ def forgot_password_reset():
         user_email = row_email[0] if row_email else None
 
         # Update password in users table and delete OTP
-        new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
         with g.db.cursor() as c:
             c.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, user_id))
             c.execute("DELETE FROM login_otp WHERE user_id=%s", (user_id,))
@@ -1035,7 +1043,7 @@ def change_password():
             return jsonify({"success": False, "message": "New password cannot be the same as the previous password."}), 400
 
         # Update to new hash in users table
-        new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
         with g.db.cursor() as c:
             c.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, user_id))
         g.db.commit()
@@ -1143,7 +1151,7 @@ def add_employee():
             return jsonify({"success": False, "message": "Employee ID already exists"}), 4003
 
         # Create password hash from email
-        password_hash = bcrypt.hashpw(emp_email.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        password_hash = bcrypt.hashpw(emp_email.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
 
         # Insert into users table (new schema)
         cursor.execute("""
@@ -1151,7 +1159,7 @@ def add_employee():
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (emp_id, emp_name, emp_email, password_hash, 'user', emp_division, emp_pc, emp_team, True))
 
-        g.db.commit()  # ✅ commit DB changes before emailing
+        g.db.commit()  # [SUCCESS] commit DB changes before emailing
 
         # Send welcome email with username (EMP_<id>) and instructions
         try:
@@ -1921,10 +1929,10 @@ def employee_report():
                 d.drawing_no as Drawing_ID,
                 dr.revision_no as Revision_num,
                 u_rev.emp_id as Reviewer_EMP_ID,
-                dr.reviewed_date as Date,
-                CASE WHEN dr.approved = TRUE THEN 'Approve'
-                     WHEN dr.approved = FALSE THEN 'Reject'
-                     ELSE 'Pending' END as Decision,
+                COALESCE(dr.reviewed_date, dr.created_at) as Date,
+                CASE WHEN dr.reviewed_date IS NULL THEN 'Pending'
+                     WHEN dr.approved = TRUE THEN 'Approve'
+                     ELSE 'Reject' END as Decision,
                 GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes,
                 dr.task_number as Task_Number,
                 d.pc as drawing_pc,
@@ -1951,13 +1959,13 @@ def employee_report():
             params.extend(teams)
 
         if start_date:
-            query += " AND dr.reviewed_date >= %s"
+            query += " AND DATE(COALESCE(dr.reviewed_date, dr.created_at)) >= %s"
             params.append(start_date)
         if end_date:
-            query += " AND dr.reviewed_date <= %s"
+            query += " AND DATE(COALESCE(dr.reviewed_date, dr.created_at)) <= %s"
             params.append(end_date)
 
-        query += " GROUP BY dr.id, d.pc, u_cre.id ORDER BY dr.reviewed_date DESC"
+        query += " GROUP BY dr.id, d.pc, u_cre.id ORDER BY COALESCE(dr.reviewed_date, dr.created_at) DESC"
 
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
@@ -3077,10 +3085,10 @@ def download_annotated_pdf(drawing_id, revision):
     payload = request.get_json(silent=True) or {}
     annotations = payload.get("annotations") or []
 
-    print(f"📝 Generating annotated PDF for {drawing_id} Rev {revision}")
-    print(f"📝 Received {len(annotations)} annotations")
+    print(f"[INFO] Generating annotated PDF for {drawing_id} Rev {revision}")
+    print(f"[INFO] Received {len(annotations)} annotations")
 
-    # ✅ g.db safety check
+    # [SUCCESS] g.db safety check
     if not hasattr(g, "db") or g.db is None:
         return dbg_fail("db-check", "Database connection is not established", code=500)
 
@@ -3093,7 +3101,7 @@ def download_annotated_pdf(drawing_id, revision):
 
         # Open original PDF from DB
         doc = fitz.open(stream=blob, filetype="pdf")
-        print(f"📄 Opened PDF with {len(doc)} pages")
+        print(f"[INFO] Opened PDF with {len(doc)} pages")
 
         annotations_added = 0
         stamps_added = 0
@@ -3102,7 +3110,7 @@ def download_annotated_pdf(drawing_id, revision):
             try:
                 page_index = int(ann.get("page", 1)) - 1
                 if page_index < 0 or page_index >= len(doc):
-                    print(f"⚠️ Skipping annotation - page {page_index+1} out of range")
+                    print(f"[WARNING] Skipping annotation - page {page_index+1} out of range")
                     continue
                 
                 page = doc[page_index]
@@ -3154,7 +3162,7 @@ def download_annotated_pdf(drawing_id, revision):
                             s2.commit()
 
                         stamps_added += 1
-                        print(f"✅ Added flattened {stamp_type} stamp on page {page_index+1}")
+                        print(f"[SUCCESS] Added flattened {stamp_type} stamp on page {page_index+1}")
                         continue
 
                     # Define stamp dimensions for regular textual stamps
@@ -3206,7 +3214,7 @@ def download_annotated_pdf(drawing_id, revision):
                         page.add_text_annot(fitz.Point(x, y), combined_text)
                     
                     stamps_added += 1
-                    print(f"✅ Added {stamp_type} stamp on page {page_index+1}")
+                    print(f"[SUCCESS] Added {stamp_type} stamp on page {page_index+1}")
                     
                 elif ann_type == "pen":
                     points = ann.get("points", [])
@@ -3224,33 +3232,33 @@ def download_annotated_pdf(drawing_id, revision):
                         s.finish(color=color, fill=None, width=width, lineCap=1, lineJoin=1, closePath=False)
                         s.commit()
                         annotations_added += 1
-                        print(f"✅ Added pen stroke on page {page_index+1}")
+                        print(f"[SUCCESS] Added pen stroke on page {page_index+1}")
                 else:
                     # Handle text annotation (existing code)
                     text = str(ann.get("text") or "").strip()
                     if not text:
-                        print(f"⚠️ Skipping annotation - empty text")
+                        print(f"[WARNING] Skipping annotation - empty text")
                         continue
 
                     # Add a standard text annotation icon at that point
                     page.add_text_annot(fitz.Point(x, y), text)
                     annotations_added += 1
-                    print(f"✅ Added text annotation on page {page_index+1}: '{text[:50]}...'")
+                    print(f"[SUCCESS] Added text annotation on page {page_index+1}: '{text[:50]}...'")
                     
             except Exception as e:
                 # Don't fail the whole export for a single bad annotation
-                print(f"❌ Failed to add annotation: {e}")
+                print(f"[ERROR] Failed to add annotation: {e}")
                 import traceback
                 traceback.print_exc()
                 continue
 
-        print(f"✅ Successfully added {annotations_added} text annotations and {stamps_added} stamps")
+        print(f"[SUCCESS] Successfully added {annotations_added} text annotations and {stamps_added} stamps")
 
         out_bytes = doc.write()
         doc.close()
 
         download_name = f"{drawing_id}_Rev{str(revision).zfill(2)}_annotated.pdf"
-        print(f"📦 Sending annotated PDF: {download_name} ({len(out_bytes)} bytes)")
+        print(f"[SUCCESS] Sending annotated PDF: {download_name} ({len(out_bytes)} bytes)")
         
         return send_file(
             io.BytesIO(out_bytes),
@@ -3259,7 +3267,7 @@ def download_annotated_pdf(drawing_id, revision):
             download_name=download_name
         )
     except Exception as e:
-        print(f"❌ FULL ERROR generating annotated PDF: {e}")
+        print(f"[ERROR] FULL ERROR generating annotated PDF: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
@@ -3477,7 +3485,7 @@ def prefill_upload():
             "task_number": task_number or ""
         }
         
-        print(f"📤 BACKEND /prefill-upload response: drawing_id={drawing_no}, revision={chosen_rev}")
+        print(f"[INFO] BACKEND /prefill-upload response: drawing_id={drawing_no}, revision={chosen_rev}")
         
         return jsonify(response_data)
 
@@ -3578,7 +3586,8 @@ def save_annotations(drawing_id):
         annotations_dir = os.path.join(UPLOAD_FOLDER, 'annotations')
         os.makedirs(annotations_dir, exist_ok=True)
         
-        file_path = os.path.join(annotations_dir, f"{drawing_id}.json")
+        safe_drawing_id = secure_filename(drawing_id)
+        file_path = os.path.join(annotations_dir, f"{safe_drawing_id}.json")
         with open(file_path, 'w') as f:
             json.dump(annotations, f)
         
@@ -3596,7 +3605,8 @@ def load_annotations(drawing_id):
     """
     try:
         annotations_dir = os.path.join(UPLOAD_FOLDER, 'annotations')
-        file_path = os.path.join(annotations_dir, f"{drawing_id}.json")
+        safe_drawing_id = secure_filename(drawing_id)
+        file_path = os.path.join(annotations_dir, f"{safe_drawing_id}.json")
         
         if not os.path.exists(file_path):
             return jsonify({"annotations": []}), 200
