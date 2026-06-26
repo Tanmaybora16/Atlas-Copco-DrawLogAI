@@ -13,3 +13,4 @@ pytesseract==0.3.13
 scikit-learn==1.7.2
 Werkzeug==3.1.4
 pytz
+zipp>=3.19.1

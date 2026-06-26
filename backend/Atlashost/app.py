@@ -214,6 +214,13 @@ def upload_file():
 
     filename = secure_filename(file.filename)
     file_path = os.path.join(UPLOAD_FOLDER, filename)
+    
+    # Enforce strict path traversal check (CWE-22)
+    resolved_path = os.path.realpath(file_path)
+    resolved_upload_folder = os.path.realpath(UPLOAD_FOLDER)
+    if not resolved_path.startswith(resolved_upload_folder + os.path.sep) and resolved_path != resolved_upload_folder:
+        return jsonify({'error': 'Path traversal attempt detected'}), 400
+
     file.save(file_path)
     
     annotations = extract_annotations(file_path)
@@ -1746,7 +1753,11 @@ def _parse_error_codes(val):
             return json.loads(s)
         except Exception:
             try:
-                return list(ast.literal_eval(s))
+                # Cleanly extract list items without using AST execution (CWE-94)
+                inner_content = s[1:-1].strip()
+                if not inner_content:
+                    return []
+                return [item.strip().strip("'\"") for item in inner_content.split(',') if item.strip()]
             except Exception:
                 pass
     # Fallback: comma-separated string "P1,P22"
