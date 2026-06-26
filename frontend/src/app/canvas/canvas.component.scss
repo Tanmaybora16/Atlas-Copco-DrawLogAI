@@ -82,8 +82,8 @@
 
 
 .tool-group button.active {
-  background: #0ea5e9;
-  border-color: #0ea5e9;
+  background: var(--primary-color);
+  border-color: var(--primary-color);
   color: #ffffff;
 }
 
@@ -235,8 +235,8 @@
 }
 
 .annotation.selected {
-  background: rgba(14, 165, 233, 0.08);
-  border-color: #0ea5e9;
+  background: rgba(5, 78, 90, 0.08);
+  border-color: var(--primary-color);
 }
 
 /* Text annotation specific styles */
@@ -245,7 +245,7 @@
 }
 
 .annotation.text-annotation.selected {
-  background: rgba(14, 165, 233, 0.08);
+  background: rgba(5, 78, 90, 0.08);
 }
 
 /* Stamp annotation styles */
@@ -284,7 +284,7 @@
 }
 
 .annotation.stamp-annotation.selected {
-  box-shadow: 0 0 0 2px #0ea5e9;
+  box-shadow: 0 0 0 2px var(--primary-color);
 }
 
 .stamp-content {
@@ -367,7 +367,7 @@
   padding: 6px 8px;
   min-width: 160px;
   max-width: 80vw;
-  border: 1px dashed #0ea5e9;
+  border: 1px dashed var(--primary-color);
   border-radius: 6px;
   background: #ffffff;
   color: #111827;
@@ -409,8 +409,8 @@
   /* vertically center text and icon */
   gap: 8px;
   /* space between text and icon */
-  background-color: #0ea5e9;
-  /* blue background */
+  background-color: var(--primary-color);
+  /* brand background */
   color: #ffffff;
   /* white text */
   border: none;
@@ -425,8 +425,8 @@
 }
 
 .next-step button:hover {
-  background-color: #0284c7;
-  /* slightly darker on hover */
+  background-color: var(--primary-hover);
+  /* brand hover */
 }
 
 .next-step span {

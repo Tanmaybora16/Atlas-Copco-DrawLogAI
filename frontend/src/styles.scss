@@ -1,3 +1,14 @@
+:root {
+  --primary-color: #054E5A;
+  --primary-hover: #043e48;
+  --primary-light: #e6eff1;
+  --primary-light-hover: #d2e4e7;
+  --primary-active: #033139;
+  --success-color: #2e7d32;
+  --warning-color: #ed6c02;
+  --error-color: #d32f2f;
+}
+
 @import '../node_modules/@syncfusion/ej2-material-theme/styles/material.css';
 
 html, body{
@@ -23,7 +34,7 @@ html, body{
     flex-wrap: wrap;
   
   }
-
+ 
 .dropdown-search {
     height: 42px;
     border: 1px solid #BABABA;
@@ -62,14 +73,14 @@ html, body{
     height: 50px;
     padding: 8px 24px;
     font-size: 16px;
-    background-color: #0092BC;
+    background-color: var(--primary-color);
     color: white;
     border: none;
     border-radius: 8px;
     cursor: pointer;
   
     &:hover{
-        background-color: #006F8F;
+        background-color: var(--primary-hover);
     }
   }
   
@@ -102,4 +113,19 @@ html, body{
     transform: translateX(100%);
     background-color: #00cb51;
   }
+
+/* Global SweetAlert2 Button Color Customization */
+.swal2-styled.swal2-confirm {
+  background-color: var(--primary-color) !important;
+  transition: background-color 0.2s ease;
   
+  &:hover {
+    background-color: var(--primary-hover) !important;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 3px rgba(5, 78, 90, 0.4) !important;
+  }
+}
+
+

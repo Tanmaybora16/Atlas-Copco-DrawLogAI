@@ -81,7 +81,7 @@
   button {
     padding: 11px 16px;
     font-size: 16px;
-    background-color: #0092BC;
+    background-color: var(--primary-color);
     color: white;
     border: none;
     border-radius: 5px;
@@ -91,7 +91,7 @@
   }
   
   button:hover {
-    background-color: #017cc4;
+    background-color: var(--primary-hover);
   }
   
   
@@ -134,7 +134,7 @@
 
 .forgot-password a {
     font-size: 13px;
-    color: #0092BC;
+    color: var(--primary-color);
     text-decoration: none;
     transition: color 0.2s;
     cursor: pointer;
@@ -142,7 +142,7 @@
 
 .forgot-password a:hover {
     text-decoration: underline;
-    color: #017cc4;
+    color: var(--primary-hover);
 }
 
 /* Responsive Design */

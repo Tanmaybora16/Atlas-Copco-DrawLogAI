@@ -131,12 +131,13 @@ SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true" if SMTP_PORT == 587 else "false"
 def get_smtp_server():
     server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
     # Commented out for production VM (uncomment if testing/using authentication):
-    # if SMTP_USE_TLS:
-    #     # Secure negotiation using modern TLS context (CWE-757)
-    #     context = ssl.create_default_context()
-    #     server.starttls(context=context)
-    # if EMAIL_PASSWORD:
-    #     server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+    if SMTP_USE_TLS:
+        # Secure negotiation using modern TLS context (CWE-757)
+        context = ssl.create_default_context()
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        server.starttls(context=context)
+    if EMAIL_PASSWORD:
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
     return server
 
 
