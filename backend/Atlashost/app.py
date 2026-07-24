@@ -14,7 +14,6 @@ for env_path in [".env", "../.env"]:
                     val = val.strip().strip("'\"")
                     os.environ[key] = val
 
-from tkinter import messagebox
 from flask import Flask, jsonify, request, send_file, Response, g
 from flask_cors import CORS
 import base64, traceback
@@ -33,7 +32,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-import ast
 from collections import Counter
 import re
 import calendar
