@@ -111,8 +111,8 @@
     }
 
     &.active {
-      color: #0092BC;
-      border-bottom-color: #0092BC;
+      color: var(--primary-color);
+      border-bottom-color: var(--primary-color);
       font-weight: 600;
     }
   }
@@ -133,8 +133,8 @@
   line-height: 1;
 
   .active & {
-    background: #e0f2fe;
-    color: #0092BC;
+    background: var(--primary-light);
+    color: var(--primary-color);
   }
 }
 
@@ -159,7 +159,7 @@
 
   &:hover {
     background-color: #f5f5f5;
-    border-color: #0092BC;
+    border-color: var(--primary-color);
   }
 
   &:active {
@@ -265,20 +265,20 @@ tbody tr:hover {
   display: inline-flex; /* Use flexbox for icon and text alignment */
   align-items: center; /* Vertically align icon and text */
   padding: 8px 16px; /* Adjust padding as needed */
-  font-size: 16px;
-  background-color: #0092BC;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500; /* Adjust font weight for better match */
   font-size: 14px;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .status-pending {
-  color:#0092BC;
+  color: var(--primary-color);
     font-weight: bold;
-    background-color: #a9e2fe96;
+    background-color: rgba(5, 78, 90, 0.15);
     border-radius: 4px;
     padding: 4px 10px;
     width: fit-content;
@@ -331,7 +331,7 @@ tbody tr:hover {
     opacity: 0.5; /* Slightly transparent */
 }
 .actions button:hover {
-  background-color: #0074a5; /* lighter shade on hover */
+  background-color: var(--primary-hover); /* lighter shade on hover */
   transform: translateY(-1px); /* subtle lift */
 }
 

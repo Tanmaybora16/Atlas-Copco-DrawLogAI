@@ -14,7 +14,6 @@ for env_path in [".env", "../.env"]:
                     val = val.strip().strip("'\"")
                     os.environ[key] = val
 
-from tkinter import messagebox
 from flask import Flask, jsonify, request, send_file, Response, g
 from flask_cors import CORS
 import base64, traceback
@@ -33,7 +32,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-import ast
 from collections import Counter
 import re
 import calendar
@@ -131,12 +129,13 @@ SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true" if SMTP_PORT == 587 else "false"
 def get_smtp_server():
     server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
     # Commented out for production VM (uncomment if testing/using authentication):
-    # if SMTP_USE_TLS:
-    #     # Secure negotiation using modern TLS context (CWE-757)
-    #     context = ssl.create_default_context()
-    #     server.starttls(context=context)
-    # if EMAIL_PASSWORD:
-    #     server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+    if SMTP_USE_TLS:
+        # Secure negotiation using modern TLS context (CWE-757)
+        context = ssl.create_default_context()
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        server.starttls(context=context)
+    if EMAIL_PASSWORD:
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
     return server
 
 
@@ -213,6 +212,13 @@ def upload_file():
 
     filename = secure_filename(file.filename)
     file_path = os.path.join(UPLOAD_FOLDER, filename)
+    
+    # Enforce strict path traversal check (CWE-22)
+    resolved_path = os.path.realpath(file_path)
+    resolved_upload_folder = os.path.realpath(UPLOAD_FOLDER)
+    if not resolved_path.startswith(resolved_upload_folder + os.path.sep) and resolved_path != resolved_upload_folder:
+        return jsonify({'error': 'Path traversal attempt detected'}), 400
+
     file.save(file_path)
     
     annotations = extract_annotations(file_path)
@@ -1745,7 +1751,11 @@ def _parse_error_codes(val):
             return json.loads(s)
         except Exception:
             try:
-                return list(ast.literal_eval(s))
+                # Cleanly extract list items without using AST execution (CWE-94)
+                inner_content = s[1:-1].strip()
+                if not inner_content:
+                    return []
+                return [item.strip().strip("'\"") for item in inner_content.split(',') if item.strip()]
             except Exception:
                 pass
     # Fallback: comma-separated string "P1,P22"

@@ -494,7 +494,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
         top: `${top}px`,
         transform: `scale(${this.scale})`,
         transformOrigin: 'top left',
-        border: isSelected ? '2px solid #0ea5e9' : 'none'
+        border: isSelected ? '2px solid #054E5A' : 'none'
       };
     } else if (a.type === 'pen') {
       // Bounding box style for selection highlight when dragging
@@ -512,7 +512,7 @@ export class CanvasComponent implements AfterViewInit, OnInit {
         top: `${top}px`,
         fontSize: `${baseFontSize * this.scale}px`,
         color,
-        border: isSelected ? '1px solid #0ea5e9' : '1px solid transparent'
+        border: isSelected ? '1px solid #054E5A' : '1px solid transparent'
       };
     }
   }

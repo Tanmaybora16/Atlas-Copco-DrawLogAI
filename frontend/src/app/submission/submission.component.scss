@@ -50,14 +50,14 @@ select {
   height: 50px;
   padding: 8px 24px;
   font-size: 16px;
-  background-color: #0092BC;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
 
   &:hover {
-    background-color: #006F8F;
+    background-color: var(--primary-hover);
   }
 }
 
@@ -246,7 +246,7 @@ input {
 
   .file-icon {
     flex-shrink: 0;
-    color: #0092BC;
+    color: var(--primary-color);
   }
 
   .file-name {
@@ -320,7 +320,7 @@ textarea {
 
 
 #upload-button {
-  background-color: #0092BC;
+  background-color: var(--primary-color);
   color: white;
   height: 45px;
   padding: 0px 20px;
@@ -335,7 +335,7 @@ textarea {
   transition: all 0.2s ease;
 
   &:hover:not(.disabled) {
-    background-color: #006F8F;
+    background-color: var(--primary-hover);
   }
 
   &.disabled {
@@ -416,7 +416,7 @@ li {
 
 .ref-table-header h3 {
   font-size: 20px;
-  color: #005b82;
+  color: var(--primary-color);
   margin: 0;
 }
 
@@ -435,7 +435,7 @@ li {
 }
 
 .table-title p {
-  color: #005b82;
+  color: var(--primary-color);
   margin: 0;
   font-style: italic;
 }
@@ -462,7 +462,7 @@ th {
   position: sticky;
   top: 0;
   /* stick header to top */
-  background-color: #005b82;
+  background-color: var(--primary-color);
   color: white;
   text-align: left;
   padding: 12px 15px;
@@ -512,7 +512,7 @@ tr:hover {
 
 .seq-nr {
   font-weight: bold;
-  color: #005b82;
+  color: var(--primary-color);
 }
 
 .legend {
@@ -702,7 +702,7 @@ footer {
   background: white;
 
   &:hover {
-    border-color: #0092BC;
+    border-color: var(--primary-color);
     background-color: #f8fbfd;
   }
 
@@ -712,8 +712,8 @@ footer {
     pointer-events: none;
 
     &:checked+.radio-custom {
-      border-color: #0092BC;
-      background-color: #0092BC;
+      border-color: var(--primary-color);
+      background-color: var(--primary-color);
 
       &::after {
         transform: translate(-50%, -50%) scale(1);
@@ -722,7 +722,7 @@ footer {
     }
 
     &:checked~.radio-text {
-      color: #0092BC;
+      color: var(--primary-color);
       font-weight: 600;
     }
   }

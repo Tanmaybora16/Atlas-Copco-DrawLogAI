@@ -88,8 +88,8 @@ tbody tr:hover {
   padding: 8px 16px; /* Adjust padding as needed */
   font-size: 16px;
   background-color: white;
-  border: 1px solid #0092BC;
-  color: #0092BC;
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500; /* Adjust font weight for better match */
@@ -98,7 +98,7 @@ tbody tr:hover {
 
 /* ✅ Hover Effect */
 .download-button:hover {
-  background-color: #0092BC;
+  background-color: var(--primary-color);
   color: white;
 }
 
@@ -112,7 +112,7 @@ tbody tr:hover {
   width: 16px; /* Adjust icon size as needed */
   height: 16px; /* Adjust icon size as needed */
   margin-right: 8px; /* Add spacing between icon and text */
-  filter: brightness(0) saturate(100%) invert(25%) sepia(94%) saturate(740%) hue-rotate(181deg) brightness(95%) contrast(102%);
+  filter: brightness(0) saturate(100%) invert(23%) sepia(57%) saturate(1478%) hue-rotate(151deg) brightness(94%) contrast(101%);
 }
 
 

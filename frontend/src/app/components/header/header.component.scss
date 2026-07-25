@@ -85,13 +85,22 @@ nav a {
   }
 }
 
+.profile-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background-color: var(--primary-color);
+}
+
 .profile-icon {
   width: 15px;
   height: 15px;
-  padding: 6px;
-  border-radius: 50%;
+  padding: 0 !important;
+  margin: 0 !important;
   filter: invert(100%);
-  background-color: #e76128;
 }
 
 
@@ -188,7 +197,7 @@ nav a {
   margin-left: 10px;
 padding: 8px 16px;
 font-size: 14px;
-background-color: #0092BC;
+background-color: var(--primary-color);
 color: white;
 border: none;
 border-radius: 6px;
@@ -197,5 +206,5 @@ transition: background 0.3s ease;
 }
 
 .profile button:hover {
-background-color: #006ba1;
+background-color: var(--primary-hover);
 }

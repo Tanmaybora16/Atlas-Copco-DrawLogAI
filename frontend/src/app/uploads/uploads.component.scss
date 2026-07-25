@@ -257,7 +257,7 @@ input{
 }
 
 #upload-button {
-  background-color: #0092BC;
+  background-color: var(--primary-color);
   color: white; 
   padding: 14px 16px;
   border-radius: 5px;
@@ -266,7 +266,7 @@ input{
   transition: all 0.2s ease;
   
   &:hover:not(.disabled) {
-    background-color: #006F8F;
+    background-color: var(--primary-hover);
   }
   
   &.disabled {
@@ -374,7 +374,7 @@ textarea:focus {
 }
 
 .p-codes {
-  color: #0092BC;
+  color: var(--primary-color);
   font-weight: 500;
 }
 
@@ -471,7 +471,7 @@ select {
   padding: 0 32px;
   font-size: 16px;
   font-weight: 500;
-  background-color: #0092BC;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   border-radius: 8px;
@@ -479,7 +479,7 @@ select {
   transition: all 0.2s ease;
   
   &:hover:not(.disabled-btn) {
-    background-color: #006F8F;
+    background-color: var(--primary-hover);
   }
   
   &.disabled-btn {

@@ -111,20 +111,25 @@ select:focus::after {
 
 .add-btn {
   display: flex;
-  align-items: end;
+  align-items: flex-end;
 }
 .add-employee-button {
   display: inline-flex; /* Use flexbox for icon and text alignment */
   align-items: center; /* Vertically align icon and text */
   padding: 11px 16px; /* Adjust padding as needed */
   font-size: 16px;
-  background-color: #0092BC;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500; /* Adjust font weight for better match */
   margin-top: 10px; /* Add some spacing from the top */
+  transition: background-color 0.2s ease;
+
+  &:hover:not([disabled]) {
+    background-color: var(--primary-hover);
+  }
 }
 
 .button-icon {
@@ -301,7 +306,7 @@ border-color: #6C6C6C;
 }
 
 .dropdown-box.open {
-border-color: #0092BC;
+border-color: var(--primary-color);
 }
 
 .dropdown-box.disabled {

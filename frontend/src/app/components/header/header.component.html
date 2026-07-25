@@ -30,7 +30,9 @@
 
     <div class="profile" *ngIf="authService.isLoggedIn(); else guestBlock">
       <div class="profile-toggle" (click)="toggleProfileDropdown()">
-        <img class="profile-icon" src="/assets/user.svg" alt="User Icon" />
+        <div class="profile-icon-wrapper">
+          <img class="profile-icon" src="/assets/user.svg" alt="User Icon" />
+        </div>
         <p>{{ loggedInUser }}</p>
         <span class="role" [ngClass]="userRole">{{ userRole }}</span>
       </div>
