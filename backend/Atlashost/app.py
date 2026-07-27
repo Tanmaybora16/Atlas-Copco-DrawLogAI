@@ -1933,7 +1933,7 @@ def employee_report():
 
         cursor = g.db.cursor()
 
-        # Build query using joined creator details for consistency
+        # Build query using joined reviewer details for reviewer performance report
         query = """
             SELECT
                 d.drawing_no as Drawing_ID,
@@ -1946,9 +1946,9 @@ def employee_report():
                 GROUP_CONCAT(ec.code SEPARATOR ', ') as Error_codes,
                 dr.task_number as Task_Number,
                 d.pc as drawing_pc,
-                u_cre.name as Employee_name,
-                u_cre.pc as user_pc,
-                u_cre.division as Division,
+                COALESCE(u_rev.name, u_cre.name) as Employee_name,
+                COALESCE(u_rev.pc, u_cre.pc) as user_pc,
+                COALESCE(u_rev.division, u_cre.division) as Division,
                 u_cre.emp_id as Creator_EMP_ID
             FROM drawings d
             JOIN drawing_revisions dr ON d.id = dr.drawing_id
@@ -1961,11 +1961,11 @@ def employee_report():
         params = []
 
         if employee_id:
-            query += " AND u_cre.emp_id = %s"
+            query += " AND u_rev.emp_id = %s"
             params.append(employee_id)
         elif teams:
             placeholders = ','.join(['%s'] * len(teams))
-            query += f" AND u_cre.team IN ({placeholders})"
+            query += f" AND u_rev.team IN ({placeholders})"
             params.extend(teams)
 
         if start_date:
@@ -1975,7 +1975,7 @@ def employee_report():
             query += " AND DATE(COALESCE(dr.reviewed_date, dr.created_at)) <= %s"
             params.append(end_date)
 
-        query += " GROUP BY dr.id, d.pc, u_cre.id ORDER BY COALESCE(dr.reviewed_date, dr.created_at) DESC"
+        query += " GROUP BY dr.id, d.pc, u_cre.id, u_rev.id ORDER BY COALESCE(dr.reviewed_date, dr.created_at) DESC"
 
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
