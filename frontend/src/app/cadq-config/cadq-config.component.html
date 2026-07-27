@@ -1,0 +1,69 @@
+<div class="config-container">
+  <h2>CADQ Checklist Configuration</h2>
+
+  <div class="controls">
+    <label for="teamSelect">Select Team: </label>
+    <select id="teamSelect" [(ngModel)]="selectedTeam" (change)="onTeamChange()">
+      <option value="Global">Global (Default)</option>
+      <option *ngFor="let t of teams" [value]="t.name">{{ t.name }}</option>
+    </select>
+
+    <button class="btn btn-primary" (click)="addRow()">+ Add Row</button>
+    <button class="btn btn-secondary" (click)="loadPrimaryChecklist()">Load Default Checklist</button>
+    <button class="btn btn-success" (click)="saveAll()">Save All Changes</button>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Seq. Nr.</th>
+          <th>Standard Ref.</th>
+          <th>Part</th>
+          <th>Piping</th>
+          <th>Welded</th>
+          <th>Other</th>
+          <th>Ferro</th>
+          <th>Non Ferro</th>
+          <th>Casted & Machined</th>
+          <th>Machined (Non Casted)</th>
+          <th>Sheet Metal</th>
+          <th>Foam/Decals</th>
+          <th>Assembly</th>
+          <th>Instruction</th>
+          <th>Information</th>
+          <th>Safety Labels</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of checklistItems; let i = index">
+          <td><input type="number" [(ngModel)]="item.display_order" style="width: 50px;"></td>
+          <td><input type="text" [(ngModel)]="item.seq_nr" style="width: 50px;"></td>
+          <td><input type="text" [(ngModel)]="item.standard_ref" style="width: 150px;"></td>
+          
+          <td><input type="text" [(ngModel)]="item.part_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.piping_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.welded_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.other_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.ferro_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.non_ferro_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.casted_machined_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.machined_non_casted_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.sheet_metal_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.foam_decals_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.assembly_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.instruction_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.information_val" style="width: 30px;" title="M/O/Blank"></td>
+          <td><input type="text" [(ngModel)]="item.safety_labels_val" style="width: 30px;" title="M/O/Blank"></td>
+          
+          <td class="actions">
+            <button class="btn btn-success btn-sm" (click)="saveRow(item)" [disabled]="isBusy">Save</button>
+            <button class="btn btn-danger btn-sm" (click)="deleteRow(item, i)" [disabled]="isBusy">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

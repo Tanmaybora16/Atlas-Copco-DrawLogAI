@@ -27,6 +27,10 @@ interface EmployeeOption {
 export class SubmissionComponent implements OnInit {
   private readonly API = `${environment.apiUrl}`;
 
+  // CADQ Checklist
+  checklistItems: any[] = [];
+  checklistEdition: string = '06';
+
   // Busy flag to prevent double-clicks
   isBusy = false;
 
@@ -128,6 +132,20 @@ export class SubmissionComponent implements OnInit {
 
     // 3) Load employees for reviewer dropdown
     this.fetchEmployees();
+
+    // 4) Fetch app settings
+    this.fetchAppSettings();
+  }
+
+  fetchAppSettings() {
+    this.http.get<any>(`${this.API}/app-settings`).subscribe(
+      (data) => {
+        if (data && data.checklist_edition) {
+          this.checklistEdition = data.checklist_edition;
+        }
+      },
+      (error) => console.error('Error fetching app settings:', error)
+    );
   }
 
   // Dropdown toggles
@@ -265,8 +283,24 @@ export class SubmissionComponent implements OnInit {
           this.displaySinglePC = true;
           this.selectedPC = rawPC;
         }
+
+        // Fetch checklist for the team
+        this.fetchCadqChecklist((this.selectedCreator.emp_team || '').toString());
       },
       (error) => console.error('Error fetching creator details:', error),
+    );
+  }
+
+  fetchCadqChecklist(team: string) {
+    let url = `${this.API}/api/cadq-checklist?_t=${new Date().getTime()}`;
+    if (team) {
+      url += `&team=${encodeURIComponent(team.trim())}`;
+    }
+    this.http.get<any[]>(url).subscribe(
+      (data) => {
+        this.checklistItems = data || [];
+      },
+      (error) => console.error('Error fetching checklist:', error)
     );
   }
 
