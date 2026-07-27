@@ -53,3 +53,4 @@ backend/uploads
 backend/Atlashost/.env
 backend/Atlashost/uploads/
 *.sql
+backend/.env.example
