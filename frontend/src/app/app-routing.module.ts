@@ -11,6 +11,7 @@ import { RequestsComponent } from './requests/requests.component';
 import { SubmissionComponent } from './submission/submission.component';
 import { CanvasComponent } from './canvas/canvas.component';
 import { StructureComponent } from './structure/structure.component';
+import { CadqConfigComponent } from './cadq-config/cadq-config.component';
 
 const routes: Routes = [
   // Redirect root to explicit login route
@@ -39,6 +40,7 @@ const routes: Routes = [
   // Employee page – HR only
   { path: 'employee', component: EmployeeComponent, canActivate: [AuthGuard], data: { roles: ['HR'] } },
   { path: 'structure', component: StructureComponent, canActivate: [AuthGuard], data: { roles: ['HR'] } },
+  { path: 'cadq-config', component: CadqConfigComponent, canActivate: [AuthGuard], data: { roles: ['HR'] } },
   { path: 'canvas', component: CanvasComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] } },
 
   // Fallback

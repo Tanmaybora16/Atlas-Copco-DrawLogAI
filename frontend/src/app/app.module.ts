@@ -27,6 +27,7 @@ import { FooterComponent } from './footer/footer.component';
 import { StructureComponent } from './structure/structure.component';
 import { AuthInterceptor } from './auth.interceptor';
 import { ReportDashboardComponent } from './components/report-dashboard/report-dashboard.component';
+import { CadqConfigComponent } from './cadq-config/cadq-config.component';
 
 
 @NgModule({
@@ -51,7 +52,8 @@ import { ReportDashboardComponent } from './components/report-dashboard/report-d
     CanvasComponent,
     FooterComponent,
     StructureComponent,
-    ReportDashboardComponent
+    ReportDashboardComponent,
+    CadqConfigComponent
 
   ],
   imports: [

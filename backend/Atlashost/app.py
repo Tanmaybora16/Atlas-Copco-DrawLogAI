@@ -3791,6 +3791,123 @@ def delete_team(id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ----------------- CADQ Checklist Endpoints ----------------- #
+
+@app.route('/api/app-settings', methods=['GET'])
+def get_app_settings():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        with g.db.cursor(pymysql.cursors.DictCursor) as c:
+            c.execute("SELECT setting_value FROM app_settings WHERE setting_key = 'checklist_edition'")
+            row = c.fetchone()
+            edition = row['setting_value'] if row else ''
+            return jsonify({"checklist_edition": edition}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/cadq-checklist', methods=['GET'])
+def get_cadq_checklist():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        team = request.args.get('team')
+        with g.db.cursor(pymysql.cursors.DictCursor) as c:
+            if team and team != 'Global' and team != 'null':
+                # First check if there is a specific checklist for this team
+                c.execute("SELECT * FROM cadq_checklist WHERE team_name = %s ORDER BY display_order ASC", (team,))
+                rows = c.fetchall()
+                if not rows:
+                    # Fallback to Global defaults if team has no custom checklist
+                    c.execute("SELECT * FROM cadq_checklist WHERE team_name IS NULL ORDER BY display_order ASC")
+                    rows = c.fetchall()
+                return jsonify(rows), 200
+            else:
+                # Fetch only Global items when no team is specified or Global is selected
+                c.execute("SELECT * FROM cadq_checklist WHERE team_name IS NULL ORDER BY display_order ASC")
+                return jsonify(c.fetchall()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/cadq-checklist', methods=['POST'])
+def save_cadq_checklist():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        data = request.json or {}
+        # Expected fields based on DB
+        seq_nr = data.get('seq_nr', '')
+        standard_ref = data.get('standard_ref', '')
+        part_val = data.get('part_val', '')
+        piping_val = data.get('piping_val', '')
+        welded_val = data.get('welded_val', '')
+        other_val = data.get('other_val', '')
+        ferro_val = data.get('ferro_val', '')
+        non_ferro_val = data.get('non_ferro_val', '')
+        casted_machined_val = data.get('casted_machined_val', '')
+        machined_non_casted_val = data.get('machined_non_casted_val', '')
+        sheet_metal_val = data.get('sheet_metal_val', '')
+        foam_decals_val = data.get('foam_decals_val', '')
+        assembly_val = data.get('assembly_val', '')
+        instruction_val = data.get('instruction_val', '')
+        information_val = data.get('information_val', '')
+        safety_labels_val = data.get('safety_labels_val', '')
+        team_name = data.get('team_name', None)
+        
+        # Ensure team_name is NULL if it's empty string or "null" or "Global"
+        if team_name == '' or team_name == 'null' or team_name == 'Global':
+            team_name = None
+
+        display_order = data.get('display_order', 0)
+        
+        item_id = data.get('id')
+        
+        with g.db.cursor() as c:
+            if item_id:
+                sql = """
+                    UPDATE cadq_checklist SET
+                    seq_nr=%s, standard_ref=%s, part_val=%s, piping_val=%s, welded_val=%s, other_val=%s,
+                    ferro_val=%s, non_ferro_val=%s, casted_machined_val=%s, machined_non_casted_val=%s,
+                    sheet_metal_val=%s, foam_decals_val=%s, assembly_val=%s, instruction_val=%s,
+                    information_val=%s, safety_labels_val=%s, team_name=%s, display_order=%s
+                    WHERE id=%s
+                """
+                c.execute(sql, (
+                    seq_nr, standard_ref, part_val, piping_val, welded_val, other_val,
+                    ferro_val, non_ferro_val, casted_machined_val, machined_non_casted_val,
+                    sheet_metal_val, foam_decals_val, assembly_val, instruction_val,
+                    information_val, safety_labels_val, team_name, display_order, item_id
+                ))
+            else:
+                sql = """
+                    INSERT INTO cadq_checklist (
+                        seq_nr, standard_ref, part_val, piping_val, welded_val, other_val, 
+                        ferro_val, non_ferro_val, casted_machined_val, machined_non_casted_val, 
+                        sheet_metal_val, foam_decals_val, assembly_val, instruction_val, 
+                        information_val, safety_labels_val, team_name, display_order
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    )
+                """
+                c.execute(sql, (
+                    seq_nr, standard_ref, part_val, piping_val, welded_val, other_val,
+                    ferro_val, non_ferro_val, casted_machined_val, machined_non_casted_val,
+                    sheet_metal_val, foam_decals_val, assembly_val, instruction_val,
+                    information_val, safety_labels_val, team_name, display_order
+                ))
+        g.db.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/cadq-checklist/<int:id>', methods=['DELETE'])
+def delete_cadq_checklist(id):
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        with g.db.cursor() as c:
+            c.execute("DELETE FROM cadq_checklist WHERE id = %s", (id,))
+        g.db.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # Canvas end
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
