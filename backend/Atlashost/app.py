@@ -4015,6 +4015,91 @@ def bulk_save_cadq_checklist():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ----------------- Support Request Endpoint & Helper ----------------- #
+def send_support_email(name: str, emp_id: str, team: str, user_message: str):
+    """
+    Sends support request notification email to suraj6re@gmail.com
+    """
+    try:
+        to_email = "suraj6re@gmail.com"
+        subject = f"Support Request from {name} ({emp_id})"
+        
+        body = f"""Hello Admin,
+
+A new Support / Feedback request has been submitted through the DrawLogAI Portal.
+
+User Details:
+----------------------------------------
+Name     : {name}
+Emp ID   : {emp_id}
+Team     : {team or 'N/A'}
+Submitted: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Message / Issue Description:
+----------------------------------------
+{user_message}
+
+----------------------------------------
+Regards,
+Atlas Copco DrawLogAI Portal
+"""
+
+        server = get_smtp_server()
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL_SENDER
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
+        server.quit()
+        print(f"[SUCCESS] Support notification email sent to {to_email}")
+    except Exception as e:
+        print("[ERROR] Failed to send support notification email:", e)
+
+
+@app.route('/api/support', methods=['POST'])
+def submit_support_request():
+    try:
+        data = request.json or {}
+        name = (data.get('name') or '').strip()
+        emp_id = (data.get('emp_id') or '').strip()
+        team = (data.get('team') or '').strip()
+        message = (data.get('message') or '').strip()
+
+        if not name or not emp_id or not message:
+            return jsonify({"error": "Name, Emp ID, and Message are required fields"}), 400
+
+        # Save to database if available
+        if hasattr(g, 'db') and g.db is not None:
+            try:
+                with g.db.cursor() as c:
+                    c.execute("""
+                        CREATE TABLE IF NOT EXISTS support_requests (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            name VARCHAR(255) NOT NULL,
+                            emp_id VARCHAR(100) NOT NULL,
+                            team VARCHAR(100),
+                            message TEXT NOT NULL,
+                            status VARCHAR(50) DEFAULT 'Open',
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    c.execute("""
+                        INSERT INTO support_requests (name, emp_id, team, message)
+                        VALUES (%s, %s, %s, %s)
+                    """, (name, emp_id, team, message))
+                g.db.commit()
+            except Exception as db_err:
+                print(f"[WARN] Support request DB save error: {db_err}")
+
+        # Send notification email to suraj6re@gmail.com
+        send_support_email(name, emp_id, team, message)
+
+        return jsonify({"success": True, "message": "Support request submitted successfully"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # Canvas end
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
