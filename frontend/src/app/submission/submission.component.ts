@@ -292,9 +292,9 @@ export class SubmissionComponent implements OnInit {
   }
 
   fetchCadqChecklist(team: string) {
-    let url = `${this.API}/api/cadq-checklist`;
+    let url = `${this.API}/api/cadq-checklist?_t=${new Date().getTime()}`;
     if (team) {
-      url += `?team=${encodeURIComponent(team.trim())}`;
+      url += `&team=${encodeURIComponent(team.trim())}`;
     }
     this.http.get<any[]>(url).subscribe(
       (data) => {

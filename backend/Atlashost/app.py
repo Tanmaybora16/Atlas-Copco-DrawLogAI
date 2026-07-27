@@ -3819,11 +3819,14 @@ def get_cadq_checklist():
                     # Fallback to Global defaults if team has no custom checklist
                     c.execute("SELECT * FROM cadq_checklist WHERE team_name IS NULL ORDER BY display_order ASC")
                     rows = c.fetchall()
-                return jsonify(rows), 200
             else:
                 # Fetch only Global items when no team is specified or Global is selected
                 c.execute("SELECT * FROM cadq_checklist WHERE team_name IS NULL ORDER BY display_order ASC")
-                return jsonify(c.fetchall()), 200
+                rows = c.fetchall()
+            
+            response = jsonify(rows)
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            return response, 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -3860,6 +3863,15 @@ def save_cadq_checklist():
         item_id = data.get('id')
         
         with g.db.cursor() as c:
+            if not item_id and standard_ref:
+                if team_name is None:
+                    c.execute("SELECT id FROM cadq_checklist WHERE standard_ref = %s AND team_name IS NULL", (standard_ref,))
+                else:
+                    c.execute("SELECT id FROM cadq_checklist WHERE standard_ref = %s AND team_name = %s", (standard_ref, team_name))
+                row = c.fetchone()
+                if row:
+                    item_id = row[0] if isinstance(row, tuple) else row['id']
+
             if item_id:
                 sql = """
                     UPDATE cadq_checklist SET
@@ -3905,6 +3917,101 @@ def delete_cadq_checklist(id):
             c.execute("DELETE FROM cadq_checklist WHERE id = %s", (id,))
         g.db.commit()
         return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/cadq-checklist/bulk-save', methods=['POST'])
+def bulk_save_cadq_checklist():
+    if not hasattr(g, 'db') or g.db is None: return jsonify({"error": "DB connection failed"}), 500
+    try:
+        payload = request.json or {}
+        team_name = payload.get('team')
+        if team_name == '' or team_name == 'null' or team_name == 'Global':
+            team_name = None
+            
+        items = payload.get('items', [])
+        if not isinstance(items, list):
+            return jsonify({"error": "Items must be a list"}), 400
+
+        with g.db.cursor() as c:
+            submitted_ids = [int(item['id']) for item in items if item.get('id')]
+            
+            if team_name is None:
+                if submitted_ids:
+                    format_strings = ','.join(['%s'] * len(submitted_ids))
+                    c.execute(f"DELETE FROM cadq_checklist WHERE team_name IS NULL AND id NOT IN ({format_strings})", tuple(submitted_ids))
+                else:
+                    c.execute("DELETE FROM cadq_checklist WHERE team_name IS NULL")
+            else:
+                if submitted_ids:
+                    format_strings = ','.join(['%s'] * len(submitted_ids))
+                    c.execute(f"DELETE FROM cadq_checklist WHERE team_name = %s AND id NOT IN ({format_strings})", (team_name,) + tuple(submitted_ids))
+                else:
+                    c.execute("DELETE FROM cadq_checklist WHERE team_name = %s", (team_name,))
+            
+            for i, item in enumerate(items):
+                item_id = item.get('id')
+                seq_nr = item.get('seq_nr', '')
+                standard_ref = item.get('standard_ref', '')
+                part_val = item.get('part_val', '')
+                piping_val = item.get('piping_val', '')
+                welded_val = item.get('welded_val', '')
+                other_val = item.get('other_val', '')
+                ferro_val = item.get('ferro_val', '')
+                non_ferro_val = item.get('non_ferro_val', '')
+                casted_machined_val = item.get('casted_machined_val', '')
+                machined_non_casted_val = item.get('machined_non_casted_val', '')
+                sheet_metal_val = item.get('sheet_metal_val', '')
+                foam_decals_val = item.get('foam_decals_val', '')
+                assembly_val = item.get('assembly_val', '')
+                instruction_val = item.get('instruction_val', '')
+                information_val = item.get('information_val', '')
+                safety_labels_val = item.get('safety_labels_val', '')
+                display_order = item.get('display_order', i + 1)
+                
+                if not item_id and standard_ref:
+                    if team_name is None:
+                        c.execute("SELECT id FROM cadq_checklist WHERE standard_ref = %s AND team_name IS NULL", (standard_ref,))
+                    else:
+                        c.execute("SELECT id FROM cadq_checklist WHERE standard_ref = %s AND team_name = %s", (standard_ref, team_name))
+                    row = c.fetchone()
+                    if row:
+                        item_id = row[0] if isinstance(row, tuple) else row['id']
+                
+                if item_id:
+                    sql = """
+                        UPDATE cadq_checklist SET
+                        seq_nr=%s, standard_ref=%s, part_val=%s, piping_val=%s, welded_val=%s, other_val=%s,
+                        ferro_val=%s, non_ferro_val=%s, casted_machined_val=%s, machined_non_casted_val=%s,
+                        sheet_metal_val=%s, foam_decals_val=%s, assembly_val=%s, instruction_val=%s,
+                        information_val=%s, safety_labels_val=%s, team_name=%s, display_order=%s
+                        WHERE id=%s
+                    """
+                    c.execute(sql, (
+                        seq_nr, standard_ref, part_val, piping_val, welded_val, other_val,
+                        ferro_val, non_ferro_val, casted_machined_val, machined_non_casted_val,
+                        sheet_metal_val, foam_decals_val, assembly_val, instruction_val,
+                        information_val, safety_labels_val, team_name, display_order, item_id
+                    ))
+                else:
+                    sql = """
+                        INSERT INTO cadq_checklist (
+                            seq_nr, standard_ref, part_val, piping_val, welded_val, other_val, 
+                            ferro_val, non_ferro_val, casted_machined_val, machined_non_casted_val, 
+                            sheet_metal_val, foam_decals_val, assembly_val, instruction_val, 
+                            information_val, safety_labels_val, team_name, display_order
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                    """
+                    c.execute(sql, (
+                        seq_nr, standard_ref, part_val, piping_val, welded_val, other_val,
+                        ferro_val, non_ferro_val, casted_machined_val, machined_non_casted_val,
+                        sheet_metal_val, foam_decals_val, assembly_val, instruction_val,
+                        information_val, safety_labels_val, team_name, display_order
+                    ))
+        g.db.commit()
+        return jsonify({"success": True, "count": len(items)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

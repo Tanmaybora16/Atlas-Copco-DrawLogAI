@@ -20,11 +20,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 1
+    "display_order": 1,
   },
   {
     "seq_nr": "2.0",
-    "standard_ref": "1350 K-f,m,c or v as required General tolerances and            standard references",
+    "standard_ref": "1350 K-f,m,c or v as required General tolerances and standard references",
     "part_val": "",
     "piping_val": "O",
     "welded_val": "M",
@@ -39,7 +39,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 2
+    "display_order": 2,
   },
   {
     "seq_nr": "3.0",
@@ -58,7 +58,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 3
+    "display_order": 3,
   },
   {
     "seq_nr": "4.0",
@@ -77,7 +77,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 4
+    "display_order": 4,
   },
   {
     "seq_nr": "4a",
@@ -96,11 +96,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 5
+    "display_order": 5,
   },
   {
     "seq_nr": "5.0",
-    "standard_ref": "6131 K Dimensional tolerances and machining allowances for            castings",
+    "standard_ref": "6131 K Dimensional tolerances and machining allowances for castings",
     "part_val": "",
     "piping_val": "",
     "welded_val": "",
@@ -115,11 +115,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 6
+    "display_order": 6,
   },
   {
     "seq_nr": "6.0",
-    "standard_ref": "6134 K Specifications for steel and iron casting            requirements",
+    "standard_ref": "6134 K Specifications for steel and iron casting requirements",
     "part_val": "",
     "piping_val": "",
     "welded_val": "",
@@ -134,7 +134,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 7
+    "display_order": 7,
   },
   {
     "seq_nr": "7.0",
@@ -153,7 +153,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 8
+    "display_order": 8,
   },
   {
     "seq_nr": "8.0",
@@ -172,7 +172,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 9
+    "display_order": 9,
   },
   {
     "seq_nr": "9.0",
@@ -191,11 +191,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 10
+    "display_order": 10,
   },
   {
     "seq_nr": "11.0",
-    "standard_ref": "Confidentiality note. It should contain \"This document is            property of Atlas Copco AB and shall not without our            permission be altered, copied, used for manufacturing or            communicated to any other person or company\".",
+    "standard_ref": "Confidentiality note. It should contain \"This document is property of Atlas Copco AB and shall not without our permission be altered, copied, used for manufacturing or communicated to any other person or company\".",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -210,7 +210,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 11
+    "display_order": 11,
   },
   {
     "seq_nr": "12.0",
@@ -229,7 +229,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 12
+    "display_order": 12,
   },
   {
     "seq_nr": "13.0",
@@ -248,11 +248,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 13
+    "display_order": 13,
   },
   {
     "seq_nr": "14.0",
-    "standard_ref": "Check drawing & document edition, vault edition and BPCS            edition are same",
+    "standard_ref": "Check drawing & document edition, vault edition and BPCS edition are same",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -267,7 +267,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 14
+    "display_order": 14,
   },
   {
     "seq_nr": "15.0",
@@ -286,7 +286,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 15
+    "display_order": 15,
   },
   {
     "seq_nr": "16.0",
@@ -305,11 +305,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 16
+    "display_order": 16,
   },
   {
     "seq_nr": "17.0",
-    "standard_ref": "Material assigned. Should be given in title block of the            drawing. Exception for tabular drawing",
+    "standard_ref": "Material assigned. Should be given in title block of the drawing. Exception for tabular drawing",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -324,11 +324,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 17
+    "display_order": 17,
   },
   {
     "seq_nr": "18.0",
-    "standard_ref": "Material comment added (T for thickness) if not            dimensioned",
+    "standard_ref": "Material comment added (T for thickness) if not dimensioned",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -343,11 +343,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 18
+    "display_order": 18,
   },
   {
     "seq_nr": "19.0",
-    "standard_ref": "Treatment assigned, or not applicable. Should be given in            title block of the drawing. Exception for tabular drawing",
+    "standard_ref": "Treatment assigned, or not applicable. Should be given in title block of the drawing. Exception for tabular drawing",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -362,7 +362,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 19
+    "display_order": 19,
   },
   {
     "seq_nr": "20.0",
@@ -381,11 +381,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 20
+    "display_order": 20,
   },
   {
     "seq_nr": "22.0",
-    "standard_ref": "Latest edition of Atlas Copco template used Exception US:            Latest edition of ANSI templates used",
+    "standard_ref": "Latest edition of Atlas Copco template used Exception US: Latest edition of ANSI templates used",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -400,7 +400,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 21
+    "display_order": 21,
   },
   {
     "seq_nr": "23.0",
@@ -419,7 +419,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 22
+    "display_order": 22,
   },
   {
     "seq_nr": "24.0",
@@ -438,11 +438,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 23
+    "display_order": 23,
   },
   {
     "seq_nr": "26.0",
-    "standard_ref": "Standard scale used Exception US: Scales to be used 1/1;            1/2; 1/4; 2/1; 3/1; 4/1; 5/1; 10/1",
+    "standard_ref": "Standard scale used Exception US: Scales to be used 1/1; 1/2; 1/4; 2/1; 3/1; 4/1; 5/1; 10/1",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -457,7 +457,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "O",
     "information_val": "O",
     "safety_labels_val": "O",
-    "display_order": 24
+    "display_order": 24,
   },
   {
     "seq_nr": "27.0",
@@ -476,7 +476,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "M",
-    "display_order": 25
+    "display_order": 25,
   },
   {
     "seq_nr": "28.0",
@@ -495,7 +495,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "M",
-    "display_order": 26
+    "display_order": 26,
   },
   {
     "seq_nr": "29.0",
@@ -514,7 +514,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 27
+    "display_order": 27,
   },
   {
     "seq_nr": "30.0",
@@ -533,7 +533,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 28
+    "display_order": 28,
   },
   {
     "seq_nr": "31.0",
@@ -552,7 +552,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 29
+    "display_order": 29,
   },
   {
     "seq_nr": "32.0",
@@ -571,7 +571,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 30
+    "display_order": 30,
   },
   {
     "seq_nr": "33.0",
@@ -590,11 +590,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 31
+    "display_order": 31,
   },
   {
     "seq_nr": "34.0",
-    "standard_ref": "All centermarks and centerlines drawn for holes /            symmetric parts",
+    "standard_ref": "All centermarks and centerlines drawn for holes / symmetric parts",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -609,7 +609,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 32
+    "display_order": 32,
   },
   {
     "seq_nr": "35.0",
@@ -628,7 +628,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 33
+    "display_order": 33,
   },
   {
     "seq_nr": "36.0",
@@ -647,7 +647,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 34
+    "display_order": 34,
   },
   {
     "seq_nr": "37.0",
@@ -666,11 +666,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 35
+    "display_order": 35,
   },
   {
     "seq_nr": "38.0",
-    "standard_ref": "Text on drawing acc.Atlas Copco standard 1212 K . -            English & Portugese text should have font \"Arial\" -            Chinese text should have font \"Simsun\"",
+    "standard_ref": "Text on drawing acc. Atlas Copco standard 1212 K . - English & Portuguese text should have font \"Arial\" - Chinese text should have font \"Simsun\"",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -685,11 +685,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 36
+    "display_order": 36,
   },
   {
     "seq_nr": "39.0",
-    "standard_ref": "Is the drawing unambigously",
+    "standard_ref": "Is the drawing unambiguously",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -704,11 +704,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 37
+    "display_order": 37,
   },
   {
     "seq_nr": "40.0",
-    "standard_ref": "Approval notification if needeed (PED, ASME,\u00d4\u00c7\u00aa.)",
+    "standard_ref": "Approval notification if needed (PED, ASME, ...)",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -723,7 +723,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 38
+    "display_order": 38,
   },
   {
     "seq_nr": "41.0",
@@ -742,7 +742,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 39
+    "display_order": 39,
   },
   {
     "seq_nr": "46.0",
@@ -761,11 +761,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 40
+    "display_order": 40,
   },
   {
     "seq_nr": "47.0",
-    "standard_ref": "Check that at least english language is used",
+    "standard_ref": "Check that at least English language is used",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -780,7 +780,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 41
+    "display_order": 41,
   },
   {
     "seq_nr": "50.0",
@@ -799,11 +799,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "",
-    "display_order": 42
+    "display_order": 42,
   },
   {
     "seq_nr": "51.0",
-    "standard_ref": "In case of tabular drawing, all mentioned 3D's should be            linked to the tabular drawing",
+    "standard_ref": "In case of tabular drawing, all mentioned 3D's should be linked to the tabular drawing",
     "part_val": "",
     "piping_val": "",
     "welded_val": "",
@@ -818,11 +818,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 43
+    "display_order": 43,
   },
   {
     "seq_nr": "57.0",
-    "standard_ref": "Check edition is available for all item numbers of a            tabular drawing",
+    "standard_ref": "Check edition is available for all item numbers of a tabular drawing",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -837,11 +837,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 44
+    "display_order": 44,
   },
   {
     "seq_nr": "58.0",
-    "standard_ref": "Check supplier information is not given on bought out            parts except for situations referenced in AC Standard            1015K",
+    "standard_ref": "Check supplier information is not given on bought out parts except for situations referenced in AC Standard 1015K",
     "part_val": "",
     "piping_val": "",
     "welded_val": "",
@@ -856,11 +856,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 45
+    "display_order": 45,
   },
   {
     "seq_nr": "59.0",
-    "standard_ref": "Check brand logo in template - supplier            parts/Manufacturing parts - AC logo. For dimension            drawing, installation drawing, ASL, AIB -de-brand or owned            brand",
+    "standard_ref": "Check brand logo in template - supplier parts/Manufacturing parts - AC logo. For dimension drawing, installation drawing, ASL, AIB -de-brand or owned brand",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -875,7 +875,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 46
+    "display_order": 46,
   },
   {
     "seq_nr": "42.0",
@@ -894,7 +894,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 47
+    "display_order": 47,
   },
   {
     "seq_nr": "43.0",
@@ -913,7 +913,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 48
+    "display_order": 48,
   },
   {
     "seq_nr": "44.0",
@@ -932,11 +932,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 49
+    "display_order": 49,
   },
   {
     "seq_nr": "48.0",
-    "standard_ref": "Check that Part numbers and Qty are not manually            overwritten",
+    "standard_ref": "Check that Part numbers and Qty are not manually overwritten",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -951,11 +951,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 50
+    "display_order": 50,
   },
   {
     "seq_nr": "49.0",
-    "standard_ref": "Check that the drawing does not relates to a standard part",
+    "standard_ref": "Check that the drawing does not relate to a standard part",
     "part_val": "",
     "piping_val": "",
     "welded_val": "",
@@ -970,11 +970,11 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "",
     "information_val": "",
     "safety_labels_val": "",
-    "display_order": 51
+    "display_order": 51,
   },
   {
     "seq_nr": "70.0",
-    "standard_ref": "Check 'All files are \"For Approval\" or \"Approved' during            ECO",
+    "standard_ref": "Check 'All files are \"For Approval\" or \"Approved\" during ECO",
     "part_val": "M",
     "piping_val": "M",
     "welded_val": "M",
@@ -989,7 +989,7 @@ const PRIMARY_CHECKLIST = [
     "instruction_val": "M",
     "information_val": "M",
     "safety_labels_val": "M",
-    "display_order": 52
+    "display_order": 52,
   }
 ];
 declare const Swal: any;
@@ -1023,15 +1023,22 @@ export class CadqConfigComponent implements OnInit {
   }
 
   fetchChecklist() {
-    let url = `${this.API}/api/cadq-checklist`;
+    let url = `${this.API}/api/cadq-checklist?_t=${new Date().getTime()}`;
     if (this.selectedTeam && this.selectedTeam !== 'Global') {
-      url += `?team=${encodeURIComponent(this.selectedTeam)}`;
+      url += `&team=${encodeURIComponent(this.selectedTeam)}`;
     }
     this.http.get<any[]>(url).subscribe(
       (data) => {
         this.checklistItems = data || [];
         if (this.checklistItems.length === 0) {
           this.loadPrimaryChecklist();
+        } else if (this.selectedTeam !== 'Global') {
+          this.checklistItems.forEach(item => {
+            if (!item.team_name || item.team_name !== this.selectedTeam) {
+              delete item.id;
+              item.team_name = this.selectedTeam;
+            }
+          });
         }
       },
       (error) => console.error('Error fetching checklist:', error)
@@ -1132,35 +1139,38 @@ export class CadqConfigComponent implements OnInit {
   saveAll() {
     if (this.isBusy) return;
     this.isBusy = true;
-    const newItems = this.checklistItems.filter(item => !item.id);
-    let completed = 0;
+    const itemsToSave = this.checklistItems;
     
-    if (newItems.length === 0) {
+    if (itemsToSave.length === 0) {
       this.isBusy = false;
-      Swal.fire({ icon: 'info', title: 'No new items to save', timer: 1500, showConfirmButton: false });
+      Swal.fire({ icon: 'info', title: 'No items to save', timer: 1500, showConfirmButton: false });
       return;
     }
 
-    newItems.forEach(item => {
+    itemsToSave.forEach(item => {
       item.team_name = this.selectedTeam === 'Global' ? null : this.selectedTeam;
-      this.http.post(`${this.API}/api/cadq-checklist`, item).subscribe(
-        () => {
-          completed++;
-          if (completed === newItems.length) {
-            this.isBusy = false;
-            Swal.fire({ icon: 'success', title: 'All Saved!', timer: 1500, showConfirmButton: false });
-            this.fetchChecklist();
-          }
-        },
-        (error) => {
-          console.error('Error saving item', error);
-          completed++;
-          if (completed === newItems.length) {
-            this.isBusy = false;
-            this.fetchChecklist();
-          }
-        }
-      );
     });
+
+    const payload = {
+      team: this.selectedTeam,
+      items: itemsToSave
+    };
+
+    this.http.post(`${this.API}/api/cadq-checklist/bulk-save`, payload).subscribe(
+      (res: any) => {
+        this.isBusy = false;
+        if (res && res.success) {
+          Swal.fire({ icon: 'success', title: 'All Changes Saved!', timer: 1500, showConfirmButton: false });
+          this.fetchChecklist();
+        } else {
+          Swal.fire({ icon: 'error', title: 'Save Failed', text: 'Could not save checklist' });
+        }
+      },
+      (error) => {
+        this.isBusy = false;
+        console.error('Error saving checklist:', error);
+        Swal.fire({ icon: 'error', title: 'Save Failed', text: error.error?.error || 'Could not save checklist' });
+      }
+    );
   }
 }
