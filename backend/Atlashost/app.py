@@ -2256,7 +2256,20 @@ def overview_dashboard():
             where_clause += " AND DATE(dr.reviewed_date) <= %s"
             where_params.append(end_date)
 
-        # KPI & Status Query
+        # 1. Unique Drawings Count (SQL Aggregation)
+        query_unique = f"""
+            SELECT COUNT(DISTINCT d.drawing_no) as unique_drawings
+            FROM drawing_revisions dr
+            JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u_cre ON d.creator_id = u_cre.id
+            LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
+            {where_clause}
+        """
+        cursor.execute(query_unique, tuple(where_params))
+        unique_row = cursor.fetchone()
+        unique_drawings = int(unique_row['unique_drawings']) if (unique_row and unique_row['unique_drawings'] is not None) else 0
+
+        # 2. KPIs & Status Distribution Query
         query_all = f"""
             SELECT 
                 dr.id, 
@@ -2352,6 +2365,7 @@ def overview_dashboard():
         return jsonify({
             "kpis": {
                 "totalAudits": total_audits,
+                "uniqueDrawings": unique_drawings,
                 "passRatio": round(pass_ratio, 1),
                 "pendingReviews": 0 # Placeholder if no specific column
             },
