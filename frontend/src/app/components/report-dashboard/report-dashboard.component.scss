@@ -57,7 +57,7 @@
 /* KPI Row */
 .kpi-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
@@ -77,12 +77,20 @@
       color: #1a1a1a;
       line-height: 1;
       &.quality { color: #00E396; }
+      &.unique { color: #2E93fA; }
     }
     .label {
       font-size: 13px;
       color: #888;
       margin-top: 8px;
     }
+  }
+  .kpi-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-right: 15px;
+    opacity: 0.85;
   }
 }
 
