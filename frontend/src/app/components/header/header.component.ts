@@ -81,14 +81,11 @@ export class HeaderComponent implements OnInit {
 
     // Fetch team info if available
     if (empId) {
-      this.http.get<any[]>(`${this.API}/api/users`).subscribe({
-        next: (users) => {
-          if (Array.isArray(users)) {
-            const matched = users.find(u => u.emp_id === empId || u.name === empId);
-            if (matched) {
-              if (matched.team) this.supportData.team = matched.team;
-              if (matched.name) this.supportData.name = matched.name;
-            }
+      this.http.get<any>(`${this.API}/get-employee/${empId}`).subscribe({
+        next: (user) => {
+          if (user) {
+            if (user.emp_team) this.supportData.team = user.emp_team;
+            if (user.emp_name) this.supportData.name = user.emp_name;
           }
         },
         error: (err) => console.warn('Could not auto-fetch user details for support:', err)
