@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -18,6 +18,8 @@ export class ReportTableComponent implements OnChanges {
   @Input() startDate?: string;
   @Input() endDate?: string;
   @Input() selectedTeam: string[] = [];
+  @Input() allEmployees: string[] = [];
+  @Output() summaryUpdated = new EventEmitter<any>();
 
   employeeSummary: {
     id?: string;
@@ -27,6 +29,11 @@ export class ReportTableComponent implements OnChanges {
     totalAccepted?: number;
     totalRejected?: number;
     passRatio?: string;
+    totalSubmissions?: number;
+    activeCount?: number;
+    inactiveCount?: number;
+    activeNames?: string[];
+    inactiveNames?: string[];
   } = {};
 
   tableData: any[] = [];
@@ -115,6 +122,24 @@ export class ReportTableComponent implements OnChanges {
           const ratio =
             total > 0 ? ((accepted / total) * 100).toFixed(1) + '%' : '0%';
 
+          const activeIds = new Set(this.tableData.map(r => r.Reviewer_EMP_ID).filter(id => id));
+          const activeNames: string[] = [];
+          const inactiveNames: string[] = [];
+
+          if (this.allEmployees && this.allEmployees.length > 0) {
+            this.allEmployees.forEach(empStr => {
+              const parts = empStr.split(' - ');
+              const empId = parts[0].trim();
+              const empName = parts.length > 1 ? parts[1].trim() : empId;
+
+              if (activeIds.has(empId)) {
+                activeNames.push(empName);
+              } else {
+                inactiveNames.push(empName);
+              }
+            });
+          }
+
           this.employeeSummary = {
             id: this.employeeId || this.selectedTeam.join(', '),
             name: this.employeeId ? (data[0]?.Employee_name || '') : 'Team Summary',
@@ -123,7 +148,14 @@ export class ReportTableComponent implements OnChanges {
             totalAccepted: accepted,
             totalRejected: rejected,
             passRatio: ratio,
+            totalSubmissions: this.tableData.length,
+            activeCount: activeNames.length,
+            inactiveCount: inactiveNames.length,
+            activeNames: activeNames,
+            inactiveNames: inactiveNames
           };
+
+          this.summaryUpdated.emit(this.employeeSummary);
         }
       },
       (error) => {
@@ -234,7 +266,7 @@ export class ReportTableComponent implements OnChanges {
       // Sort by Task Number natively
       this.tableData.sort((a, b) => {
         if (a.Task_Number === b.Task_Number) {
-          return a.Drawing_ID === b.Drawing_ID ? 
+          return a.Drawing_ID === b.Drawing_ID ?
             a.Revision_num - b.Revision_num : a.Drawing_ID.localeCompare(b.Drawing_ID);
         }
         return (a.Task_Number || '').localeCompare(b.Task_Number || '');
@@ -251,7 +283,7 @@ export class ReportTableComponent implements OnChanges {
     'Review Date': 'Review_Date',
     'Creator Emp ID': 'Creator_EMP_ID',
     'Drawing Type': 'Drawing_type',
-    'Task Number': 'Task_Number', 
+    'Task Number': 'Task_Number',
     Decision: 'Decision',
   };
 

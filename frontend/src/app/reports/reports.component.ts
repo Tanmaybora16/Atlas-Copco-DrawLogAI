@@ -37,6 +37,7 @@ export class ReportsComponent implements OnInit {
   showEmployees: boolean = false;
   showDrawings: boolean = false;
   showTasks: boolean = false;
+  currentEmployeeSummary: any = null;
 
   constructor(private http: HttpClient) { }
 
@@ -225,7 +226,7 @@ export class ReportsComponent implements OnInit {
     const value = (event.target as HTMLSelectElement).value;
     this.selectedReport = value as any;
 
-    this.showTeamDropdown = ['monthly', 'trend', 'passRatio', 'taskReport', 'employeeReport', 'drawingReport'].includes(this.selectedReport);
+    this.showTeamDropdown = ['monthly', 'trend', 'passRatio', 'taskReport', 'employeeReport', 'drawingReport', 'overview'].includes(this.selectedReport);
     this.showPCDropdown = ['monthly', 'trend', 'passRatio'].includes(this.selectedReport);
     this.showEmployeeDropdown = this.selectedReport === 'employeeReport';
     this.showDrawingIdDropdown = this.selectedReport === 'drawingReport';
@@ -233,7 +234,7 @@ export class ReportsComponent implements OnInit {
     // Overview only shows Date Range filters (handled by exclusion)
 
     // For taskReport, all above are false, which naturally hides them.
-    
+
     // Clear selections when switching reports
     this.selectedTeams = [];
     this.selectedPCs = [];
@@ -242,6 +243,7 @@ export class ReportsComponent implements OnInit {
     this.drawingSearch = '';
     this.selectedDrawingId = '';
     this.taskNumberSearch = '';
+    this.currentEmployeeSummary = null;
 
     // Re-fetch dependent dropdown items with cleared team/date filters
     this.fetchTasks();

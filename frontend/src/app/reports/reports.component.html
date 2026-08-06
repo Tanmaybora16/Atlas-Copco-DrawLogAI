@@ -46,8 +46,7 @@
         <button (click)="selectAllPCs()" style="font-size: 0.8em; padding: 2px 5px; cursor: pointer;">All</button>
         <button (click)="deselectAllPCs()" style="font-size: 0.8em; padding: 2px 5px; cursor: pointer;">None</button>
       </div>
-      <label class="dropdown-item" *ngFor="let pc of pcs"
-        (click)="togglePC(pc.name, $event); $event.preventDefault()"
+      <label class="dropdown-item" *ngFor="let pc of pcs" (click)="togglePC(pc.name, $event); $event.preventDefault()"
         style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
         <input type="checkbox" [checked]="selectedPCs.includes(pc.name)" style="pointer-events: none;">
         {{ pc.name }}
@@ -82,8 +81,8 @@
   <!-- Task Number Dropdown with Search -->
   <div class="dropdown-container" *ngIf="showTaskNumberInput">
     <label for="taskNumberSearch">Task Number</label>
-    <input id="taskNumberSearch" class="dropdown-box" type="text" [(ngModel)]="taskNumberSearch" (focus)="showTasks = true"
-      (input)="filterTasks()" placeholder="Select or Type Task Number" />
+    <input id="taskNumberSearch" class="dropdown-box" type="text" [(ngModel)]="taskNumberSearch"
+      (focus)="showTasks = true" (input)="filterTasks()" placeholder="Select or Type Task Number" />
     <div class="dropdown-list" *ngIf="showTasks">
       <div class="dropdown-item" *ngFor="let task of filteredTasks" (click)="selectTask(task)">
         {{ task }}
@@ -107,8 +106,10 @@
 <!-- Charts Section -->
 <div class="charts-container">
   <!-- ✅ Overview Dashboard (Integrated) -->
-  <app-report-dashboard *ngIf="selectedReport === 'overview'" [startDate]="startDate" [endDate]="endDate">
+  <app-report-dashboard *ngIf="selectedReport === 'overview'" [startDate]="startDate" [endDate]="endDate"
+    [selectedTeams]="selectedTeams">
   </app-report-dashboard>
+
 
   <!-- Standard Reports (Column, Line, Table) -->
   <ng-container *ngIf="selectedReport !== 'overview'">
@@ -117,9 +118,12 @@
         [startDate]="startDate" [endDate]="endDate">
       </app-column-chart>
 
-      <app-report-table *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport' || selectedReport === 'taskReport'"
-        [reportType]="selectedReport" [employeeId]="selectedEmpId" [drawingId]="selectedDrawingId" [taskNumber]="taskNumberSearch" [startDate]="startDate"
-        [endDate]="endDate" [selectedTeam]="selectedTeams">
+      <app-report-table
+        *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport' || selectedReport === 'taskReport'"
+        [reportType]="selectedReport" [employeeId]="selectedEmpId" [drawingId]="selectedDrawingId"
+        [taskNumber]="taskNumberSearch" [startDate]="startDate" [endDate]="endDate" [selectedTeam]="selectedTeams"
+        [allEmployees]="employees"
+        (summaryUpdated)="currentEmployeeSummary = $event">
       </app-report-table>
 
       <app-line-chart *ngIf="selectedReport === 'trend'" [selectedTeam]="selectedTeams" [selectedPC]="selectedPCs"
@@ -136,9 +140,11 @@
         [selectedTeam]="selectedTeams" [selectedPC]="selectedPCs" [startDate]="startDate" [endDate]="endDate">
       </app-bar-chart>
 
-      <app-report-charts *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport' || selectedReport === 'taskReport'"
-        [reportType]="selectedReport" [employeeId]="selectedEmpId" [drawingId]="selectedDrawingId" [taskNumber]="taskNumberSearch" [startDate]="startDate"
-        [endDate]="endDate" [selectedTeams]="selectedTeams">
+      <app-report-charts
+        *ngIf="selectedReport === 'employeeReport' || selectedReport === 'drawingReport' || selectedReport === 'taskReport'"
+        [reportType]="selectedReport" [employeeId]="selectedEmpId" [drawingId]="selectedDrawingId"
+        [taskNumber]="taskNumberSearch" [startDate]="startDate" [endDate]="endDate" [selectedTeams]="selectedTeams"
+        [employeeSummary]="currentEmployeeSummary">
       </app-report-charts>
     </div>
   </ng-container>

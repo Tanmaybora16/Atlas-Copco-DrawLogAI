@@ -46,3 +46,92 @@
 
 
   
+.team-stats-container {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+  margin-top: 20px;
+  gap: 15px;
+
+  .metric-box {
+    flex: 1;
+    border-radius: 6px;
+    padding: 10px;
+    background: #fff;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.05);
+    border: 1px solid #eee;
+
+    h4 {
+      margin: 0;
+      font-size: 13px;
+      color: #555;
+    }
+
+    p {
+      margin: 4px 0 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    &.accepted p { color: green; }
+    &.rejected p { color: red; }
+    &.ratio p { color: var(--primary-color, #1CC487); }
+  }
+}
+
+.members-lists-container {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 15px;
+  gap: 15px;
+
+  .members-list {
+    flex: 1;
+    background: #f9f9f9;
+    border-radius: 6px;
+    padding: 12px;
+    border: 1px solid #eee;
+
+    h5 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 5px;
+    }
+
+    &.active-list h5 {
+      color: green;
+    }
+    
+    &.inactive-list h5 {
+      color: red;
+    }
+
+    ul {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+      max-height: 150px;
+      overflow-y: auto;
+
+      li {
+        font-size: 12px;
+        color: #333;
+        padding: 4px 0;
+        border-bottom: 1px dashed #e0e0e0;
+        
+        &:last-child {
+          border-bottom: none;
+        }
+
+        &.empty {
+          color: #999;
+          text-align: center;
+          font-style: italic;
+          border-bottom: none;
+        }
+      }
+    }
+  }
+}
