@@ -1,7 +1,7 @@
 <div class="dashboard-wrapper">
   <div class="dashboard-header">
     <h1>INTERNAL QUALITY OVERVIEW DASHBOARD</h1>
-    <p class="subtitle">Real-time aggregate data across all teams and auditors</p>
+    <p class="subtitle">Real-time aggregate data across all teams </p>
   </div>
 
   <div *ngIf="loading" class="loader-container">
@@ -14,7 +14,7 @@
   </div>
 
   <div *ngIf="!loading && data" class="dashboard-grid">
-    
+
     <!-- KPI Section -->
     <div class="kpi-row">
       <div class="card kpi-card">
@@ -48,13 +48,9 @@
             <span class="label">Total number of checks performed.</span>
           </div>
           <div class="kpi-chart" id="gauge-total">
-            <apx-chart
-              [series]="gaugeTotalOptions.series!"
-              [chart]="gaugeTotalOptions.chart!"
-              [plotOptions]="gaugeTotalOptions.plotOptions!"
-              [fill]="gaugeTotalOptions.fill!"
-              [labels]="gaugeTotalOptions.labels!"
-            ></apx-chart>
+            <apx-chart [series]="gaugeTotalOptions.series!" [chart]="gaugeTotalOptions.chart!"
+              [plotOptions]="gaugeTotalOptions.plotOptions!" [fill]="gaugeTotalOptions.fill!"
+              [labels]="gaugeTotalOptions.labels!"></apx-chart>
           </div>
         </div>
       </div>
@@ -69,7 +65,8 @@
             <span class="label">Total distinct drawings checked.</span>
           </div>
           <div class="kpi-icon-wrapper">
-            <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#2E93fA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#2E93fA" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -90,12 +87,8 @@
             <span class="label">Average Pass Ratio across all teams.</span>
           </div>
           <div class="kpi-chart" id="gauge-quality">
-            <apx-chart
-              [series]="gaugeQualityOptions.series!"
-              [chart]="gaugeQualityOptions.chart!"
-              [plotOptions]="gaugeQualityOptions.plotOptions!"
-              [fill]="gaugeQualityOptions.fill!"
-            ></apx-chart>
+            <apx-chart [series]="gaugeQualityOptions.series!" [chart]="gaugeQualityOptions.chart!"
+              [plotOptions]="gaugeQualityOptions.plotOptions!" [fill]="gaugeQualityOptions.fill!"></apx-chart>
           </div>
         </div>
       </div>
@@ -104,56 +97,32 @@
     <!-- Middle Charts Row -->
     <div class="charts-row">
       <div class="card treemap-card">
-          <apx-chart
-            [series]="treemapOptions.series!"
-            [chart]="treemapOptions.chart!"
-            [plotOptions]="treemapOptions.plotOptions!"
-            [dataLabels]="treemapOptions.dataLabels!"
-            [xaxis]="treemapOptions.xaxis!"
-            [legend]="treemapOptions.legend!"
-            [title]="treemapOptions.title!"
-            [colors]="treemapOptions.colors!"
-          ></apx-chart>
+        <apx-chart [series]="treemapOptions.series!" [chart]="treemapOptions.chart!"
+          [plotOptions]="treemapOptions.plotOptions!" [dataLabels]="treemapOptions.dataLabels!"
+          [xaxis]="treemapOptions.xaxis!" [legend]="treemapOptions.legend!" [title]="treemapOptions.title!"
+          [colors]="treemapOptions.colors!"></apx-chart>
       </div>
 
       <div class="card status-card">
-          <apx-chart
-            [series]="statusOptions.series!"
-            [chart]="statusOptions.chart!"
-            [plotOptions]="statusOptions.plotOptions!"
-            [xaxis]="statusOptions.xaxis!"
-            [dataLabels]="statusOptions.dataLabels!"
-            [title]="statusOptions.title!"
-            [colors]="statusOptions.colors!"
-            [legend]="statusOptions.legend!"
-          ></apx-chart>
+        <apx-chart [series]="statusOptions.series!" [chart]="statusOptions.chart!"
+          [plotOptions]="statusOptions.plotOptions!" [xaxis]="statusOptions.xaxis!"
+          [dataLabels]="statusOptions.dataLabels!" [title]="statusOptions.title!" [colors]="statusOptions.colors!"
+          [legend]="statusOptions.legend!"></apx-chart>
       </div>
 
       <div class="card leaderboard-card">
-          <apx-chart
-            [series]="leaderboardOptions.series!"
-            [chart]="leaderboardOptions.chart!"
-            [plotOptions]="leaderboardOptions.plotOptions!"
-            [xaxis]="leaderboardOptions.xaxis!"
-            [title]="leaderboardOptions.title!"
-            [legend]="leaderboardOptions.legend!"
-          ></apx-chart>
+        <apx-chart [series]="leaderboardOptions.series!" [chart]="leaderboardOptions.chart!"
+          [plotOptions]="leaderboardOptions.plotOptions!" [xaxis]="leaderboardOptions.xaxis!"
+          [title]="leaderboardOptions.title!" [legend]="leaderboardOptions.legend!"></apx-chart>
       </div>
     </div>
 
     <!-- Bottom Row (Trend & Table) -->
     <div class="bottom-row">
       <div class="card trend-card">
-        <apx-chart
-          [series]="trendOptions.series!"
-          [chart]="trendOptions.chart!"
-          [xaxis]="trendOptions.xaxis!"
-          [yaxis]="trendOptions.yaxis!"
-          [stroke]="trendOptions.stroke!"
-          [markers]="trendOptions.markers!"
-          [dataLabels]="trendOptions.dataLabels!"
-          [title]="trendOptions.title!"
-        ></apx-chart>
+        <apx-chart [series]="trendOptions.series!" [chart]="trendOptions.chart!" [xaxis]="trendOptions.xaxis!"
+          [yaxis]="trendOptions.yaxis!" [stroke]="trendOptions.stroke!" [markers]="trendOptions.markers!"
+          [dataLabels]="trendOptions.dataLabels!" [title]="trendOptions.title!"></apx-chart>
       </div>
 
       <div class="card table-card">

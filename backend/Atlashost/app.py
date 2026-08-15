@@ -2239,6 +2239,7 @@ def overview_dashboard():
     """
     start_date = (request.args.get('start_date') or '').strip()
     end_date   = (request.args.get('end_date') or '').strip()
+    teams = request.args.getlist('team')
 
     try:
         if not hasattr(g, 'db') or g.db is None:
@@ -2255,6 +2256,10 @@ def overview_dashboard():
         if end_date:
             where_clause += " AND DATE(dr.reviewed_date) <= %s"
             where_params.append(end_date)
+        if teams:
+            placeholders = ', '.join(['%s'] * len(teams))
+            where_clause += f" AND u_cre.team IN ({placeholders})"
+            where_params.extend(teams)
 
         # 1. Unique Drawings Count (SQL Aggregation)
         query_unique = f"""
@@ -2354,6 +2359,7 @@ def overview_dashboard():
                 CASE WHEN dr.approved = TRUE THEN 'Correct' ELSE 'Wrong' END as decision
             FROM drawing_revisions dr
             JOIN drawings d ON dr.drawing_id = d.id
+            JOIN users u_cre ON d.creator_id = u_cre.id
             LEFT JOIN users u_rev ON dr.reviewer_id = u_rev.id
             {where_clause}
             ORDER BY dr.reviewed_date DESC

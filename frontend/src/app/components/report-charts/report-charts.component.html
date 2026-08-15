@@ -1,42 +1,63 @@
 <div class="charts-container">
   <!-- ✅ Top Errors Chart (Hidden for Task Reports) -->
   <div id="error-chart" *ngIf="reportType === 'employeeReport' || reportType === 'drawingReport'">
-    <apx-chart
-      *ngIf="(chartOptionsErrors?.series || []).length > 0"
-      [title]="chartOptionsErrors.title!"
-      [series]="chartOptionsErrors.series!"
-      [chart]="chartOptionsErrors.chart!"
-      [dataLabels]="chartOptionsErrors.dataLabels!"
-      [plotOptions]="chartOptionsErrors.plotOptions!"
-      [xaxis]="chartOptionsErrors.xaxis!"
-      [tooltip]="chartOptionsErrors.tooltip!"
-      
-    ></apx-chart>
+    <apx-chart *ngIf="(chartOptionsErrors?.series || []).length > 0" [title]="chartOptionsErrors.title!"
+      [series]="chartOptionsErrors.series!" [chart]="chartOptionsErrors.chart!"
+      [dataLabels]="chartOptionsErrors.dataLabels!" [plotOptions]="chartOptionsErrors.plotOptions!"
+      [xaxis]="chartOptionsErrors.xaxis!" [tooltip]="chartOptionsErrors.tooltip!"></apx-chart>
     <p class="no-data" *ngIf="(chartOptionsErrors?.series || []).length === 0">
       No error data to display.
     </p>
+
+    <!-- ✅ Team Stats Section -->
+    <div class="team-stats-container" *ngIf="reportType === 'employeeReport' && employeeSummary && !employeeId">
+      <div class="metric-box ratio">
+        <h4>Total Submissions</h4>
+        <p>{{ employeeSummary.totalSubmissions ?? 0 }}</p>
+      </div>
+      <div class="metric-box accepted" title="{{ employeeSummary.activeNames?.join(', ') }}">
+        <h4>Active Members</h4>
+        <p>{{ employeeSummary.activeCount ?? 0 }}</p>
+      </div>
+      <div class="metric-box rejected" title="{{ employeeSummary.inactiveNames?.join(', ') }}">
+        <h4>Inactive Members</h4>
+        <p>{{ employeeSummary.inactiveCount ?? 0 }}</p>
+      </div>
+    </div>
+
+    <!-- Explicit Member Lists -->
+    <div class="members-lists-container" *ngIf="reportType === 'employeeReport' && employeeSummary && !employeeId">
+      <div class="members-list active-list">
+        <h5>Active Members</h5>
+        <ul>
+          <li *ngFor="let name of employeeSummary.activeNames">{{ name }}</li>
+          <li *ngIf="!employeeSummary.activeNames?.length" class="empty">No active members</li>
+        </ul>
+      </div>
+      <div class="members-list inactive-list">
+        <h5>Inactive Members</h5>
+        <ul>
+          <li *ngFor="let name of employeeSummary.inactiveNames">{{ name }}</li>
+          <li *ngIf="!employeeSummary.inactiveNames?.length" class="empty">No inactive members</li>
+        </ul>
+      </div>
+    </div>
     
   </div>
 
   <!-- ✅ Approved vs Rejected Drawings Chart (Only for Employee Report) -->
   <div id="drawings-chart" *ngIf="reportType === 'employeeReport' && employeeId">
-    <apx-chart
-      *ngIf="(chartOptionsDrawings?.series || []).length > 0"
-      [title]="chartOptionsDrawings.title!"
-      [series]="chartOptionsDrawings.series!"
-      [chart]="chartOptionsDrawings.chart!"
-      [dataLabels]="chartOptionsDrawings.dataLabels!"
-      [plotOptions]="chartOptionsDrawings.plotOptions!"
-      [xaxis]="chartOptionsDrawings.xaxis!"
-      [colors]="chartOptionsErrors.colors!"
-    ></apx-chart>
+    <apx-chart *ngIf="(chartOptionsDrawings?.series || []).length > 0" [title]="chartOptionsDrawings.title!"
+      [series]="chartOptionsDrawings.series!" [chart]="chartOptionsDrawings.chart!"
+      [dataLabels]="chartOptionsDrawings.dataLabels!" [plotOptions]="chartOptionsDrawings.plotOptions!"
+      [xaxis]="chartOptionsDrawings.xaxis!" [colors]="chartOptionsErrors.colors!"></apx-chart>
     <p class="no-data" *ngIf="(chartOptionsDrawings?.series || []).length === 0">
       No drawing data to display.
     </p>
   </div>
 
   <!-- ✅ Task Distribution Chart (Pie Chart) -->
-  <div id="task-distribution-chart" *ngIf="reportType === 'taskReport'">
+  <!-- <div id="task-distribution-chart" *ngIf="reportType === 'taskReport'">
     <apx-chart
       *ngIf="(chartOptionsTasks?.series || []).length > 0"
       [title]="chartOptionsTasks.title!"
@@ -55,4 +76,4 @@
   <p class="no-data" *ngIf="loading">Loading…</p>
 <p class="no-data" *ngIf="!loading && error">{{ error }}</p>
 
-</div>
+</div> -->

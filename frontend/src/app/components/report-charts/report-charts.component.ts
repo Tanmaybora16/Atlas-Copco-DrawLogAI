@@ -93,6 +93,7 @@ export class ReportChartsComponent implements OnChanges {
   @Input() startDate: string = ''; // expect YYYY-MM-DD
   @Input() endDate: string = '';   // expect YYYY-MM-DD
   @Input() selectedTeams: string[] = []; // for task report filtering
+  @Input() employeeSummary: any = null;
 
   public chartOptionsErrors!: Partial<ChartOptions>;
   public chartOptionsDrawings!: Partial<ChartOptions>;
@@ -102,7 +103,7 @@ export class ReportChartsComponent implements OnChanges {
 
   private readonly API_BASE = `${environment.apiUrl}`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   ngOnChanges(changes: SimpleChanges): void {
     // Clear charts if switching to an empty ID
@@ -114,7 +115,6 @@ export class ReportChartsComponent implements OnChanges {
       this.resetCharts();
       return;
     }
-
     if (this.reportType) {
       this.fetchChartData();
     }
@@ -147,7 +147,7 @@ export class ReportChartsComponent implements OnChanges {
     }
 
     if (this.startDate) params = params.set('start_date', this.normalizeDate(this.startDate));
-    if (this.endDate)   params = params.set('end_date',   this.normalizeDate(this.endDate));
+    if (this.endDate) params = params.set('end_date', this.normalizeDate(this.endDate));
 
     if (this.reportType === 'employeeReport') {
       if (this.employeeId) {
@@ -240,11 +240,11 @@ export class ReportChartsComponent implements OnChanges {
       xaxis: { categories: errors.map(([code]) => code) },
       colors: ['#1CC487', '#F45463'],
       tooltip: {
-        custom: function({ series, seriesIndex, dataPointIndex, w }) {
+        custom: function ({ series, seriesIndex, dataPointIndex, w }) {
           const errorCode = w.globals.labels[dataPointIndex];
           const errorCount = series[seriesIndex][dataPointIndex];
           const description = errorDescriptions[errorCode] || 'No description available';
-          
+
           return `
               <div style="
                 padding: 10px 14px;

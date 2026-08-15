@@ -45,6 +45,7 @@ export type ChartOptions = {
 export class ReportDashboardComponent implements OnChanges, OnInit {
   @Input() startDate: string = '';
   @Input() endDate: string = '';
+  @Input() selectedTeams: string[] = [];
 
   loading = false;
   error: string | null = null;
@@ -67,7 +68,7 @@ export class ReportDashboardComponent implements OnChanges, OnInit {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['startDate'] || changes['endDate']) {
+    if (changes['startDate'] || changes['endDate'] || changes['selectedTeams']) {
       this.fetchDashboardData();
     }
   }
@@ -79,6 +80,9 @@ export class ReportDashboardComponent implements OnChanges, OnInit {
     let params = new HttpParams();
     if (this.startDate) params = params.set('start_date', this.startDate);
     if (this.endDate)   params = params.set('end_date',   this.endDate);
+    if (this.selectedTeams && this.selectedTeams.length > 0) {
+      this.selectedTeams.forEach(t => params = params.append('team', t));
+    }
 
     this.http.get<any>(`${this.API_BASE}/api/overview-dashboard`, { params })
       .pipe(catchError((err) => {

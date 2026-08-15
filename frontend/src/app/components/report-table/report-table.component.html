@@ -1,9 +1,7 @@
 <div class="container">
   <!-- Employee/Team Summary Section -->
-  <div
-    *ngIf="reportType === 'employeeReport' && (employeeId || (selectedTeam && selectedTeam.length > 0))"
-    class="employee-summary"
-  >
+  <div *ngIf="reportType === 'employeeReport' && (employeeId || (selectedTeam && selectedTeam.length > 0))"
+    class="employee-summary">
     <div class="employee-row">
       <div *ngIf="employeeId"><strong>Employee ID:</strong> {{ employeeSummary.id || "-" }}</div>
       <div *ngIf="!employeeId"><strong>Team:</strong> {{ employeeSummary.id || "-" }}</div>
@@ -40,27 +38,20 @@
   </div>
 
   <div class="table-container">
-    <div
-      *ngIf="reportType === 'employeeReport' && !employeeId && (!selectedTeam || selectedTeam.length === 0)"
-      class="warning-message"
-    >
+    <div *ngIf="reportType === 'employeeReport' && !employeeId && (!selectedTeam || selectedTeam.length === 0)"
+      class="warning-message">
       Please select Employee ID
     </div>
-    <div
-      *ngIf="reportType === 'drawingReport' && !drawingId && (!selectedTeam || selectedTeam.length === 0)"
-      class="warning-message"
-    >
+    <div *ngIf="reportType === 'drawingReport' && !drawingId && (!selectedTeam || selectedTeam.length === 0)"
+      class="warning-message">
       Please select Drawing ID
     </div>
 
-    <table
-      class="styled-table"
-      *ngIf="
+    <table class="styled-table" *ngIf="
         reportType === 'taskReport' ||
         (reportType === 'employeeReport' && (employeeId || (selectedTeam && selectedTeam.length > 0))) ||
         (reportType === 'drawingReport' && (drawingId || (selectedTeam && selectedTeam.length > 0)))
-      "
-    >
+      ">
       <thead>
         <tr>
           <th *ngFor="let header of tableHeaders">{{ header }}</th>
@@ -69,33 +60,24 @@
       </thead>
       <tbody>
         <tr *ngFor="let row of tableData; let i = index">
-          <td
-            *ngFor="let header of tableHeaders"
-            [class.approved]="
+          <td *ngFor="let header of tableHeaders" [class.approved]="
               header === 'Decision' &&
               row[getColumnKey(header)]?.toLowerCase() === 'approve'
-            "
-            [class.rejected]="
+            " [class.rejected]="
               header === 'Decision' &&
               row[getColumnKey(header)]?.toLowerCase() === 'reject'
-            "
-          >
+            ">
             {{
-              header === "Error Codes"
-                ? row["Error_codes"]?.join(", ") || "-"
-                : row[getColumnKey(header)] || "-"
+            header === "Error Codes"
+            ? row["Error_codes"]?.join(", ") || "-"
+            : row[getColumnKey(header)] || "-"
             }}
           </td>
           <td>
-            <img
-              src="assets/download.svg"
-              alt="Download"
-              class="action-icon"
-              (click)="downloadDrawing(i)"
-            />
+            <img src="assets/download.svg" alt="Download" class="action-icon" (click)="downloadDrawing(i)" />
           </td>
         </tr>
-        
+
       </tbody>
     </table>
 
