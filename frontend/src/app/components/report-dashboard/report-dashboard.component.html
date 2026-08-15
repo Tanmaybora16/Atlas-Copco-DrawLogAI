@@ -19,6 +19,27 @@
     <div class="kpi-row">
       <div class="card kpi-card">
         <div class="card-header">
+          <h3>TOTAL USERS</h3>
+        </div>
+        <div class="card-content kpi-content">
+          <div class="kpi-value">
+            <span class="number" style="color: #FF9800;">{{ data.kpis.totalUsers || 0 }}</span>
+            <span class="label">Total number of users.</span>
+          </div>
+          <div class="kpi-icon-wrapper">
+            <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#FF9800" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="card kpi-card">
+        <div class="card-header">
           <h3>TOTAL CHECKS PERFORMED</h3>
         </div>
         <div class="card-content kpi-content">
