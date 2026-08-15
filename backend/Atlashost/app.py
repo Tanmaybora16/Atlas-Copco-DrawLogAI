@@ -2368,11 +2368,23 @@ def overview_dashboard():
         cursor.execute(query_recent, tuple(where_params))
         recent_audits = cursor.fetchall()
 
+        # Total Users count
+        user_where = []
+        user_params = []
+        if teams:
+            user_where.append(f"team IN ({', '.join(['%s']*len(teams))})")
+            user_params.extend(teams)
+        user_where_clause = "WHERE " + " AND ".join(user_where) if user_where else ""
+        cursor.execute(f"SELECT COUNT(id) as total_users FROM users {user_where_clause}", tuple(user_params))
+        total_users_row = cursor.fetchone()
+        total_users = int(total_users_row['total_users']) if (total_users_row and total_users_row['total_users'] is not None) else 0
+
         return jsonify({
             "kpis": {
                 "totalAudits": total_audits,
                 "uniqueDrawings": unique_drawings,
                 "passRatio": round(pass_ratio, 1),
+                "totalUsers": total_users,
                 "pendingReviews": 0 # Placeholder if no specific column
             },
             "statusDistribution": status_distribution,
@@ -3834,11 +3846,21 @@ def get_cadq_checklist():
             if team and team != 'Global' and team != 'null':
                 # First check if there is a specific checklist for this team
                 c.execute("SELECT * FROM cadq_checklist WHERE team_name = %s ORDER BY display_order ASC", (team,))
-                rows = c.fetchall()
-                if not rows:
+                team_rows = c.fetchall()
+                
+                # Fetch Global defaults
+                c.execute("SELECT * FROM cadq_checklist WHERE team_name IS NULL ORDER BY display_order ASC")
+                global_rows = c.fetchall()
+
+                if not team_rows:
                     # Fallback to Global defaults if team has no custom checklist
-                    c.execute("SELECT * FROM cadq_checklist WHERE team_name IS NULL ORDER BY display_order ASC")
-                    rows = c.fetchall()
+                    rows = global_rows
+                else:
+                    team_refs = set(r['standard_ref'] for r in team_rows)
+                    missing_globals = [r for r in global_rows if r['standard_ref'] not in team_refs]
+                    
+                    rows = team_rows + missing_globals
+                    rows.sort(key=lambda x: x['display_order'])
             else:
                 # Fetch only Global items when no team is specified or Global is selected
                 c.execute("SELECT * FROM cadq_checklist WHERE team_name IS NULL ORDER BY display_order ASC")
