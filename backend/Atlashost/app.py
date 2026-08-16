@@ -2059,7 +2059,7 @@ def get_employee_ids():
 
     try:
         teams = request.args.getlist('team')
-        query = "SELECT emp_id, name FROM users WHERE is_active = TRUE"
+        query = "SELECT emp_id, name FROM users WHERE is_active = TRUE AND role != 'admin'"
         params = []
         if teams:
             placeholders = ','.join(['%s'] * len(teams))
@@ -2369,12 +2369,12 @@ def overview_dashboard():
         recent_audits = cursor.fetchall()
 
         # Total Users count
-        user_where = []
+        user_where = ["is_active = TRUE", "role != 'admin'"]
         user_params = []
         if teams:
             user_where.append(f"team IN ({', '.join(['%s']*len(teams))})")
             user_params.extend(teams)
-        user_where_clause = "WHERE " + " AND ".join(user_where) if user_where else ""
+        user_where_clause = "WHERE " + " AND ".join(user_where)
         cursor.execute(f"SELECT COUNT(id) as total_users FROM users {user_where_clause}", tuple(user_params))
         total_users_row = cursor.fetchone()
         total_users = int(total_users_row['total_users']) if (total_users_row and total_users_row['total_users'] is not None) else 0
