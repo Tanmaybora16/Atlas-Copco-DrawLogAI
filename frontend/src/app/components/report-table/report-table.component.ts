@@ -122,22 +122,38 @@ export class ReportTableComponent implements OnChanges {
           const ratio =
             total > 0 ? ((accepted / total) * 100).toFixed(1) + '%' : '0%';
 
-          const activeIds = new Set(this.tableData.map(r => r.Reviewer_EMP_ID).filter(id => id));
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          const submissionCounts = new Map<string, number>();
+          this.tableData
+            .filter(r => r.Date && new Date(r.Date) >= thirtyDaysAgo)
+            .forEach(r => {
+              if (r.Creator_EMP_ID) {
+                submissionCounts.set(r.Creator_EMP_ID, (submissionCounts.get(r.Creator_EMP_ID) || 0) + 1);
+              }
+            });
+
           const activeNames: string[] = [];
           const inactiveNames: string[] = [];
 
           if (this.allEmployees && this.allEmployees.length > 0) {
+            const activeMembers: { name: string; count: number }[] = [];
+
             this.allEmployees.forEach(empStr => {
               const parts = empStr.split(' - ');
               const empId = parts[0].trim();
               const empName = parts.length > 1 ? parts[1].trim() : empId;
 
-              if (activeIds.has(empId)) {
-                activeNames.push(empName);
+              if (submissionCounts.has(empId)) {
+                activeMembers.push({ name: empName, count: submissionCounts.get(empId)! });
               } else {
                 inactiveNames.push(empName);
               }
             });
+
+            activeMembers.sort((a, b) => b.count - a.count);
+            activeMembers.forEach(m => activeNames.push(`${m.name}(${m.count} submission)`));
           }
 
           this.employeeSummary = {

@@ -61,7 +61,7 @@ export class ReportDashboardComponent implements OnChanges, OnInit {
 
   private readonly API_BASE = `${environment.apiUrl}`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   ngOnInit(): void {
     this.fetchDashboardData();
@@ -79,7 +79,7 @@ export class ReportDashboardComponent implements OnChanges, OnInit {
 
     let params = new HttpParams();
     if (this.startDate) params = params.set('start_date', this.startDate);
-    if (this.endDate)   params = params.set('end_date',   this.endDate);
+    if (this.endDate) params = params.set('end_date', this.endDate);
     if (this.selectedTeams && this.selectedTeams.length > 0) {
       this.selectedTeams.forEach(t => params = params.append('team', t));
     }

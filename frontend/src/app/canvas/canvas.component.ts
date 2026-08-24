@@ -13,6 +13,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { environment } from 'src/environments/environment';
 import { AuthService } from '../auth.service';
 
+declare const Swal: any;
+
 type CanvasMode = 'view' | 'add-text' | 'select' | 'add-stamp' | 'pen';
 
 export interface Annotation {
@@ -163,8 +165,11 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     }, 3000);
   }
 
-  private async loadPdfFromApi(drawingId: string, revision: number): Promise<void> {
-    const url = `${this.API}/drawings/${encodeURIComponent(drawingId)}/${revision}/pdf/view`;
+  private async loadPdfFromApi(drawingId: string, revision: number, password?: string): Promise<void> {
+    let url = `${this.API}/drawings/${encodeURIComponent(drawingId)}/${revision}/pdf/view`;
+    if (password) {
+      url += `?password=${encodeURIComponent(password)}`;
+    }
     try {
       const buffer = await firstValueFrom(
         this.http.get(url, { responseType: 'arraybuffer' })
@@ -175,7 +180,27 @@ export class CanvasComponent implements AfterViewInit, OnInit {
       this.pageNum = 1;
       await this.renderPage(this.pageNum);
       this.toast('Loaded PDF from server.');
-    } catch (err) {
+    } catch (err: any) {
+      if (err && err.status === 401) {
+        const { value: userPassword } = await Swal.fire({
+          title: 'Protected PDF',
+          text: password ? 'Incorrect password. Please try again.' : 'This PDF is password protected. Please enter the password:',
+          input: 'password',
+          inputPlaceholder: 'Enter password',
+          showCancelButton: true,
+          confirmButtonText: 'Unlock',
+          cancelButtonText: 'Cancel',
+          allowOutsideClick: false,
+        });
+
+        if (userPassword) {
+          return this.loadPdfFromApi(drawingId, revision, userPassword);
+        } else {
+          this.renderMockPage();
+          this.toast('Password is required to view this PDF.');
+          return;
+        }
+      }
       console.error('Failed to load PDF from API', err);
       this.renderMockPage();
       this.toast('Could not load PDF from server.');
