@@ -4060,10 +4060,10 @@ def bulk_save_cadq_checklist():
 # ----------------- Support Request Endpoint & Helper ----------------- #
 def send_support_email(name: str, emp_id: str, team: str, user_message: str):
     """
-    Sends support request notification email to suraj6re@gmail.com
+    Sends support request notification email to anuj.khande@atlascopco.com
     """
     try:
-        to_email = "suraj6re@gmail.com"
+        to_email = "anuj.khande@atlascopco.com"
         subject = f"Support Request from {name} ({emp_id})"
         
         body = f"""Hello Admin,
@@ -4135,7 +4135,7 @@ def submit_support_request():
             except Exception as db_err:
                 print(f"[WARN] Support request DB save error: {db_err}")
 
-        # Send notification email to suraj6re@gmail.com
+        # Send notification email to anuj.khande@atlascopco.com
         send_support_email(name, emp_id, team, message)
 
         return jsonify({"success": True, "message": "Support request submitted successfully"}), 201
