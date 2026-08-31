@@ -3092,6 +3092,22 @@ def view_pdf(drawing_id, revision):
         blob = _fetch_pdf_blob(conn, drawing_id, revision)
         if not blob:
             return {"error": "PDF not found"}, 404
+
+        password = request.args.get("password", "")
+
+        import fitz
+        try:
+            doc = fitz.open(stream=blob, filetype="pdf")
+            if doc.is_encrypted:
+                if not doc.authenticate(""):
+                    if not password or not doc.authenticate(password):
+                        doc.close()
+                        return {"error": "password_required", "message": "This PDF is password protected."}, 401
+                blob = doc.write()
+            doc.close()
+        except Exception as e:
+            print(f"[WARNING] Failed to process PDF through fitz in view_pdf: {e}")
+
         return Response(blob, mimetype="application/pdf")
     finally:
         conn.close()
@@ -3108,6 +3124,21 @@ def download_pdf(drawing_id, revision):
         blob = _fetch_pdf_blob(conn, drawing_id, revision)
         if not blob:
             return {"error": "PDF not found"}, 404
+
+        password = request.args.get("password", "")
+
+        import fitz
+        try:
+            doc = fitz.open(stream=blob, filetype="pdf")
+            if doc.is_encrypted:
+                if not doc.authenticate(""):
+                    if not password or not doc.authenticate(password):
+                        doc.close()
+                        return {"error": "password_required", "message": "This PDF is password protected."}, 401
+                blob = doc.write()
+            doc.close()
+        except Exception as e:
+            print(f"[WARNING] Failed to process PDF through fitz in download_pdf: {e}")
 
         return send_file(
             io.BytesIO(blob),
