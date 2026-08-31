@@ -8,7 +8,9 @@
         <label for="UserName">User Name </label>
         <input
           type="text"
+          id="UserName"
           name="UserName"
+          autocomplete="username"
           [(ngModel)]="UserName"
           required
           [disabled]="isBusy"
@@ -20,7 +22,9 @@
         <div class="password-wrapper">
           <input
             [type]="passwordVisible ? 'text' : 'password'"
+            id="password"
             name="password"
+            autocomplete="current-password"
             [(ngModel)]="password"
             required
             [disabled]="isBusy"
