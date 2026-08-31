@@ -686,11 +686,10 @@ def send_otp_email(to_email: str, emp_id: str, otp_plain: str):
     """
     Reuses your SMTP config to send the OTP.
     """
-    try:
-        server = get_smtp_server()
+    server = get_smtp_server()
 
-        subject = "Your OTP for Password Reset (valid for 5 minutes)"
-        body = f"""Dear User ({emp_id}),
+    subject = "Your OTP for Password Reset (valid for 5 minutes)"
+    body = f"""Dear User ({emp_id}),
 
 Your one-time password (OTP) for resetting your Atlas Copco account password is:
 
@@ -708,16 +707,14 @@ If you did not request this, please ignore this email.
         Atlas Copco AI Error Logging System
         """
 
-        msg = MIMEMultipart()
-        msg["From"] = EMAIL_SENDER
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_SENDER
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
 
-        server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
-        server.quit()
-    except Exception as e:
-        print("Failed to send OTP email:", e)
+    server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
+    server.quit()
 
 
 def cleanup_otps(conn):
@@ -779,10 +776,10 @@ def forgot_password_initiate():
         # 5) Upsert OTP row with user_id FK, expire in 5 minutes (use MySQL NOW() in IST)
         with g.db.cursor() as c:
             c.execute("""
-                INSERT INTO login_otp (user_id, otp_hash, expires_at, consumed)
-                VALUES (%s, %s, DATE_ADD(NOW(), INTERVAL 5 MINUTE), 0)
+                INSERT INTO login_otp (user_id, purpose, otp, expires_at, consumed)
+                VALUES (%s, 'password_reset', %s, DATE_ADD(NOW(), INTERVAL 5 MINUTE), 0)
                 ON DUPLICATE KEY UPDATE
-                    otp_hash = VALUES(otp_hash),
+                    otp = VALUES(otp),
                     expires_at = VALUES(expires_at),
                     consumed = 0
             """, (user_id, otp_hash))
@@ -793,7 +790,11 @@ def forgot_password_initiate():
             send_otp_email(to_email=email, emp_id=emp_id, otp_plain=otp_plain)
         except Exception as mail_err:
             print("OTP email error:", mail_err)
-            # Optional: delete OTP row if mail fails
+            # Rollback OTP row since mail failed
+            with g.db.cursor() as c:
+                c.execute("DELETE FROM login_otp WHERE user_id=%s AND otp=%s AND purpose='password_reset'", (user_id, otp_hash))
+            g.db.commit()
+            return jsonify({"success": False, "message": "Failed to send OTP email. Please try again later."}), 500
 
         return jsonify({"success": True, "message": "OTP sent to your registered email."}), 200
 
@@ -827,11 +828,12 @@ def forgot_password_verify():
         # Fetch active OTP row (not expired) using user_id FK
         with g.db.cursor() as c:
             c.execute("""
-                SELECT lo.otp_hash, lo.consumed
+                SELECT lo.otp, lo.consumed
                   FROM login_otp lo
                   JOIN users u ON lo.user_id = u.id
                  WHERE u.emp_id=%s
                    AND u.is_active=TRUE
+                   AND lo.purpose='password_reset'
                    AND lo.expires_at > NOW()
                  LIMIT 1
             """, (emp_id,))
@@ -843,7 +845,7 @@ def forgot_password_verify():
                 c2.execute("""
                     DELETE lo FROM login_otp lo
                     JOIN users u ON lo.user_id = u.id
-                    WHERE u.emp_id=%s
+                    WHERE u.emp_id=%s AND lo.purpose='password_reset'
                 """, (emp_id,))
                 g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
@@ -902,11 +904,12 @@ def forgot_password_reset():
         # Fetch active OTP row (not expired) using user_id FK
         with g.db.cursor() as c:
             c.execute("""
-                SELECT lo.otp_hash, lo.consumed, u.id, u.password_hash
+                SELECT lo.otp, lo.consumed, u.id, u.password_hash
                   FROM login_otp lo
                   JOIN users u ON lo.user_id = u.id
                  WHERE u.emp_id=%s
                    AND u.is_active=TRUE
+                   AND lo.purpose='password_reset'
                    AND lo.expires_at > NOW()
                  LIMIT 1
             """, (emp_id,))
@@ -916,7 +919,7 @@ def forgot_password_reset():
                 c2.execute("""
                     DELETE lo FROM login_otp lo
                     JOIN users u ON lo.user_id = u.id
-                    WHERE u.emp_id=%s
+                    WHERE u.emp_id=%s AND lo.purpose='password_reset'
                 """, (emp_id,))
                 g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
@@ -946,7 +949,7 @@ def forgot_password_reset():
         new_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
         with g.db.cursor() as c:
             c.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, user_id))
-            c.execute("DELETE FROM login_otp WHERE user_id=%s", (user_id,))
+            c.execute("DELETE FROM login_otp WHERE user_id=%s AND purpose='password_reset'", (user_id,))
         g.db.commit()
 
         # Send notification (non-blocking for success path)
@@ -1249,7 +1252,7 @@ def delete_employee(emp_id):
         cursor = g.db.cursor()
 
         # 1) Clean up OTP records
-        cursor.execute("DELETE FROM login_otp WHERE user_id = (SELECT id FROM users WHERE emp_id = %s)", (emp_id,))
+        cursor.execute("DELETE FROM login_otp WHERE user_id = (SELECT id FROM users WHERE emp_id = %s) AND purpose='password_reset'", (emp_id,))
 
         # 2) Soft delete user (set is_active = FALSE) instead of hard delete
         cursor.execute("UPDATE users SET is_active = FALSE WHERE emp_id = %s", (emp_id,))
