@@ -127,7 +127,8 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", 25))
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true" if SMTP_PORT == 587 else "false").lower() in ("true", "1", "yes")
 
 def get_smtp_server():
-    server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+    # Set a 10-second timeout so the application doesn't freeze if the network blocks the port
+    server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10)
     # Commented out for production VM (uncomment if testing/using authentication):
     if SMTP_USE_TLS:
         # Secure negotiation using modern TLS context (CWE-757)
@@ -833,7 +834,7 @@ def forgot_password_verify():
                   JOIN users u ON lo.user_id = u.id
                  WHERE u.emp_id=%s
                    AND u.is_active=TRUE
-                   AND lo.purpose='password_reset'
+                   AND lo.purpose = 'password_reset'
                    AND lo.expires_at > NOW()
                  LIMIT 1
             """, (emp_id,))
@@ -845,7 +846,7 @@ def forgot_password_verify():
                 c2.execute("""
                     DELETE lo FROM login_otp lo
                     JOIN users u ON lo.user_id = u.id
-                    WHERE u.emp_id=%s AND lo.purpose='password_reset'
+                    WHERE u.emp_id=%s AND lo.purpose = 'password_reset'
                 """, (emp_id,))
                 g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
@@ -909,7 +910,11 @@ def forgot_password_reset():
                   JOIN users u ON lo.user_id = u.id
                  WHERE u.emp_id=%s
                    AND u.is_active=TRUE
+<<<<<<< Updated upstream
                    AND lo.purpose='password_reset'
+=======
+                   AND lo.purpose = 'password_reset'
+>>>>>>> Stashed changes
                    AND lo.expires_at > NOW()
                  LIMIT 1
             """, (emp_id,))
@@ -919,7 +924,11 @@ def forgot_password_reset():
                 c2.execute("""
                     DELETE lo FROM login_otp lo
                     JOIN users u ON lo.user_id = u.id
+<<<<<<< Updated upstream
                     WHERE u.emp_id=%s AND lo.purpose='password_reset'
+=======
+                    WHERE u.emp_id=%s AND lo.purpose = 'password_reset'
+>>>>>>> Stashed changes
                 """, (emp_id,))
                 g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
