@@ -1,0 +1,179 @@
+.manager-container {
+  padding: 40px;
+  background-color: #f7f9fc;
+  min-height: calc(100vh - 80px);
+  font-family: Arial, sans-serif;
+
+  .header-section {
+    margin-bottom: 30px;
+    h1 {
+      color: #0092bc;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    p {
+      color: #555;
+      font-size: 16px;
+    }
+  }
+
+  .tabs {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+    border-bottom: 2px solid #e0e0e0;
+
+    button {
+      background: none;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      color: #777;
+      cursor: pointer;
+      font-weight: bold;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+
+      &:hover {
+        color: #0092bc;
+      }
+
+      &.active {
+        color: #0092bc;
+        border-bottom: 3px solid #0092bc;
+      }
+    }
+  }
+
+  .loading-state, .empty-state {
+    padding: 40px;
+    text-align: center;
+    color: #666;
+    font-size: 18px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  }
+
+  .styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+
+    th, td {
+      padding: 15px 20px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #0092bc;
+      color: #fff;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+
+    td {
+      border-bottom: 1px solid #eee;
+      color: #444;
+      font-size: 14px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background-color: #f9fbff;
+    }
+
+    .emp-id {
+      color: #888;
+      font-size: 12px;
+      margin-left: 5px;
+    }
+
+    .error-code {
+      display: inline-block;
+      background: #ffebe6;
+      color: #bf2600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+
+    .count-badge {
+      display: inline-block;
+      background: #e3fcef;
+      color: #006644;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .training-name {
+      font-weight: 600;
+      color: #0052cc;
+    }
+
+    .error-trigger {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      
+      small {
+        color: #666;
+        font-size: 12px;
+        line-height: 1.3;
+      }
+    }
+
+    .btn-assign {
+      background: #0092bc;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.3s;
+
+      &:hover:not([disabled]) {
+        background: #007799;
+      }
+
+      &[disabled] {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+    }
+
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+
+      &.assigned {
+        background: #e6fcff;
+        color: #008da6;
+      }
+
+      &.in.progress {
+        background: #fff0b3;
+        color: #ff8b00;
+      }
+
+      &.completed {
+        background: #e3fcef;
+        color: #006644;
+      }
+    }
+  }
+}

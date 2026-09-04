@@ -11,18 +11,21 @@
       <a *ngIf="isLoggedIn() && userRole === 'HR'" routerLink="/structure" routerLinkActive="active-link">Structure</a>
       <a *ngIf="isLoggedIn() && userRole === 'HR'" routerLink="/cadq-config" routerLinkActive="active-link">Checklist Config</a>
 
-      <!-- Employee-only -->
+      <!-- Employee and Manager -->
 
-      <a *ngIf="isLoggedIn() && userRole === 'Employee'" routerLink="/submission" routerLinkActive="active-link"
+      <a *ngIf="isLoggedIn() && (userRole === 'Employee' || userRole === 'Manager')" routerLink="/submission" routerLinkActive="active-link"
         [routerLinkActiveOptions]="{ exact: true }">Submission</a>
 
-      <a *ngIf="isLoggedIn() && userRole === 'Employee'" routerLink="/requests"
+      <a *ngIf="isLoggedIn() && (userRole === 'Employee' || userRole === 'Manager')" routerLink="/requests"
         routerLinkActive="active-link">Requests</a>
 
-      <a *ngIf="isLoggedIn() && userRole === 'Employee'" routerLink="/canvas" routerLinkActive="active-link">Canvas</a>
+      <a *ngIf="isLoggedIn() && (userRole === 'Employee' || userRole === 'Manager')" routerLink="/canvas" routerLinkActive="active-link">Canvas</a>
 
-      <a *ngIf="isLoggedIn() && userRole === 'Employee'" routerLink="/uploads"
+      <a *ngIf="isLoggedIn() && (userRole === 'Employee' || userRole === 'Manager')" routerLink="/uploads"
         routerLinkActive="active-link">Uploads</a>
+
+      <!-- Manager exclusive -->
+      <a *ngIf="isLoggedIn() && userRole === 'Manager'" routerLink="/manager-dashboard" routerLinkActive="active-link">Training Mapping</a>
 
       <!-- Both roles -->
       <a *ngIf="isLoggedIn()" routerLink="/reports" routerLinkActive="active-link">Reports</a>

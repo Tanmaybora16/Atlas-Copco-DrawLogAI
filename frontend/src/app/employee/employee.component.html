@@ -61,6 +61,15 @@
         </select>
       </div>
 
+      <div class="input-container">
+        <label for="role">Role</label>
+        <select id="role" [(ngModel)]="selectedRole" name="role" required [disabled]="isBusy">
+          <option value="user">Employee</option>
+          <option value="manager">Manager</option>
+          <option value="admin">Admin (HR)</option>
+        </select>
+      </div>
+
       <div class="add-btn">
         <button type="button" (click)="saveEmployee()" class="add-employee-button" [disabled]="isBusy">
           <img [src]="editingIndex !== null ? 'assets/save.svg' : 'assets/plus.svg'"
@@ -85,6 +94,7 @@
             <th>Division</th>
             <th>PC</th>
             <th>Team</th>
+            <th>Role</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -96,6 +106,7 @@
             <td>{{ employee.division }}</td>
             <td>{{ employee.pc }}</td>
             <td>{{ employee.team }}</td>
+            <td style="text-transform: capitalize;">{{ employee.role }}</td>
             <td class="actions">
               <img src="assets/edit-2.svg" alt="Edit" class="action-icon edit-icon" [class.disabled]="isBusy"
                 (click)="!isBusy && editEmployee(i)" />

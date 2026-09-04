@@ -483,19 +483,52 @@ export class CanvasComponent implements AfterViewInit, OnInit {
     this.fileInputRef?.nativeElement.click();
   }
 
-  async onFileSelected(event: Event): Promise<void> {
+  async onFileSelected(event: Event, retryPassword?: string): Promise<void> {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+    const file = input.files?.[0] || this.currentPdfFile;
     if (!file) return;
 
     this.currentPdfFile = file;
     const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    this.pdfDoc = await loadingTask.promise;
-    this.totalPages = this.pdfDoc.numPages;
-    this.pageNum = 1;
-    await this.renderPage(this.pageNum);
-    this.toast('PDF uploaded and loaded.');
+    
+    try {
+      const options: any = { data: arrayBuffer };
+      if (retryPassword) {
+        options.password = retryPassword;
+      }
+      
+      const loadingTask = pdfjsLib.getDocument(options);
+      this.pdfDoc = await loadingTask.promise;
+      this.totalPages = this.pdfDoc.numPages;
+      this.pageNum = 1;
+      await this.renderPage(this.pageNum);
+      this.toast('PDF uploaded and loaded.');
+      if (input && input.value) input.value = '';
+    } catch (err: any) {
+      if (err && err.name === 'PasswordException') {
+        const { value: userPassword } = await Swal.fire({
+          title: 'Protected PDF',
+          text: retryPassword ? 'Incorrect password. Please try again.' : 'This PDF is password protected. Please enter the password:',
+          input: 'password',
+          inputPlaceholder: 'Enter password',
+          showCancelButton: true,
+          confirmButtonText: 'Unlock',
+          cancelButtonText: 'Cancel',
+          allowOutsideClick: false,
+        });
+
+        if (userPassword) {
+          return this.onFileSelected(event, userPassword);
+        } else {
+          this.toast('Password is required to view this PDF.');
+          if (input && input.value) input.value = '';
+        }
+      } else {
+        console.error('Error loading local PDF', err);
+        this.toast('Could not load PDF.');
+        if (input && input.value) input.value = '';
+      }
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────

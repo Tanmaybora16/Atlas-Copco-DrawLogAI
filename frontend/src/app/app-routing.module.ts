@@ -12,6 +12,7 @@ import { SubmissionComponent } from './submission/submission.component';
 import { CanvasComponent } from './canvas/canvas.component';
 import { StructureComponent } from './structure/structure.component';
 import { CadqConfigComponent } from './cadq-config/cadq-config.component';
+import { ManagerDashboardComponent } from './manager-dashboard/manager-dashboard.component';
 
 const routes: Routes = [
   // Redirect root to explicit login route
@@ -20,19 +21,19 @@ const routes: Routes = [
   // Login (public)
   { path: 'admin-login', component: AdminLoginComponent },
 
-  // Reports – accessible to both HR and Employee
-  { path: 'reports', component: ReportsComponent, canActivate: [AuthGuard], data: { roles: ['HR', 'Employee'] } },
+  // Reports – accessible to HR, Employee, and Manager
+  { path: 'reports', component: ReportsComponent, canActivate: [AuthGuard], data: { roles: ['HR', 'Employee', 'Manager'] } },
 
-  // Uploads – Employee only (per your requirement)
-  { path: 'uploads', component: UploadsComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] } },
+  // Uploads – Employee and Manager
+  { path: 'uploads', component: UploadsComponent, canActivate: [AuthGuard], data: { roles: ['Employee', 'Manager'] } },
 
-  // Change password – must be logged in (both roles)
-  { path: 'change-password', component: ChangePasswordComponent, canActivate: [AuthGuard], data: { roles: ['HR', 'Employee'] } },
+  // Change password – must be logged in
+  { path: 'change-password', component: ChangePasswordComponent, canActivate: [AuthGuard], data: { roles: ['HR', 'Employee', 'Manager'] } },
   {
-    path: 'submission', component: SubmissionComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] }
+    path: 'submission', component: SubmissionComponent, canActivate: [AuthGuard], data: { roles: ['Employee', 'Manager'] }
   },
   {
-    path: 'requests', component: RequestsComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] }
+    path: 'requests', component: RequestsComponent, canActivate: [AuthGuard], data: { roles: ['Employee', 'Manager'] }
   },
   // Forgot password – public
   { path: 'forgot-password', component: ForgotPasswordComponent },
@@ -41,7 +42,10 @@ const routes: Routes = [
   { path: 'employee', component: EmployeeComponent, canActivate: [AuthGuard], data: { roles: ['HR'] } },
   { path: 'structure', component: StructureComponent, canActivate: [AuthGuard], data: { roles: ['HR'] } },
   { path: 'cadq-config', component: CadqConfigComponent, canActivate: [AuthGuard], data: { roles: ['HR'] } },
-  { path: 'canvas', component: CanvasComponent, canActivate: [AuthGuard], data: { roles: ['Employee'] } },
+  { path: 'canvas', component: CanvasComponent, canActivate: [AuthGuard], data: { roles: ['Employee', 'Manager'] } },
+
+  // Manager tab - Manager only
+  { path: 'manager-dashboard', component: ManagerDashboardComponent, canActivate: [AuthGuard], data: { roles: ['Manager'] } },
 
   // Fallback
   { path: '**', redirectTo: 'admin-login' }
