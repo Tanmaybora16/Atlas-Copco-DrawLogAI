@@ -20,6 +20,7 @@ export class EmployeeComponent implements OnInit {
   selectedDivision: string = '';
   selectedPC: string = '';
   selectedTeam: string = '';
+  selectedRole: string = 'user'; // Default to 'user' for Employee
   editingIndex: number | null = null;
   selectedPCs: string[] = [];
   dropdownOpen = false;
@@ -53,6 +54,7 @@ export class EmployeeComponent implements OnInit {
             division: emp.Emp_Division,
             pc: emp.Emp_PC,
             team: emp.Emp_Team,
+            role: emp.Emp_Role || 'user',
           }));
           this.isBusy = false;
         },
@@ -135,6 +137,7 @@ export class EmployeeComponent implements OnInit {
     // Now set the selected PCs
     this.selectedPCs = employee.pc ? employee.pc.split(',').map((p: string) => p.trim()) : [];
     this.selectedTeam = employee.team;
+    this.selectedRole = employee.role || 'user';
     this.editingIndex = index;
   }
 
@@ -152,7 +155,8 @@ export class EmployeeComponent implements OnInit {
       EMP_Email: this.employeeEmail,
       Emp_Division: this.selectedDivision,
       Emp_PC: this.selectedPCs.join(','),
-      Emp_Team: this.selectedTeam
+      Emp_Team: this.selectedTeam,
+      Emp_Role: this.selectedRole
     };
 
     const isEdit = this.editingIndex !== null;
@@ -217,6 +221,7 @@ export class EmployeeComponent implements OnInit {
     this.pcs = [];
     this.selectedPCs = [];
     this.selectedTeam = '';
+    this.selectedRole = 'user';
     this.editingIndex = null;
     this.dropdownOpen = false;
   }
