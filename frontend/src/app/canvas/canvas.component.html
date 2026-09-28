@@ -24,7 +24,7 @@
   <div class="toolbar">
     <!-- File operations group -->
     <div class="tool-group">
-      <button (click)="openFileSelector()" title="Upload PDF">
+      <button (click)="openFileSelector()" title="Upload PDF (Note: For Adobe AEM Protected documents, please 'Print to PDF' first before uploading)">
         <img src="assets/upload.svg" alt="" />
       </button>
       <input #fileInput type="file" accept=".pdf" (change)="onFileSelected($event)" style="display: none" />

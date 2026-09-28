@@ -43,6 +43,9 @@ import time
 import sys
 import os
 
+with open(os.path.join(os.path.dirname(__file__), 'training_mapping.json'), 'r') as f:
+    TRAINING_MAPPING = json.load(f)
+
 # FIX: Enable unbuffered output for logging
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
@@ -665,7 +668,12 @@ def admin_login():
             return jsonify({"success": False, "message": "Invalid Credentials"}), 401
 
         # Map role to access_type for backward compatibility
-        access_type = "HR" if role == "admin" else "Employee"
+        if role == "admin":
+            access_type = "HR"
+        elif role == "manager":
+            access_type = "Manager"
+        else:
+            access_type = "Employee"
 
         return jsonify({
             "success": True,
@@ -1146,7 +1154,8 @@ def add_employee():
         emp_email = data.get("EMP_Email")
         emp_division = data.get("Emp_Division")
         emp_pc = data.get("Emp_PC")
-        emp_team = data.get("Emp_Team")
+        emp_team = str(data.get("Emp_Team") or "").strip()
+        emp_role = str(data.get("Emp_Role") or "user").strip().lower()
 
         if any(x is None or str(x).strip() == "" for x in [emp_id, emp_name, emp_email, emp_division, emp_pc, emp_team]):
             return jsonify({"success": False, "message": "All fields are required"}), 4002
@@ -1168,6 +1177,12 @@ def add_employee():
         if cursor.fetchone():
             return jsonify({"success": False, "message": "Employee ID already exists"}), 4003
 
+        if emp_role == 'manager':
+            cursor.execute("SELECT name FROM users WHERE team = %s AND role = 'manager' AND is_active = TRUE", (emp_team,))
+            manager_row = cursor.fetchone()
+            if manager_row:
+                return jsonify({"success": False, "message": f"{manager_row[0]} is already the manager of this team"}), 4004
+
         # Create password hash from email
         password_hash = bcrypt.hashpw(emp_email.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
 
@@ -1175,7 +1190,7 @@ def add_employee():
         cursor.execute("""
             INSERT INTO users (emp_id, name, email, password_hash, role, division, pc, team, is_active)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (emp_id, emp_name, emp_email, password_hash, 'user', emp_division, emp_pc, emp_team, True))
+        """, (emp_id, emp_name, emp_email, password_hash, emp_role, emp_division, emp_pc, emp_team, True))
 
         g.db.commit()  # [SUCCESS] commit DB changes before emailing
 
@@ -1214,7 +1229,8 @@ def edit_employee():
     emp_email = data.get("EMP_Email")
     emp_division = data.get("Emp_Division")
     emp_pc = data.get("Emp_PC")
-    emp_team = data.get("Emp_Team")
+    emp_team = str(data.get("Emp_Team") or "").strip()
+    emp_role = str(data.get("Emp_Role") or "user").strip().lower()
     print("Received data:", data)
 
     if not all([emp_id, emp_name, emp_email, emp_division, emp_pc, emp_team]):
@@ -1231,12 +1247,18 @@ def edit_employee():
         if cursor.rowcount == 0:
             return jsonify({"error": "Invalid Employee ID!"}), 400
 
+        if emp_role == 'manager':
+            cursor.execute("SELECT name FROM users WHERE team = %s AND role = 'manager' AND is_active = TRUE AND emp_id != %s", (emp_team, emp_id))
+            manager_row = cursor.fetchone()
+            if manager_row:
+                return jsonify({"error": f"{manager_row[0]} is already the manager of this team"}), 400
+
         # Update employee details in users table
         cursor.execute("""
             UPDATE users
-            SET name=%s, email=%s, division=%s, pc=%s, team=%s
+            SET name=%s, email=%s, division=%s, pc=%s, team=%s, role=%s
             WHERE emp_id=%s
-        """, (emp_name, emp_email, emp_division, emp_pc, emp_team, emp_id))
+        """, (emp_name, emp_email, emp_division, emp_pc, emp_team, emp_role, emp_id))
 
         g.db.commit()
         return jsonify({"success": "Employee details updated successfully!"})
@@ -1301,7 +1323,8 @@ def fetch_all_employees():
                    email as Emp_Email,
                    division as Emp_Division,
                    pc as Emp_PC,
-                   team as Emp_Team
+                   team as Emp_Team,
+                   role as Emp_Role
             FROM users WHERE is_active = TRUE
         """)
         employees = cursor.fetchall()
@@ -4184,6 +4207,130 @@ def submit_support_request():
         return jsonify({"success": True, "message": "Support request submitted successfully"}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# =======================================================================
+# Manager Dashboard APIs
+# =======================================================================
+
+@app.route('/api/manager/team-errors', methods=['GET'])
+def get_team_errors():
+    manager_id = request.args.get('manager_id')
+    if not manager_id:
+        return jsonify({"error": "manager_id is required"}), 400
+
+    try:
+        cursor = g.db.cursor(pymysql.cursors.DictCursor)
+        # Fetch the manager's team
+        cursor.execute("SELECT team FROM users WHERE emp_id = %s", (manager_id,))
+        mgr_row = cursor.fetchone()
+        if not mgr_row or not mgr_row['team']:
+            return jsonify([])
+
+        team_name = mgr_row['team']
+        
+        # Query errors made by members in this team (including members with no errors)
+        cursor.execute("""
+            SELECT u.emp_id, u.name as emp_name, ec.code as error_code, ec.description as error_description, COUNT(rec.error_code_id) as error_count
+            FROM users u
+            LEFT JOIN drawings d ON u.id = d.creator_id
+            LEFT JOIN drawing_revisions dr ON d.id = dr.drawing_id
+            LEFT JOIN revision_error_codes rec ON dr.id = rec.revision_id
+            LEFT JOIN error_codes ec ON rec.error_code_id = ec.id
+            WHERE u.team = %s
+            GROUP BY u.emp_id, u.name, ec.code, ec.description
+        """, (team_name,))
+        
+        errors = cursor.fetchall()
+        
+        # Track which employees actually have errors
+        emp_has_errors = set([e['emp_id'] for e in errors if e['error_code']])
+        
+        filtered_errors = []
+        for error in errors:
+            if not error['error_code']:
+                # If they have actual errors in other rows, skip this empty row
+                if error['emp_id'] in emp_has_errors:
+                    continue
+                error['error_code'] = "N/A"
+                error['error_description'] = "No recorded errors"
+                error['recommended_training'] = "None required"
+                filtered_errors.append(error)
+            else:
+                # Clean error code (e.g. 'P28' -> '28') for mapping
+                clean_code = ''.join(filter(str.isdigit, str(error['error_code'])))
+                error['recommended_training'] = TRAINING_MAPPING.get(clean_code, 'No training mapped')
+                filtered_errors.append(error)
+        
+        print(f"[MANAGER DASHBOARD] Found {len(filtered_errors)} records for team {team_name}")
+
+        return jsonify(filtered_errors)
+    except Exception as e:
+        print("Error fetching team errors:", e)
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/api/manager/assign-training', methods=['POST'])
+def assign_training():
+    data = request.json
+    manager_id = data.get('manager_id')
+    emp_id = data.get('emp_id')
+    error_code = data.get('error_code')
+    training_name = data.get('training_name')
+
+    if not all([manager_id, emp_id, error_code, training_name]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        cursor = g.db.cursor()
+        
+        # Check if already assigned and not completed
+        cursor.execute("""
+            SELECT id FROM assigned_trainings 
+            WHERE emp_id = %s AND error_code = %s AND status != 'Completed'
+        """, (emp_id, error_code))
+        
+        if cursor.fetchone():
+            return jsonify({"error": "This training is already assigned and not completed"}), 400
+
+        cursor.execute("""
+            INSERT INTO assigned_trainings (emp_id, manager_id, error_code, training_name, status)
+            VALUES (%s, %s, %s, %s, 'Assigned')
+        """, (emp_id, manager_id, error_code, training_name))
+        
+        g.db.commit()
+        return jsonify({"message": "Training assigned successfully"})
+    except Exception as e:
+        g.db.rollback()
+        print("Error assigning training:", e)
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/api/manager/assigned-trainings', methods=['GET'])
+def get_assigned_trainings():
+    manager_id = request.args.get('manager_id')
+    if not manager_id:
+        return jsonify({"error": "manager_id is required"}), 400
+
+    try:
+        cursor = g.db.cursor(pymysql.cursors.DictCursor)
+        # Fetch all trainings assigned by this manager or to this manager's team
+        cursor.execute("""
+            SELECT at.id, at.emp_id, u.name as emp_name, at.error_code, ec.description as error_description, at.training_name, at.status, at.assigned_at
+            FROM assigned_trainings at
+            JOIN users u ON at.emp_id = u.emp_id
+            LEFT JOIN error_codes ec ON at.error_code = ec.code
+            WHERE at.manager_id = %s
+            ORDER BY at.assigned_at DESC
+        """, (manager_id,))
+        
+        trainings = cursor.fetchall()
+        # Formatting assigned_at datetime
+        for t in trainings:
+            if t['assigned_at']:
+                t['assigned_at'] = t['assigned_at'].strftime('%Y-%m-%d %H:%M:%S')
+
+        return jsonify(trainings)
+    except Exception as e:
+        print("Error fetching assigned trainings:", e)
+        return jsonify({"error": "Internal server error"}), 500
 
 # Canvas end
 if __name__ == '__main__':

@@ -1,0 +1,87 @@
+<div class="manager-container">
+  <div class="header-section">
+    <h1>Training Mapping</h1>
+    <p>Monitor your team's design errors and assign recommended CAD-Q training.</p>
+  </div>
+
+  <div class="tabs">
+    <button [class.active]="currentTab === 'errors'" (click)="setTab('errors')">
+      Team Errors & Recommendations
+    </button>
+    <button [class.active]="currentTab === 'assigned'" (click)="setTab('assigned')">
+      Assigned Trainings Log
+    </button>
+  </div>
+
+  <!-- Errors Tab -->
+  <div class="tab-content" *ngIf="currentTab === 'errors'">
+    <div class="loading-state" *ngIf="isLoadingErrors">Loading team errors...</div>
+    <div class="empty-state" *ngIf="!isLoadingErrors && teamErrors.length === 0">
+      Great job! Your team has no recorded errors.
+    </div>
+
+    <table class="styled-table" *ngIf="!isLoadingErrors && teamErrors.length > 0">
+      <thead>
+        <tr>
+          <th>Employee Name</th>
+          <th>Error Description</th>
+          <th>Error Count</th>
+          <th>Recommended Training</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let err of teamErrors">
+          <td>{{ err.emp_name }} <span class="emp-id">({{ err.emp_id }})</span></td>
+          <td>
+            <span class="error-code">E-{{ err.error_code }}</span>
+            {{ err.error_description }}
+          </td>
+          <td><span class="count-badge">{{ err.error_count }}</span></td>
+          <td class="training-name">{{ err.recommended_training }}</td>
+          <td>
+            <button class="btn-assign" (click)="assignTraining(err)" [disabled]="isAssigning">
+              Assign Training
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Assigned Trainings Tab -->
+  <div class="tab-content" *ngIf="currentTab === 'assigned'">
+    <div class="loading-state" *ngIf="isLoadingTrainings">Loading assigned trainings...</div>
+    <div class="empty-state" *ngIf="!isLoadingTrainings && assignedTrainings.length === 0">
+      No trainings have been assigned yet.
+    </div>
+
+    <table class="styled-table" *ngIf="!isLoadingTrainings && assignedTrainings.length > 0">
+      <thead>
+        <tr>
+          <th>Employee Name</th>
+          <th>Training Name</th>
+          <th>Triggered by Error</th>
+          <th>Assigned Date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of assignedTrainings">
+          <td>{{ t.emp_name }} <span class="emp-id">({{ t.emp_id }})</span></td>
+          <td class="training-name">{{ t.training_name }}</td>
+          <td class="error-trigger">
+            <span class="error-code">E-{{ t.error_code }}</span>
+            <small>{{ t.error_description }}</small>
+          </td>
+          <td>{{ t.assigned_at }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="t.status.toLowerCase()">
+              {{ t.status }}
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

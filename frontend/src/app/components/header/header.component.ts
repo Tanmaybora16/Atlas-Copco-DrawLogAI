@@ -14,7 +14,7 @@ declare const Swal: any;
 export class HeaderComponent implements OnInit {
   loggedInUser: string | null = null;
   showDropdown = false;
-  userRole: 'HR' | 'Employee' | undefined;
+  userRole: 'HR' | 'Employee' | 'Manager' | undefined;
 
   // Support Modal State
   showSupportModal = false;
