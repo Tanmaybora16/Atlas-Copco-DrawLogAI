@@ -4234,26 +4234,33 @@ def get_team_errors():
         
         errors = cursor.fetchall()
         
-        # Track which employees actually have errors
-        emp_has_errors = set([e['emp_id'] for e in errors if e['error_code']])
-        
+        # Group errors by employee to extract top 3 errors per employee
+        from collections import defaultdict
+        emp_errors_map = defaultdict(list)
+        for e in errors:
+            emp_errors_map[e['emp_id']].append(e)
+
         filtered_errors = []
-        for error in errors:
-            if not error['error_code']:
-                # If they have actual errors in other rows, skip this empty row
-                if error['emp_id'] in emp_has_errors:
-                    continue
+        for emp_id, emp_list in emp_errors_map.items():
+            actual_errors = [e for e in emp_list if e['error_code']]
+            if actual_errors:
+                # Sort by highest error count descending
+                actual_errors.sort(key=lambda x: (x['error_count'] or 0), reverse=True)
+                # Take top 3 errors per employee
+                top_3 = actual_errors[:3]
+                for error in top_3:
+                    clean_code = ''.join(filter(str.isdigit, str(error['error_code'])))
+                    error['recommended_training'] = TRAINING_MAPPING.get(clean_code, 'No training mapped')
+                    filtered_errors.append(error)
+            else:
+                # Employee has no recorded errors
+                error = emp_list[0]
                 error['error_code'] = "N/A"
                 error['error_description'] = "No recorded errors"
                 error['recommended_training'] = "None required"
                 filtered_errors.append(error)
-            else:
-                # Clean error code (e.g. 'P28' -> '28') for mapping
-                clean_code = ''.join(filter(str.isdigit, str(error['error_code'])))
-                error['recommended_training'] = TRAINING_MAPPING.get(clean_code, 'No training mapped')
-                filtered_errors.append(error)
         
-        print(f"[MANAGER DASHBOARD] Found {len(filtered_errors)} records for team {team_name}")
+        print(f"[MANAGER DASHBOARD] Found {len(filtered_errors)} records (top 3 errors per employee) for team {team_name}")
 
         return jsonify(filtered_errors)
     except Exception as e:
