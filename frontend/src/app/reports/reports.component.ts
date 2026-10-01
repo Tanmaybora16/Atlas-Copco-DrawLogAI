@@ -251,6 +251,23 @@ export class ReportsComponent implements OnInit {
     this.fetchEmployees();
   }
 
+  clearFilters() {
+    this.selectedTeams = [];
+    this.selectedPCs = [];
+    this.empSearch = '';
+    this.selectedEmpId = '';
+    this.drawingSearch = '';
+    this.selectedDrawingId = '';
+    this.taskNumberSearch = '';
+    this.startDate = '';
+    this.endDate = '';
+    
+    // Fetch data with cleared filters
+    this.fetchTasks();
+    this.fetchDrawings();
+    this.fetchEmployees();
+  }
+
   filterEmployees() {
     if (!this.empSearch) {
       this.filteredEmployees = this.employees;

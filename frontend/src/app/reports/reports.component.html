@@ -93,13 +93,18 @@
   <!-- Start Date -->
   <div class="input-container">
     <label for="fromDate">Start Date</label>
-    <input id="fromDate" type="date" (change)="onDateChange($event, 'start')" />
+    <input id="fromDate" type="date" [(ngModel)]="startDate" (change)="onDateChange($event, 'start')" />
   </div>
 
   <!-- End Date -->
   <div class="input-container">
     <label for="toDate">End Date</label>
-    <input id="toDate" type="date" (change)="onDateChange($event, 'end')" />
+    <input id="toDate" type="date" [(ngModel)]="endDate" (change)="onDateChange($event, 'end')" />
+  </div>
+
+  <!-- Clear Filters Button -->
+  <div class="input-container clear-btn-container">
+    <button class="clear-button" (click)="clearFilters()">Clear Filters</button>
   </div>
 </div>
 
