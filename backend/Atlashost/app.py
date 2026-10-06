@@ -918,11 +918,7 @@ def forgot_password_reset():
                   JOIN users u ON lo.user_id = u.id
                  WHERE u.emp_id=%s
                    AND u.is_active=TRUE
-<<<<<<< Updated upstream
-                   AND lo.purpose='password_reset'
-=======
                    AND lo.purpose = 'password_reset'
->>>>>>> Stashed changes
                    AND lo.expires_at > NOW()
                  LIMIT 1
             """, (emp_id,))
@@ -932,11 +928,7 @@ def forgot_password_reset():
                 c2.execute("""
                     DELETE lo FROM login_otp lo
                     JOIN users u ON lo.user_id = u.id
-<<<<<<< Updated upstream
-                    WHERE u.emp_id=%s AND lo.purpose='password_reset'
-=======
                     WHERE u.emp_id=%s AND lo.purpose = 'password_reset'
->>>>>>> Stashed changes
                 """, (emp_id,))
                 g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
@@ -4242,31 +4234,82 @@ def get_team_errors():
         
         errors = cursor.fetchall()
         
-        # Track which employees actually have errors
-        emp_has_errors = set([e['emp_id'] for e in errors if e['error_code']])
-        
+        # Group errors by employee to extract top 3 errors per employee
+        from collections import defaultdict
+        emp_errors_map = defaultdict(list)
+        for e in errors:
+            emp_errors_map[e['emp_id']].append(e)
+
         filtered_errors = []
-        for error in errors:
-            if not error['error_code']:
-                # If they have actual errors in other rows, skip this empty row
-                if error['emp_id'] in emp_has_errors:
-                    continue
+        for emp_id, emp_list in emp_errors_map.items():
+            actual_errors = [e for e in emp_list if e['error_code']]
+            if actual_errors:
+                # Sort by highest error count descending
+                actual_errors.sort(key=lambda x: (x['error_count'] or 0), reverse=True)
+                # Take top 3 errors per employee
+                top_3 = actual_errors[:3]
+                for error in top_3:
+                    clean_code = ''.join(filter(str.isdigit, str(error['error_code'])))
+                    error['recommended_training'] = TRAINING_MAPPING.get(clean_code, 'No training mapped')
+                    filtered_errors.append(error)
+            else:
+                # Employee has no recorded errors
+                error = emp_list[0]
                 error['error_code'] = "N/A"
                 error['error_description'] = "No recorded errors"
                 error['recommended_training'] = "None required"
                 filtered_errors.append(error)
-            else:
-                # Clean error code (e.g. 'P28' -> '28') for mapping
-                clean_code = ''.join(filter(str.isdigit, str(error['error_code'])))
-                error['recommended_training'] = TRAINING_MAPPING.get(clean_code, 'No training mapped')
-                filtered_errors.append(error)
         
-        print(f"[MANAGER DASHBOARD] Found {len(filtered_errors)} records for team {team_name}")
+        print(f"[MANAGER DASHBOARD] Found {len(filtered_errors)} records (top 3 errors per employee) for team {team_name}")
 
         return jsonify(filtered_errors)
     except Exception as e:
         print("Error fetching team errors:", e)
         return jsonify({"error": "Internal server error"}), 500
+
+def send_training_assignment_email(to_email: str, emp_name: str, emp_id: str, manager_name: str, training_name: str, error_code: str):
+    """
+    Sends an email notification to employee when a training is assigned by their manager.
+    Includes instruction that the assigned training must be completed from AtlasCopco skill matrix.
+    """
+    try:
+        subject = f"Training Assigned: {training_name} - Atlas Copco Skill Matrix"
+        
+        body = f"""Dear {emp_name or emp_id},
+
+A new training has been assigned to you by {manager_name or 'your Manager'}.
+
+Training Details:
+----------------------------------------
+Training Name : {training_name}
+Error Code    : {error_code}
+Assigned By   : {manager_name or 'Manager'}
+
+Instruction:
+----------------------------------------
+Please note that the assigned training "{training_name}" must be completed from the Atlas Copco Skill Matrix.
+
+Portal Link: https://drawlogai.atlascopco.group
+
+----------------------------------------
+Regards,
+Atlas Copco AI Error Logging & Training Management System
+This is an automated system notification. Please do not reply directly to this email.
+"""
+
+        server = get_smtp_server()
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL_SENDER
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
+        server.quit()
+        print(f"[SUCCESS] Training assignment email sent to {to_email}")
+    except Exception as e:
+        print(f"[WARNING] Failed to send training assignment email to {to_email}: {e}")
+
 
 @app.route('/api/manager/assign-training', methods=['POST'])
 def assign_training():
@@ -4297,7 +4340,33 @@ def assign_training():
         """, (emp_id, manager_id, error_code, training_name))
         
         g.db.commit()
-        return jsonify({"message": "Training assigned successfully"})
+
+        # Fetch employee email & name, and manager name to send email notification
+        try:
+            cursor.execute("SELECT email, name FROM users WHERE emp_id = %s", (emp_id,))
+            emp_row = cursor.fetchone()
+            cursor.execute("SELECT name FROM users WHERE emp_id = %s", (manager_id,))
+            mgr_row = cursor.fetchone()
+
+            if emp_row and emp_row[0]:
+                to_email = str(emp_row[0]).strip()
+                emp_name = emp_row[1] or emp_id
+                manager_name = mgr_row[0] if mgr_row and mgr_row[0] else manager_id
+                
+                send_training_assignment_email(
+                    to_email=to_email,
+                    emp_name=emp_name,
+                    emp_id=emp_id,
+                    manager_name=manager_name,
+                    training_name=training_name,
+                    error_code=error_code
+                )
+            else:
+                print(f"[WARNING] No email address found for employee {emp_id}, email notification skipped.")
+        except Exception as mail_err:
+            print(f"[WARNING] Error preparing training assignment email: {mail_err}")
+
+        return jsonify({"message": "Training assigned successfully and email notification sent."})
     except Exception as e:
         g.db.rollback()
         print("Error assigning training:", e)
