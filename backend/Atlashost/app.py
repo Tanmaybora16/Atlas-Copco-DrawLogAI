@@ -918,11 +918,7 @@ def forgot_password_reset():
                   JOIN users u ON lo.user_id = u.id
                  WHERE u.emp_id=%s
                    AND u.is_active=TRUE
-<<<<<<< Updated upstream
-                   AND lo.purpose='password_reset'
-=======
                    AND lo.purpose = 'password_reset'
->>>>>>> Stashed changes
                    AND lo.expires_at > NOW()
                  LIMIT 1
             """, (emp_id,))
@@ -932,11 +928,7 @@ def forgot_password_reset():
                 c2.execute("""
                     DELETE lo FROM login_otp lo
                     JOIN users u ON lo.user_id = u.id
-<<<<<<< Updated upstream
-                    WHERE u.emp_id=%s AND lo.purpose='password_reset'
-=======
                     WHERE u.emp_id=%s AND lo.purpose = 'password_reset'
->>>>>>> Stashed changes
                 """, (emp_id,))
                 g.db.commit()
             return jsonify({"success": False, "message": "OTP expired or not found. Please resend a new OTP."}), 400
