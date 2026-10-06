@@ -4267,6 +4267,50 @@ def get_team_errors():
         print("Error fetching team errors:", e)
         return jsonify({"error": "Internal server error"}), 500
 
+def send_training_assignment_email(to_email: str, emp_name: str, emp_id: str, manager_name: str, training_name: str, error_code: str):
+    """
+    Sends an email notification to employee when a training is assigned by their manager.
+    Includes instruction that the assigned training must be completed from AtlasCopco skill matrix.
+    """
+    try:
+        subject = f"Training Assigned: {training_name} - Atlas Copco Skill Matrix"
+        
+        body = f"""Dear {emp_name or emp_id},
+
+A new training has been assigned to you by {manager_name or 'your Manager'}.
+
+Training Details:
+----------------------------------------
+Training Name : {training_name}
+Error Code    : {error_code}
+Assigned By   : {manager_name or 'Manager'}
+
+Instruction:
+----------------------------------------
+Please note that the assigned training "{training_name}" must be completed from the Atlas Copco Skill Matrix.
+
+Portal Link: https://drawlogai.atlascopco.group
+
+----------------------------------------
+Regards,
+Atlas Copco AI Error Logging & Training Management System
+This is an automated system notification. Please do not reply directly to this email.
+"""
+
+        server = get_smtp_server()
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL_SENDER
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        server.sendmail(EMAIL_SENDER, to_email, msg.as_string())
+        server.quit()
+        print(f"[SUCCESS] Training assignment email sent to {to_email}")
+    except Exception as e:
+        print(f"[WARNING] Failed to send training assignment email to {to_email}: {e}")
+
+
 @app.route('/api/manager/assign-training', methods=['POST'])
 def assign_training():
     data = request.json
@@ -4296,7 +4340,33 @@ def assign_training():
         """, (emp_id, manager_id, error_code, training_name))
         
         g.db.commit()
-        return jsonify({"message": "Training assigned successfully"})
+
+        # Fetch employee email & name, and manager name to send email notification
+        try:
+            cursor.execute("SELECT email, name FROM users WHERE emp_id = %s", (emp_id,))
+            emp_row = cursor.fetchone()
+            cursor.execute("SELECT name FROM users WHERE emp_id = %s", (manager_id,))
+            mgr_row = cursor.fetchone()
+
+            if emp_row and emp_row[0]:
+                to_email = str(emp_row[0]).strip()
+                emp_name = emp_row[1] or emp_id
+                manager_name = mgr_row[0] if mgr_row and mgr_row[0] else manager_id
+                
+                send_training_assignment_email(
+                    to_email=to_email,
+                    emp_name=emp_name,
+                    emp_id=emp_id,
+                    manager_name=manager_name,
+                    training_name=training_name,
+                    error_code=error_code
+                )
+            else:
+                print(f"[WARNING] No email address found for employee {emp_id}, email notification skipped.")
+        except Exception as mail_err:
+            print(f"[WARNING] Error preparing training assignment email: {mail_err}")
+
+        return jsonify({"message": "Training assigned successfully and email notification sent."})
     except Exception as e:
         g.db.rollback()
         print("Error assigning training:", e)
