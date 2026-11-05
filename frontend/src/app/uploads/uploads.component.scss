@@ -54,6 +54,50 @@ select{
   width: 85%;
   min-width: 0;
 }
+
+.table-container { overflow-x: auto; }
+.styled-table { min-width: 1100px; }
+.styled-table select {
+  width: 100%;
+  min-width: 190px;
+  height: auto;
+  min-height: 40px;
+  border: 1px solid #9ca3af;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #fff;
+  font-size: 14px;
+}
+.action-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.action-buttons button {
+  border: 1px solid #9ca3af;
+  border-radius: 5px;
+  padding: 6px 8px;
+  background: #fff;
+  cursor: pointer;
+}
+.action-buttons button:focus-visible,
+.styled-table select:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.prediction-status {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #fef3c7;
+  color: #78350f;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.prediction-status[data-status='corrected'],
+.prediction-status[data-status='kept_classifier'] { background: #dcfce7; color: #166534; }
+.prediction-status[data-status='removed'] { background: #e5e7eb; color: #374151; }
+.removed-row { opacity: 0.62; }
+.choice-change, .prediction-message { display: block; margin-top: 6px; color: #374151; }
+.final-description { display: block; margin-top: 5px; max-width: 240px; white-space: normal; }
+.prediction-error { color: #991b1b; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 .right-side{
   flex: 1;
   display: flex;
@@ -628,5 +672,53 @@ select {
   
   .submit-container button {
     padding: 0 20px;
+  }
+}
+.feedback-history {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid #d5dde5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.feedback-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.feedback-history-heading h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.feedback-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.feedback-export-actions button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.85rem;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #005eb8;
+  cursor: pointer;
+}
+
+.feedback-export-actions button.secondary {
+  color: #005eb8;
+  border: 1px solid #005eb8;
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .feedback-history-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

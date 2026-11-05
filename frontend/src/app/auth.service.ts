@@ -7,6 +7,7 @@ interface SessionState {
   fullName?: string;
   accessType?: AccessType;
   loginTime: number; // epoch ms
+  apiToken?: string;
 }
 
 @Injectable({
@@ -19,12 +20,13 @@ export class AuthService {
   private readonly SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
   /** Call this after a successful login */
-  login(username: string, accessType?: AccessType, fullName?: string): void {
+  login(username: string, accessType?: AccessType, fullName?: string, apiToken?: string): void {
     const state: SessionState = {
       username: username.trim(),
       fullName: fullName?.trim() || username.trim(),
       accessType,
-      loginTime: Date.now()
+      loginTime: Date.now(),
+      apiToken
     };
     sessionStorage.setItem(this.KEY, JSON.stringify(state));
   }
@@ -64,6 +66,14 @@ export class AuthService {
   getAccessType(): AccessType | undefined {
     const s = this.getState();
     return s?.accessType as AccessType | undefined;
+  }
+
+  getApiToken(): string | null {
+    return this.getState()?.apiToken || null;
+  }
+
+  hasApiToken(): boolean {
+    return !!this.getApiToken();
   }
 
   /** Optionally refresh the 1-hour window (call on activity if you want rolling sessions) */

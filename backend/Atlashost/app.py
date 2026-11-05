@@ -1,7 +1,7 @@
 import os
 
 # Load environment variables from .env if it exists in current or parent directory
-for env_path in [".env", "../.env"]:
+for env_path in [".env", "../.env", os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")]:
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -22,6 +22,7 @@ import joblib
 import pymysql
 from datetime import datetime, timedelta, date
 import json
+import csv
 import cv2
 import pytesseract as pyt
 import numpy as np
@@ -42,6 +43,11 @@ import io
 import time
 import sys
 import os
+import urllib.error
+import urllib.request
+import hashlib
+import hmac
+from sklearn.metrics.pairwise import cosine_similarity
 
 with open(os.path.join(os.path.dirname(__file__), 'training_mapping.json'), 'r') as f:
     TRAINING_MAPPING = json.load(f)
@@ -122,6 +128,16 @@ def teardown_request(exception):
 model = joblib.load(MODEL_PATH)
 tfidf_vectorizer = joblib.load(VECTORIZER_PATH)
 
+def _artifact_version(*paths):
+    digest = hashlib.sha256()
+    for path in paths:
+        with open(path, "rb") as artifact:
+            for chunk in iter(lambda: artifact.read(1024 * 1024), b""):
+                digest.update(chunk)
+    return digest.hexdigest()[:16]
+
+CLASSIFIER_MODEL_VERSION = f"tfidf-logreg-{_artifact_version(MODEL_PATH, VECTORIZER_PATH)}"
+
 # SMTP Email Configuration (Use your SMTP server details)
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "Errorloggingportal@atlascopco.com")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
@@ -195,6 +211,327 @@ def predict_error(comments):
     return predictions.tolist() if predictions.size > 0 else []
 
 
+def parse_local_llm_prediction(content, allowed_codes):
+    """Parse a structured Ollama response and fail closed on unknown codes."""
+    try:
+        result = json.loads(content)
+        if not isinstance(result, dict) or not {"code", "explanation", "needs_human_review"}.issubset(result):
+            raise ValueError("Required response fields are missing")
+        code = result.get("code")
+        explanation = result.get("explanation", "")
+        needs_human_review = result.get("needs_human_review", True)
+        if not isinstance(explanation, str) or not explanation.strip() or not isinstance(needs_human_review, bool):
+            raise ValueError("Invalid response fields")
+        if code is not None and (not isinstance(code, str) or code not in allowed_codes):
+            return {
+                "code": None,
+                "explanation": "The model returned a code outside the active catalog.",
+                "needs_human_review": True,
+            }
+        return {
+            "code": code,
+            "explanation": explanation[:300],
+            "needs_human_review": needs_human_review or code is None,
+        }
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {
+            "code": None,
+            "explanation": "The model response could not be verified.",
+            "needs_human_review": True,
+        }
+
+
+def select_candidate_codes(comment, catalog, maximum=8):
+    """Use current-model labels and description similarity to keep the prompt small."""
+    if not comment.strip() or not catalog:
+        return []
+    catalog_by_code = {item["code"]: item.get("description") or "" for item in catalog}
+    comment_vector = tfidf_vectorizer.transform([comment])
+    similarities = cosine_similarity(
+        comment_vector,
+        tfidf_vectorizer.transform([entry["description"] for entry in catalog]),
+    )[0]
+    ranked_descriptions = [
+        catalog[index]["code"]
+        for index in similarities.argsort()[::-1]
+        if similarities[index] > 0
+    ][:maximum]
+
+    ranked_classifier = []
+    if hasattr(model, "predict_proba"):
+        probabilities = model.predict_proba(comment_vector)[0]
+        for index in probabilities.argsort()[::-1]:
+            code = str(model.classes_[index])
+            if code in catalog_by_code:
+                ranked_classifier.append(code)
+            if len(ranked_classifier) == 3:
+                break
+    else:
+        baseline = predict_error([comment])
+        ranked_classifier = [code for code in baseline if code in catalog_by_code]
+
+    combined = list(dict.fromkeys(ranked_classifier + ranked_descriptions))[:maximum]
+    return [{"code": code, "description": catalog_by_code[code]} for code in combined]
+
+
+def predict_with_local_ollama(comment, catalog):
+    """Ask local Ollama for a catalog-constrained suggestion; never persist it."""
+    candidates = select_candidate_codes(comment, catalog)
+    codes = [item["code"] for item in candidates]
+    if not codes:
+        return {
+            "code": None,
+            "description": None,
+            "explanation": "No catalog entry could be matched reliably to this comment.",
+            "status": "needs_review",
+            "needs_human_review": True,
+        }
+    schema = {
+        "type": "object",
+        "properties": {
+            "code": {"type": ["string", "null"], "enum": codes + [None]},
+            "explanation": {"type": "string", "minLength": 1, "maxLength": 300},
+            "needs_human_review": {"type": "boolean"},
+        },
+        "required": ["code", "explanation", "needs_human_review"],
+        "additionalProperties": False,
+    }
+    catalog_text = "\n".join(f"{item['code']}: {item['description']}" for item in candidates)
+    prompt = (
+        "Classify this drawing-review comment using only the supplied error-code catalog. "
+        "Choose null when the comment is vague or does not clearly match a code. "
+        "Set needs_human_review true when uncertain. Do not infer a code outside the catalog.\n\n"
+        f"Catalog:\n{catalog_text}\n\nComment:\n{comment}"
+    )
+    body = json.dumps({
+        "model": os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+        "format": schema,
+        "options": {"temperature": 0},
+    }).encode("utf-8")
+    url = os.getenv("OLLAMA_CHAT_URL", "http://127.0.0.1:11434/api/chat")
+    try:
+        timeout_seconds = max(1, min(120, float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "30"))))
+    except ValueError:
+        timeout_seconds = 30
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    content = payload.get("message", {}).get("content", "")
+    result = parse_local_llm_prediction(content, set(codes))
+    result["description"] = next(
+        (item["description"] for item in candidates if item["code"] == result["code"]), None
+    )
+    result["status"] = (
+        "suggested" if result["code"] and not result["needs_human_review"] else "needs_review"
+    )
+    return result
+
+
+def unavailable_prediction(reason="Local AI prediction is unavailable."):
+    return {
+        "code": None,
+        "description": None,
+        "explanation": reason,
+        "status": "unavailable",
+        "needs_human_review": True,
+    }
+
+
+def sign_prediction_snapshot(comment, classifier_code, ai_code, explanation, classifier_version, ai_model_version):
+    """Bind browser-visible predictions to this backend-issued response."""
+    signing_key = os.getenv("AI_FEEDBACK_SIGNING_KEY", "")
+    if not signing_key:
+        return None
+    signed_values = {
+        "comment": comment,
+        "classifier_code": classifier_code,
+        "ai_code": ai_code,
+        "explanation": explanation,
+        "classifier_version": classifier_version,
+        "ai_model_version": ai_model_version,
+    }
+    message = json.dumps(signed_values, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hmac.new(signing_key.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+def issue_api_session(emp_id, role, lifetime_seconds=8 * 60 * 60):
+    """Create a short-lived bearer token for APIs that need server-side identity."""
+    signing_key = os.getenv("AI_FEEDBACK_SIGNING_KEY", "")
+    if not signing_key:
+        return None
+    payload = json.dumps({
+        "emp_id": emp_id,
+        "role": role,
+        "exp": int(time.time()) + lifetime_seconds,
+    }, separators=(",", ":")).encode("utf-8")
+    encoded = base64.urlsafe_b64encode(payload).rstrip(b"=").decode("ascii")
+    signature = hmac.new(signing_key.encode("utf-8"), encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def read_api_session(token):
+    """Verify a bearer token; caller identity is never accepted from query data."""
+    signing_key = os.getenv("AI_FEEDBACK_SIGNING_KEY", "")
+    if not signing_key or not isinstance(token, str) or "." not in token:
+        return None
+    encoded, supplied_signature = token.rsplit(".", 1)
+    expected_signature = hmac.new(signing_key.encode("utf-8"), encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(supplied_signature, expected_signature):
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
+        if not isinstance(payload.get("emp_id"), str) or int(payload.get("exp", 0)) <= int(time.time()):
+            return None
+        return payload
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def authenticated_user(cursor):
+    header = request.headers.get("Authorization", "")
+    scheme, _, token = header.partition(" ")
+    session = read_api_session(token) if scheme.lower() == "bearer" else None
+    if not session:
+        return None
+    cursor.execute("SELECT id, emp_id, role, is_active FROM users WHERE emp_id = %s LIMIT 1", (session["emp_id"],))
+    user = cursor.fetchone()
+    if not user or not user[3] or user[2] != session.get("role"):
+        return None
+    return {"id": user[0], "emp_id": user[1], "role": user[2]}
+
+
+def predict_comment_with_catalog(comment, catalog):
+    try:
+        baseline_predictions = predict_error([comment])
+        baseline = baseline_predictions[0] if baseline_predictions else None
+    except Exception:
+        app.logger.exception("Existing classifier prediction failed")
+        baseline = None
+    try:
+        if not os.getenv("AI_FEEDBACK_SIGNING_KEY"):
+            suggestion = unavailable_prediction("AI suggestions are disabled until AI_FEEDBACK_SIGNING_KEY is configured.")
+        else:
+            suggestion = predict_with_local_ollama(comment, catalog)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        suggestion = unavailable_prediction()
+    except Exception:
+        app.logger.exception("Local LLM prediction failed")
+        suggestion = unavailable_prediction()
+    result = {
+        "comment": comment,
+        "existing_classifier_code": baseline,
+        "ai_suggested_code": suggestion["code"],
+        "official_description": suggestion["description"],
+        "explanation": suggestion["explanation"],
+        "status": suggestion["status"],
+        "needs_human_review": suggestion["needs_human_review"],
+        "classifier_model_version": CLASSIFIER_MODEL_VERSION,
+        "ai_model_version": os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
+    }
+    result["prediction_token"] = sign_prediction_snapshot(
+        comment, baseline, suggestion["code"], suggestion["explanation"],
+        CLASSIFIER_MODEL_VERSION, result["ai_model_version"],
+    )
+    return result
+
+
+@app.route('/api/ai/predict-local', methods=['POST'])
+def predict_local_llm():
+    """Experimental side-by-side predictions; does not alter /upload or save labels."""
+    payload = request.get_json(silent=True) or {}
+    comments = payload.get("comments")
+    single_comment_request = comments is None
+    if comments is None:
+        comments = [payload.get("comment")]
+    if (not isinstance(comments, list) or not comments or len(comments) > 100 or
+            any(not isinstance(comment, str) or len(comment) > 4000 for comment in comments)):
+        return jsonify({"error": "comments must contain 1 to 100 strings of at most 4000 characters"}), 400
+
+    try:
+        with g.db.cursor() as cursor:
+            cursor.execute("SELECT code, description FROM error_codes WHERE is_active = 1 ORDER BY code")
+            rows = cursor.fetchall()
+        catalog = [{"code": row[0], "description": row[1] or ""} for row in rows]
+        if not catalog:
+            predictions = [
+                {"comment": comment, "existing_classifier_code": None, "ai_suggested_code": None,
+                 "official_description": None, "explanation": "No active error-code catalog is available.",
+                 "status": "unavailable", "needs_human_review": True,
+                 "classifier_model_version": CLASSIFIER_MODEL_VERSION,
+                 "ai_model_version": os.getenv("OLLAMA_MODEL", "qwen2.5:7b")}
+                for comment in comments
+            ]
+            return jsonify({"predictions": predictions, "catalog_source": "active error_codes table"}), 200
+    except Exception:
+        app.logger.exception("Could not load active error-code catalog")
+        return jsonify({"error": "Could not load active error-code catalog"}), 503
+
+    # Cache duplicate comments for this request; one Ollama call per distinct non-empty comment.
+    results_by_comment = {}
+    predictions = []
+    for raw_comment in comments:
+        comment = raw_comment.strip()
+        if not comment or comment.lower() == "no annotations found":
+            result = {
+                "comment": raw_comment, "existing_classifier_code": None,
+                "ai_suggested_code": None, "official_description": None,
+                "explanation": "No annotation text was available to classify.",
+                "status": "needs_review", "needs_human_review": True,
+                "classifier_model_version": CLASSIFIER_MODEL_VERSION,
+                "ai_model_version": os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
+            }
+        elif comment in results_by_comment:
+            result = results_by_comment[comment].copy()
+            result["comment"] = raw_comment
+        else:
+            result = predict_comment_with_catalog(comment, catalog)
+            results_by_comment[comment] = result
+        predictions.append(result)
+    if single_comment_request:
+        prediction = predictions[0]
+        return jsonify({
+            **prediction,
+            "existing_classifier": {
+                "code": prediction["existing_classifier_code"],
+                "catalog_valid": prediction["existing_classifier_code"] in {item["code"] for item in catalog},
+            },
+            "local_llm": {
+                "code": prediction["ai_suggested_code"],
+                "description": prediction["official_description"],
+                "explanation": prediction["explanation"],
+                "status": prediction["status"],
+                "needs_human_review": prediction["needs_human_review"],
+            },
+            "catalog_source": "active error_codes table rows; authoritative status not yet confirmed",
+            "source": "experimental; not saved or used by the reviewer workflow",
+        })
+    return jsonify({
+        "predictions": predictions,
+        "catalog_source": "active error_codes table rows; authoritative status not yet confirmed",
+        "source": "experimental; not saved or used by the reviewer workflow",
+    })
+
+
+@app.route('/api/error-codes', methods=['GET'])
+def get_error_code_catalog():
+    """Return active application catalog entries for reviewer selection."""
+    try:
+        with g.db.cursor() as cursor:
+            cursor.execute("SELECT code, description FROM error_codes WHERE is_active = 1 ORDER BY code")
+            rows = cursor.fetchall()
+            feedback_ready = table_exists(cursor, "reviewer_error_feedback")
+        return jsonify({
+            "codes": [{"code": row[0], "description": row[1] or ""} for row in rows],
+            "catalog_source": "active error_codes table rows; authoritative status not yet confirmed",
+            "feedback_ready": feedback_ready,
+        }), 200
+    except Exception:
+        app.logger.exception("Could not load active error-code catalog")
+        return jsonify({"error": "Could not load active error-code catalog"}), 503
+
+
 
 ALLOWED_EXTENSIONS = {'pdf'}
 
@@ -234,6 +571,7 @@ def upload_file():
         'file_path': file_path,
         'extracted_comments': annotations,
         'predicted_errors': predictions,
+        'classifier_model_version': CLASSIFIER_MODEL_VERSION,
     })
 
 
@@ -247,6 +585,213 @@ def dbg_fail(step, err, extra=None, code=500):
     if DEBUG_RETURN_ERRORS:
         return jsonify({"ok": False, "where": step, "error": str(err), "extra": extra}), code
     return jsonify({"error": "Internal Server Error"}), 500
+
+
+def validate_review_feedback(raw_feedback, active_codes, classifier_codes):
+    """Validate classifier feedback and derive reviewer decisions from the final code."""
+    if not isinstance(raw_feedback, list) or len(raw_feedback) > 200:
+        raise ValueError("review_feedback must be a list of at most 200 items")
+    validated = []
+    for item in raw_feedback:
+        if not isinstance(item, dict):
+            raise ValueError("Each review feedback item must be an object")
+        comment = item.get("comment")
+        if not isinstance(comment, str) or not comment.strip() or len(comment) > 4000:
+            raise ValueError("Each feedback item must have a non-empty comment of at most 4000 characters")
+        classifier_code = item.get("classifier_prediction") or None
+        final_code = item.get("final_code") or None
+        if classifier_code is not None and classifier_code not in classifier_codes:
+            raise ValueError("An original classifier prediction is not a known model label")
+        if classifier_code is not None and classifier_code not in active_codes:
+            raise ValueError("The original classifier prediction is not in the active error-code catalog")
+        if final_code is not None and final_code not in active_codes:
+            raise ValueError("A final code is not in the active error-code catalog")
+        review_status = item.get("review_status")
+        if review_status not in (None, "removed", "needs_review"):
+            raise ValueError("Invalid reviewer status")
+        if review_status == "removed":
+            if final_code is not None:
+                raise ValueError("Removed comments cannot have a final error code")
+            decision = "removed"
+        elif review_status == "needs_review" or final_code is None:
+            decision = "needs_review"
+        elif final_code == classifier_code:
+            decision = "kept_classifier"
+        else:
+            decision = "corrected"
+        validated.append({
+            "comment": comment.strip(),
+            "classifier_prediction": classifier_code,
+            "ai_suggestion": None,
+            "final_code": final_code,
+            "decision": decision,
+            "prediction_method": "tfidf-logistic-regression",
+            "model_version": CLASSIFIER_MODEL_VERSION[:128],
+            "explanation": "",
+        })
+    return validated
+
+
+def persist_review_feedback(cursor, revision_id, feedback_items, reviewer_id=None):
+    """Idempotently save final choices while preserving first-seen predictions."""
+    for index, item in enumerate(feedback_items):
+        comment_key = hashlib.sha256(
+            f"{index}\0{item['comment']}".encode("utf-8")
+        ).hexdigest()
+        cursor.execute("""
+            INSERT INTO reviewer_error_feedback
+                (revision_id, comment_key, comment_index, comment_text,
+                 classifier_prediction, ai_suggestion, final_code, review_decision,
+                 prediction_method, model_version, explanation, reviewer_id, reviewed_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON DUPLICATE KEY UPDATE
+                final_code = VALUES(final_code),
+                review_decision = VALUES(review_decision),
+                explanation = VALUES(explanation),
+                reviewer_id = VALUES(reviewer_id),
+                reviewed_at = NOW()
+        """, (
+            revision_id, comment_key, index, item["comment"],
+            item["classifier_prediction"], item["ai_suggestion"], item["final_code"],
+            item["decision"], item["prediction_method"], item["model_version"],
+            item["explanation"], reviewer_id,
+        ))
+
+
+def feedback_table_ready(cursor):
+    return table_exists(cursor, "reviewer_error_feedback")
+
+
+@app.route('/api/drawings/<drawing_no>/<int:revision_no>/feedback', methods=['GET'])
+def get_revision_feedback(drawing_no, revision_no):
+    """Return feedback only to an authenticated drawing creator, reviewer, or admin."""
+    try:
+        with g.db.cursor() as cursor:
+            if not feedback_table_ready(cursor):
+                return jsonify({"error": "Reviewer feedback migration is not applied"}), 503
+            user = authenticated_user(cursor)
+            if not user:
+                return jsonify({"error": "Authentication required"}), 401
+            cursor.execute("""
+                SELECT dr.id, d.creator_id, dr.reviewer_id
+                  FROM drawings d JOIN drawing_revisions dr ON dr.drawing_id = d.id
+                 WHERE d.drawing_no = %s AND dr.revision_no = %s
+                 LIMIT 1
+            """, (drawing_no, revision_no))
+            revision = cursor.fetchone()
+            if not revision:
+                return jsonify({"error": "Drawing revision not found"}), 404
+            if user["role"] != "admin" and user["id"] not in (revision[1], revision[2]):
+                return jsonify({"error": "Not authorized to view this drawing's feedback"}), 403
+            cursor.execute("""
+                SELECT comment_text, classifier_prediction, ai_suggestion, final_code,
+                       review_decision, prediction_method, model_version, reviewed_at
+                  FROM reviewer_error_feedback
+                 WHERE revision_id = %s
+                 ORDER BY comment_index, id
+            """, (revision[0],))
+            rows = cursor.fetchall()
+        return jsonify({"drawing_no": drawing_no, "revision": revision_no, "feedback": [
+            {"comment": row[0], "classifier_prediction": row[1], "ai_suggestion": row[2],
+             "final_code": row[3], "review_decision": row[4], "prediction_method": row[5],
+             "model_version": row[6], "reviewed_at": row[7].isoformat() if row[7] else None}
+            for row in rows
+        ]}), 200
+    except Exception:
+        app.logger.exception("Could not load reviewer feedback history")
+        return jsonify({"error": "Could not load reviewer feedback history"}), 500
+
+
+@app.route('/api/reviewer-feedback/export.csv', methods=['GET'])
+def export_reviewer_feedback():
+    """Export only catalog-valid, final reviewer-confirmed labels for admin users."""
+    try:
+        with g.db.cursor() as cursor:
+            if not feedback_table_ready(cursor):
+                return jsonify({"error": "Reviewer feedback migration is not applied"}), 503
+            user = authenticated_user(cursor)
+            if not user:
+                return jsonify({"error": "Authentication required"}), 401
+            if user["role"] != "admin":
+                return jsonify({"error": "Administrator access required"}), 403
+            cursor.execute("""
+                SELECT f.comment_text, f.classifier_prediction, f.ai_suggestion,
+                       f.final_code, f.review_decision, d.drawing_no, dr.revision_no,
+                       f.reviewed_at
+                  FROM reviewer_error_feedback f
+                  JOIN drawing_revisions dr ON dr.id = f.revision_id
+                  JOIN drawings d ON d.id = dr.drawing_id
+                  JOIN error_codes ec ON ec.code = f.final_code AND ec.is_active = 1
+                 WHERE f.final_code IS NOT NULL
+                   AND f.review_decision IN ('accepted_ai', 'corrected', 'kept_classifier')
+                 ORDER BY f.reviewed_at, d.drawing_no, dr.revision_no, f.comment_index
+            """)
+            rows = cursor.fetchall()
+        output = io.StringIO(newline="")
+        writer = csv.writer(output)
+        writer.writerow(["drawing_id", "revision", "comment", "classifier_prediction", "ai_suggestion",
+                         "gold_code", "review_decision", "reviewed_at"])
+        for row in rows:
+            reviewed_at = row[7].isoformat() if row[7] else ""
+            writer.writerow([row[5], row[6], row[0], row[1] or "", row[2] or "", row[3], row[4], reviewed_at])
+        return Response(output.getvalue(), mimetype="text/csv", headers={
+            "Content-Disposition": "attachment; filename=reviewer-confirmed-error-codes.csv",
+            "Cache-Control": "no-store",
+        })
+    except Exception:
+        app.logger.exception("Could not export reviewer-confirmed examples")
+        return jsonify({"error": "Could not export reviewer-confirmed examples"}), 500
+
+
+@app.route('/api/reviewer-feedback/audit.csv', methods=['GET'])
+def export_reviewer_feedback_audit():
+    """Admin audit export keeps excluded records visible with a reason."""
+    try:
+        with g.db.cursor() as cursor:
+            if not feedback_table_ready(cursor):
+                return jsonify({"error": "Reviewer feedback migration is not applied"}), 503
+            user = authenticated_user(cursor)
+            if not user:
+                return jsonify({"error": "Authentication required"}), 401
+            if user["role"] != "admin":
+                return jsonify({"error": "Administrator access required"}), 403
+            cursor.execute("""
+                SELECT f.comment_text, f.classifier_prediction, f.ai_suggestion,
+                       f.final_code, f.review_decision, d.drawing_no, dr.revision_no,
+                       f.reviewed_at, ec.code IS NOT NULL
+                  FROM reviewer_error_feedback f
+                  JOIN drawing_revisions dr ON dr.id = f.revision_id
+                  JOIN drawings d ON d.id = dr.drawing_id
+                  LEFT JOIN error_codes ec ON ec.code = f.final_code AND ec.is_active = 1
+                 ORDER BY f.reviewed_at, d.drawing_no, dr.revision_no, f.comment_index
+            """)
+            rows = cursor.fetchall()
+        output = io.StringIO(newline="")
+        writer = csv.writer(output)
+        writer.writerow(["drawing_id", "revision", "comment", "classifier_prediction", "ai_suggestion",
+                         "gold_code", "review_decision", "reviewed_at", "code_is_active",
+                         "dataset_status", "exclusion_reason"])
+        confirmed = {"accepted_ai", "corrected", "kept_classifier"}
+        for row in rows:
+            is_active = bool(row[8])
+            if row[4] not in confirmed:
+                status, reason = "excluded", "unreviewed_or_removed"
+            elif not row[3]:
+                status, reason = "excluded", "missing_final_code"
+            elif not is_active:
+                status, reason = "excluded", "invalid_or_inactive_final_code"
+            else:
+                status, reason = "included", "reviewer_confirmed_valid_label"
+            reviewed_at = row[7].isoformat() if row[7] else ""
+            writer.writerow([row[5], row[6], row[0], row[1] or "", row[2] or "", row[3] or "",
+                             row[4] or "", reviewed_at, "true" if is_active else "false", status, reason])
+        return Response(output.getvalue(), mimetype="text/csv", headers={
+            "Content-Disposition": "attachment; filename=reviewer-feedback-audit.csv",
+            "Cache-Control": "no-store",
+        })
+    except Exception:
+        app.logger.exception("Could not export reviewer-feedback audit")
+        return jsonify({"error": "Could not export reviewer-feedback audit"}), 500
 
 @app.route('/submit', methods=['POST'])
 def submit_data():
@@ -291,6 +836,11 @@ def submit_data():
 
         error_codes = payload.get("predicted_errors", []) or []
         extracted_comments = payload.get("extracted_comments", []) or []
+        has_review_feedback = "review_feedback" in payload
+        review_feedback = None
+        if not isinstance(error_codes, list) or any(not isinstance(code, str) for code in error_codes):
+            return jsonify({"error": "predicted_errors must be a list of code strings"}), 400
+        error_codes = [code for code in error_codes if code != "No errors detected"]
 
         # PDF bytes
         pdf_bytes = None
@@ -317,6 +867,48 @@ def submit_data():
         except Exception as e:
             return dbg_fail("cursor", e)
 
+        try:
+            cursor.execute("SELECT code FROM error_codes WHERE is_active = 1")
+            active_codes = {row[0] for row in cursor.fetchall()}
+            if has_review_feedback:
+                if not table_exists(cursor, "reviewer_error_feedback"):
+                    return jsonify({"error": "Apply migration 20261028_create_reviewer_error_feedback.sql before submitting reviewed predictions."}), 503
+                review_feedback = validate_review_feedback(
+                    payload.get("review_feedback"),
+                    active_codes,
+                    {str(code) for code in model.classes_},
+                )
+                expected_model_version = payload.get("classifier_model_version")
+                if expected_model_version != CLASSIFIER_MODEL_VERSION:
+                    return jsonify({"error": "The classifier changed after prediction. Reload the drawing before submitting."}), 409
+                # Baseline snapshots are recomputed server-side before any writes.
+                for item in review_feedback:
+                    try:
+                        prediction = predict_error([item["comment"]])
+                    except Exception:
+                        app.logger.exception("Baseline prediction unavailable during feedback validation")
+                        prediction = []
+                    server_baseline = prediction[0] if prediction else None
+                    if server_baseline != item["classifier_prediction"]:
+                        return jsonify({"error": "The original classifier prediction did not match the server. Reload the drawing."}), 409
+                    item["classifier_prediction"] = server_baseline
+                # Final codes come from validated per-comment feedback, never the legacy browser array.
+                error_codes = list(dict.fromkeys(
+                    item["final_code"] for item in review_feedback if item["final_code"]
+                ))
+            else:
+                legacy_codes = set(error_codes)
+                unknown_codes = legacy_codes - active_codes
+                if unknown_codes:
+                    return jsonify({"error": "Submitted error code is not in the active catalog", "invalid_codes": sorted(unknown_codes)}), 400
+            if any(not isinstance(comment, str) for comment in extracted_comments):
+                raise ValueError("extracted_comments must contain only text")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception:
+            app.logger.exception("Error-code submission validation failed")
+            return jsonify({"error": "Error codes could not be validated"}), 503
+
         # Get user IDs from emp_ids
         try:
             cursor.execute("SELECT id FROM users WHERE emp_id = %s", (creator_emp_id,))
@@ -331,6 +923,12 @@ def submit_data():
                 return dbg_fail("reviewer-lookup", "Reviewer not found", extra={"reviewer_emp_id": reviewer_emp_id}, code=404)
             reviewer_id = reviewer_row[0]
             reviewer_db_name = reviewer_row[1]
+            if has_review_feedback:
+                session_user = authenticated_user(cursor)
+                if not session_user:
+                    return jsonify({"error": "An authenticated reviewer session is required to save feedback"}), 401
+                if session_user["id"] != reviewer_id:
+                    return jsonify({"error": "The logged-in reviewer does not match the submitted reviewer"}), 403
         except Exception as e:
             return dbg_fail("user-lookup", e)
 
@@ -425,12 +1023,14 @@ def submit_data():
             try:
                 for code in error_codes:
                     # Get or create error code
-                    cursor.execute("SELECT id FROM error_codes WHERE code = %s", (code,))
+                    if has_review_feedback:
+                        cursor.execute("SELECT id FROM error_codes WHERE code = %s AND is_active = 1", (code,))
+                    else:
+                        cursor.execute("SELECT id FROM error_codes WHERE code = %s", (code,))
                     error_row = cursor.fetchone()
                     
                     if not error_row:
-                        cursor.execute("INSERT INTO error_codes (code) VALUES (%s)", (code,))
-                        error_code_id = cursor.lastrowid
+                        raise ValueError("A submitted code is no longer in the active catalog")
                     else:
                         error_code_id = error_row[0]
                     
@@ -441,6 +1041,13 @@ def submit_data():
                     """, (revision_id, error_code_id))
             except Exception as e:
                 return dbg_fail("error-codes-insert", e, extra={"revision_id": revision_id})
+
+        if review_feedback is not None:
+            try:
+                persist_review_feedback(cursor, revision_id, review_feedback, reviewer_id=reviewer_id)
+            except Exception:
+                app.logger.exception("Could not save reviewer error-code feedback")
+                return jsonify({"error": "Reviewer feedback could not be saved"}), 500
 
         # 5) Update drawing status
         try:
@@ -680,6 +1287,7 @@ def admin_login():
             "status": "OK",
             "access_type": access_type,
             "name": full_name or username,
+            "session_token": issue_api_session(db_username, role),
             "message": "Login Successful"
         }), 200
 

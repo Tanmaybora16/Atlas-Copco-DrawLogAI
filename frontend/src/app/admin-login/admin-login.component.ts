@@ -63,7 +63,7 @@ export class AdminLoginComponent {
         }
 
         // Save session (username + role + full name)
-        this.authService.login(this.UserName.trim(), response.access_type, response.name);
+        this.authService.login(this.UserName.trim(), response.access_type, response.name, response.session_token);
 
         // Route by role (HR → /employee, Employee → /uploads)
         const targetRoute = response.access_type === 'HR' ? '/employee' : '/submission';

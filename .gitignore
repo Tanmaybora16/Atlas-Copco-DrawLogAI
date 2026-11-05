@@ -52,5 +52,8 @@ backend/uploads
 .env
 backend/Atlashost/.env
 backend/Atlashost/uploads/
+backend/models/candidates/
 *.sql
+!backend/migrations/
+!backend/migrations/*.sql
 backend/.env.example

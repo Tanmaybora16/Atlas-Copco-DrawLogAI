@@ -30,6 +30,10 @@ export class AuthInterceptor implements HttpInterceptor {
       // this.authService.refreshSessionWindow();
     }
 
-    return next.handle(request);
+    const token = this.authService.getApiToken();
+    const authenticatedRequest = token
+      ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+      : request;
+    return next.handle(authenticatedRequest);
   }
 }
