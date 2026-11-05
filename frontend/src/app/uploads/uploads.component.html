@@ -104,41 +104,45 @@
                     <tr>
                       <th>Sr. No.</th>
                       <th>Actual Comment</th>
-                      <th>Predicted Code</th>
-                      <th>Code description</th>
-                      <th></th>
+                      <th>Classifier prediction</th>
+                      <th>Official code description</th>
+                      <th>Reviewer-approved code</th>
+                      <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let comment of extractedComments; let i = index">
+                    <tr *ngFor="let row of reviewRows; let i = index" [class.removed-row]="row.removed">
                       <td>{{ i + 1 }}</td>
-                      <td>{{ comment }}</td>
-
-                      <td class="p-codes" [ngClass]="{'edited-error': editedRows.has(i)}"
-                        [attr.title]="editedRows.has(i) ? 'Original: ' + originalErrors[i] : null">
-                        <ng-container *ngIf="editedIndex === i; else showText">
-                          <div (keydown.enter)="saveEditedValue(i, $event); $event.preventDefault()">
-                            <input class="edit-code-input" type="text" [value]="selectedError"
-                              (blur)="saveEditedValue(i, $event)"
-                              (keydown.enter)="saveEditedValue(i, $event); $event.preventDefault()" autofocus />
-                          </div>
-                        </ng-container>
-                        <ng-template #showText>{{ predictedErrors[i] || 'N/A' }}</ng-template>
+                      <td>{{ row.comment }}</td>
+                      <td>{{ row.classifierCode || 'Unavailable' }}</td>
+                      <td>{{ row.classifierCode ? getErrorDescription(row.classifierCode) : 'No active catalog description available' }}</td>
+                      <td>
+                        <label class="sr-only" [for]="'final-code-' + i">Reviewer-approved code for comment {{ i + 1 }}</label>
+                        <select [id]="'final-code-' + i" [name]="'finalCode' + i"
+                          [(ngModel)]="row.finalCode" [ngModelOptions]="{standalone: true}"
+                          [disabled]="row.removed" (ngModelChange)="updateFinalCode(i, $event)">
+                          <option value="">Choose code / needs review</option>
+                          <option *ngFor="let code of errorCodeCatalog" [value]="code.code">
+                            {{ code.code }} — {{ code.description }}
+                          </option>
+                        </select>
+                        <small *ngIf="row.finalCode" class="final-description">
+                          {{ getErrorDescription(row.finalCode) }}
+                        </small>
+                        <small *ngIf="row.finalCode && row.finalCode !== row.classifierCode" class="choice-change">
+                          Differs from original classifier prediction
+                        </small>
                       </td>
-
-                      <td [ngClass]="{'edited-error-desc': editedRows.has(i)}">
-                        {{ getErrorDescription(predictedErrors[i]) }}
+                      <td>
+                        <span class="prediction-status" [attr.data-status]="row.removed ? 'removed' : row.reviewStatus">
+                          {{ row.removed ? 'Removed' : row.reviewStatus === 'corrected' ? 'Corrected' : row.reviewStatus === 'kept_classifier' ? 'Classifier accepted' : 'Needs review' }}
+                        </span>
                       </td>
-
-                      <!-- <td class="edit-cell">
-                      <img class="edit-icon" src="/assets/edit.svg" (click)="editRow(i)">
-                    </td> -->
                       <td class="action-cell">
                         <div class="action-buttons">
-                          <img class="edit-icon" src="/assets/edit.svg" (click)="editRow(i)" title="Edit error code"
-                            alt="Edit">
-                          <img class="delete-icon" src="/assets/delete.svg" (click)="deleteRow(i)"
-                            title="Delete this comment" alt="Delete">
+                          <button type="button" *ngIf="row.classifierCode && !row.removed" (click)="acceptClassifierPrediction(i)">Accept prediction</button>
+                          <button type="button" (click)="deleteRow(i)">{{ row.removed ? 'Restore' : 'Remove comment' }}</button>
                         </div>
                       </td>
                     </tr>
@@ -146,6 +150,7 @@
                 </table>
               </div>
             </div>
+            <p *ngIf="predictionError" class="prediction-message prediction-error" role="alert">{{ predictionError }}</p>
 
             <div class="code-container" *ngIf="!showCodeList">
               <ng-container *ngIf="!submitted">
@@ -164,6 +169,29 @@
 
 
           </div>
+          <section class="feedback-history" *ngIf="feedbackHistoryLoading || feedbackHistoryError || feedbackHistory.length || canExportFeedback" aria-labelledby="feedback-history-title">
+            <div class="feedback-history-heading">
+              <h2 id="feedback-history-title">Reviewer feedback history</h2>
+              <div class="feedback-export-actions" *ngIf="canExportFeedback">
+                <button type="button" (click)="exportFeedbackCsv()">Export confirmed examples (CSV)</button>
+                <button type="button" class="secondary" (click)="exportFeedbackCsv(true)">Export full audit (CSV)</button>
+              </div>
+            </div>
+            <p *ngIf="feedbackHistoryLoading" role="status">Loading saved feedback…</p>
+            <p *ngIf="feedbackHistoryError" role="alert">{{ feedbackHistoryError }}</p>
+            <div class="table-container" *ngIf="feedbackHistory.length">
+              <table class="styled-table">
+                <thead><tr><th>Comment</th><th>Classifier</th><th>Final code</th><th>Decision</th><th>Reviewed at</th></tr></thead>
+                <tbody>
+                  <tr *ngFor="let item of feedbackHistory">
+                    <td>{{ item.comment }}</td><td>{{ item.classifier_prediction || '—' }}</td>
+                    <td>{{ item.final_code || '—' }}</td>
+                    <td>{{ item.review_decision }}</td><td>{{ item.reviewed_at || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
           <div class="submit-container">
             <div class="status">
               <fieldset>

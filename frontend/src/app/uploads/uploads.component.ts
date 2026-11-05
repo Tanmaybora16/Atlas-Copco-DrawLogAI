@@ -4,6 +4,7 @@ import { NgForm } from '@angular/forms';
 import { ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from 'src/environments/environment';
+import { AuthService } from '../auth.service';
 
 declare const Swal: any;
 
@@ -13,11 +14,33 @@ interface UploadResponse {
   extracted_comments: string[];
   predicted_errors: string[];
   design_number: string;
+  classifier_model_version?: string;
 }
 
 interface ErrorCodeCount {
   code: string;
   count: number;
+}
+
+interface ErrorCodeCatalogItem {
+  code: string;
+  description: string;
+}
+
+interface ReviewPredictionRow {
+  comment: string;
+  classifierCode: string;
+  finalCode: string;
+  reviewStatus: 'kept_classifier' | 'corrected' | 'needs_review' | 'removed';
+  removed: boolean;
+}
+
+interface FeedbackHistoryItem {
+  comment: string;
+  classifier_prediction: string | null;
+  final_code: string | null;
+  review_decision: string;
+  reviewed_at: string | null;
 }
 
 @Component({
@@ -34,6 +57,14 @@ export class UploadsComponent {
   filePath = '';
   extractedComments: string[] = [];
   predictedErrors: string[] = [];
+  reviewRows: ReviewPredictionRow[] = [];
+  errorCodeCatalog: ErrorCodeCatalogItem[] = [];
+  feedbackReady = false;
+  feedbackHistory: FeedbackHistoryItem[] = [];
+  feedbackHistoryError = '';
+  feedbackHistoryLoading = false;
+  classifierModelVersion = '';
+  predictionError = '';
   errorCounts: ErrorCodeCount[] = [];
   decision: string = 'approve';
 
@@ -67,16 +98,84 @@ export class UploadsComponent {
     private http: HttpClient,
     private cdRef: ChangeDetectorRef,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private authService: AuthService
   ) { }
 
   ngOnInit() {
+    this.loadErrorCodeCatalog();
     this.route.queryParamMap.subscribe((params) => {
       const drawingId = (params.get('drawing_id') || '').trim();
       const rev = (params.get('revision') || '').trim();
       if (drawingId) {
         this.prefillFromServer(drawingId, rev);
+        if (rev) this.loadFeedbackHistory(drawingId, Number(rev));
       }
+    });
+  }
+
+  private loadFeedbackHistory(drawingNo: string, revision: number) {
+    this.feedbackHistoryLoading = true;
+    this.feedbackHistoryError = '';
+    this.http.get<any>(`${this.API}/api/drawings/${encodeURIComponent(drawingNo)}/${revision}/feedback`).subscribe({
+      next: response => this.feedbackHistory = response?.feedback || [],
+      error: error => {
+        this.feedbackHistory = [];
+        this.feedbackHistoryError = error?.status === 403 || error?.status === 401
+          ? 'You are not authorized to view feedback for this drawing.'
+          : error?.status === 503
+            ? 'Feedback history is unavailable until the feedback migration is applied.'
+            : 'Could not load feedback history for this drawing.';
+      },
+      complete: () => this.feedbackHistoryLoading = false
+    });
+  }
+
+  exportFeedbackCsv(audit = false) {
+    const endpoint = audit ? 'audit.csv' : 'export.csv';
+    this.http.get(`${this.API}/api/reviewer-feedback/${endpoint}`, { responseType: 'blob' }).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = audit ? 'reviewer-feedback-audit.csv' : 'reviewer-confirmed-error-codes.csv';
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: error => {
+        const message = error?.status === 403 ? 'CSV export is available to administrators only.'
+          : error?.status === 503 ? 'Apply the reviewer feedback migration before exporting.'
+            : 'Feedback export failed.';
+        Swal.fire('Export unavailable', message, 'error');
+      }
+    });
+  }
+
+  get canExportFeedback(): boolean {
+    return this.authService.getAccessType() === 'HR';
+  }
+
+  private loadErrorCodeCatalog() {
+    this.http.get<any>(`${this.API}/api/error-codes`).subscribe({
+      next: response => {
+        this.errorCodeCatalog = response?.codes || [];
+        this.feedbackReady = response?.feedback_ready === true && this.authService.hasApiToken();
+        if (!this.feedbackReady) {
+          this.predictionError = response?.feedback_ready === true
+            ? 'A secure backend session is required. Please sign out and sign in again.'
+            : 'The feedback database migration is required before this review can be submitted.';
+        }
+        if (this.reviewRows.length) {
+          this.reviewRows.forEach(row => {
+            if (row.finalCode && !this.errorCodeCatalog.some(item => item.code === row.finalCode)) {
+              row.finalCode = '';
+              row.reviewStatus = 'needs_review';
+            }
+          });
+          this.syncLegacyPredictionArrays();
+        }
+      },
+      error: () => this.predictionError = 'The official code catalog could not be loaded. Code selection is unavailable.'
     });
   }
 
@@ -136,11 +235,8 @@ export class UploadsComponent {
   }
 
   editRow(index: number) {
-    this.editedIndex = index;
-    this.selectedError = this.predictedErrors[index];
-    if (!(index in this.originalErrors)) {
-      this.originalErrors[index] = this.predictedErrors[index];
-    }
+    const row = this.reviewRows[index];
+    if (row) row.finalCode = row.classifierCode;
   }
 
   saveEditedValue(index: number, event: any) {
@@ -149,22 +245,34 @@ export class UploadsComponent {
     }
     const inputElement = event.target as HTMLInputElement;
     const newValue = (inputElement.value || '').trim();
-    const originalValue = this.originalErrors[index];
-
-    if (newValue) {
-      this.predictedErrors[index] = newValue;
-      if (newValue !== originalValue) {
-        this.editedRows.add(index);
-      } else {
-        this.editedRows.delete(index);
-      }
-      this.errorCounts = this.countErrorOccurrences(this.predictedErrors);
-    }
-    this.editedIndex = null;
+    this.updateFinalCode(index, newValue);
   }
 
   getErrorDescription(code: string): string {
-    return this.errorDescriptions[code] || 'No description available';
+    return this.errorCodeCatalog.find(item => item.code === code)?.description || 'No description available';
+  }
+
+  updateFinalCode(index: number, code: string) {
+    const row = this.reviewRows[index];
+    if (!row || (code && !this.errorCodeCatalog.some(item => item.code === code))) return;
+    row.finalCode = code;
+    row.reviewStatus = code
+      ? (code === row.classifierCode ? 'kept_classifier' : 'corrected')
+      : 'needs_review';
+    this.syncLegacyPredictionArrays();
+  }
+
+  acceptClassifierPrediction(index: number) {
+    const row = this.reviewRows[index];
+    if (row?.classifierCode) this.updateFinalCode(index, row.classifierCode);
+  }
+
+  private syncLegacyPredictionArrays() {
+    const active = this.reviewRows.filter(row => !row.removed);
+    this.extractedComments = active.map(row => row.comment);
+    this.predictedErrors = active.map(row => row.finalCode).filter(Boolean);
+    this.errorCounts = this.countErrorOccurrences(this.predictedErrors);
+    if (!this.predictedErrors.length) this.decision = 'approve';
   }
 
   // FILE UPLOAD → extract errors
@@ -194,8 +302,25 @@ export class UploadsComponent {
     this.http.post<UploadResponse>(`${this.API}/upload`, formData).subscribe({
       next: (response) => {
         this.filePath = response.file_path;
-        this.extractedComments = response.extracted_comments || [];
-        this.predictedErrors = response.predicted_errors || [];
+        this.classifierModelVersion = response.classifier_model_version || '';
+        const comments: string[] = response.extracted_comments || [];
+        const baseline: string[] = response.predicted_errors || [];
+        this.extractedComments = comments;
+        this.predictedErrors = baseline;
+        this.reviewRows = comments.reduce<ReviewPredictionRow[]>((rows, comment, index) => {
+          if (!comment || comment.toLowerCase() === 'no annotations found') return rows;
+          const classifierCode = baseline[index] || '';
+          const codeIsActive = this.errorCodeCatalog.some(item => item.code === classifierCode);
+          rows.push({
+            comment,
+            classifierCode,
+            finalCode: codeIsActive ? classifierCode : '',
+            reviewStatus: codeIsActive ? 'kept_classifier' : 'needs_review',
+            removed: false
+          });
+          return rows;
+        }, []);
+        this.syncLegacyPredictionArrays();
         this.errorCounts = this.countErrorOccurrences(this.predictedErrors);
         this.decision = this.predictedErrors.length > 0 ? 'reject' : 'approve';
         this.isRevisionReadonly = false;
@@ -256,6 +381,17 @@ export class UploadsComponent {
       return;
     }
 
+    if (this.reviewRows.length && !this.errorCodeCatalog.length) {
+      Swal.fire('Code catalog unavailable', 'Reload when the official code catalog is available so submitted codes can be validated.', 'error');
+      return;
+    }
+    if (this.reviewRows.length && !this.feedbackReady) {
+      Swal.fire('Database migration required', 'Ask the database administrator to apply the reviewer feedback migration before submitting this review.', 'error');
+      return;
+    }
+
+    this.syncLegacyPredictionArrays();
+
     const submissionData = {
       file_name: this.fileName || 'Unknown',
       file_path: this.filePath || 'Unknown',
@@ -265,6 +401,15 @@ export class UploadsComponent {
       predicted_errors: this.predictedErrors.length
         ? this.predictedErrors
         : ['No errors detected'],
+      ...(this.reviewRows.length ? {
+        classifier_model_version: this.classifierModelVersion,
+        review_feedback: this.reviewRows.map(row => ({
+          comment: row.comment,
+          classifier_prediction: row.classifierCode || null,
+          final_code: row.removed ? null : row.finalCode || null,
+          review_status: row.removed ? 'removed' : row.reviewStatus === 'needs_review' ? 'needs_review' : null
+        }))
+      } : {}),
       form_data: {
         designNo: (this.designNo || '').trim(),
         reviewerName: (this.reviewerId || '').trim(),
@@ -291,6 +436,10 @@ export class UploadsComponent {
           text:
             'The form has been submitted successfully! An email has been sent to the creator (on reject).',
         });
+
+        const drawingNo = String(_response?.drawing_id || '').trim();
+        const revision = Number(_response?.revision || this.revisionNo);
+        if (drawingNo && revision) this.loadFeedbackHistory(drawingNo, revision);
 
         form.resetForm();
         this.resetFormState();
@@ -336,6 +485,9 @@ export class UploadsComponent {
     this.filePath = '';
     this.extractedComments = [];
     this.predictedErrors = [];
+    this.reviewRows = [];
+    this.classifierModelVersion = '';
+    this.predictionError = '';
     this.errorCounts = [];
     this.decision = 'approve';
     this.selectedEmpId = '';
@@ -360,120 +512,30 @@ export class UploadsComponent {
     return Object.keys(map).map((code) => ({ code, count: map[code] }));
   }
 
-  // Descriptions unchanged
-  errorDescriptions: { [key: string]: string } = {
-    P1: '1254 K Criteria for surface roughness',
-    P2: '1350 K-f,m,c or v as required General tolerances and standard references',
-    P3: '1356 K Indirectly stated tolerances for fusion welding',
-    P4: '4366 K  Threaded blind holes',
-    P4a: '4366:01 K  Threaded blind holes_ASME',
-    P5: '6131 K Dimensional tolerances and machining allowances for castings',
-    P6: '6134 K Specifications for steel and iron casting requirements',
-    P7: '6136 K Specifications of aluminium casting requirements',
-    P8: '6785 AIR Paint specifications',
-    P9: '6891 K Indication of welding data on drawings',
-    P11: 'Confidentiality note. It should contain “This document is property of Atlas Copco AB and shall not without our permission be altered, copied, used for manufacturing or communicated to any other person or company”.',
-    P12: 'Prohibited substances note',
-    P13: 'Sharp edges note',
-    P14: 'Check drawing & document edition, vault edition and BPCS edition are same',
-    P15: 'Part or assy linked to document',
-    P16: 'All parts latest revision',
-    P17: 'Material  assigned. Should be given in title block of the drawing. Exception for tabular drawing',
-    P18: 'Material  comment added (T for thickness) if not dimensioned',
-    P19: 'Treatment assigned, or not applicable. Should be given in title block of the drawing. Exception for tabular drawing',
-    P20: 'Treatment see drawing',
-    P22: 'Latest edition of Atlas Copco template used. Exception US: Latest edition of ANSI templates used',
-    P23: 'Check for spelling mistake',
-    P24: 'Page numbering if applicable  ',
-    P26: 'Standard scale used. Exception US: Scales to be used 1/1; 1/2; 1/4; 2/1; 3/1; 4/1; 5/1; 10/1',
-    P27: 'Are section/detail views nominated',
-    P28: 'All basic dimensions available',
-    P29: 'Tolerances deviating from general tolerance',
-    P30: 'Geometrical tolerances stated correctly',
-    P31: 'Revision note and symbol(s) available and equal',
-    P32: 'Welding symbols all available',
-    P33: 'Surface roughness symbols and indicators',
-    P34: 'All centermarks and centerlines drawn for holes / symmetric parts',
-    P35: 'Ten digit numbers',
-    P36: 'Confidentiality class: Confidential',
-    P37: 'Confidentiality class: Internal',
-    P38: 'Text on drawing acc.Atlas Copco standard 1212 K . - English & Portugese text should have font "Arial" - Chinese text should have font "Simsun"',
-    P39: 'Is the drawing unambigously',
-    P40: 'Approval notification if needeed (PED, ASME,….)',
-    P41: 'Symbol(s) of quantity Atlas Copco standard 1420 K',
-    P42: 'All R/S or - markings correct',
-    P43: 'No material on standard parts',
-    P44: 'Material and comment complete if applicable',
-    P46: 'Check that no dimensions are manually changed',
-    P47: 'Check that at least english language is used',
-    P48: 'Check that Part numbers and Qty are not manually overwritten',
-    P49: 'Check that the drawing does not relates to a standard part',
-    P50: 'Check weight on drawing',
-    P51: "In case of tabular drawing, all mentioned 3D's should be linked to the tabular drawing",
-    P57: 'Check edition is available for all item numbers of a tabular drawing',
-    P58: 'Check supplier information is not given on bought out parts except for situations referenced in AC Standard 1015K',
-    P59: 'Check brand logo in template - supplier parts/Manufacturing parts - AC logo. For dimension drawing, installation drawing, ASL, AIB -de-brand or owned brand',
-    P70: 'Check \'All files are "For Approval" or "Approved" during ECO',
-  };
-
   // Called by <app-error-code> when a code is removed from the summary pills
   removeError(errorCode: string) {
-    this.predictedErrors = this.predictedErrors.filter(code => code !== errorCode);
-    this.errorCounts = this.countErrorOccurrences(this.predictedErrors);
-    if (this.predictedErrors.length === 0) {
-      this.decision = 'approve';
-    }
-    this.editedRows.clear();
-    this.originalErrors = {};
-    this.editedIndex = null;
-    this.selectedError = '';
+    this.reviewRows.forEach(row => {
+      if (row.finalCode === errorCode) {
+        row.removed = true;
+        row.finalCode = '';
+        row.reviewStatus = 'removed';
+      }
+    });
+    this.syncLegacyPredictionArrays();
   }
 
   deleteRow(index: number) {
-    if (confirm('Are you sure you want to delete this comment and its error code?')) {
-      // Remove from both arrays
-      this.extractedComments.splice(index, 1);
-      this.predictedErrors.splice(index, 1);
-
-      // Update error counts
-      this.errorCounts = this.countErrorOccurrences(this.predictedErrors);
-
-      // Clean up edit tracking for this row
-      this.editedRows.delete(index);
-      delete this.originalErrors[index];
-
-      // Reindex edit tracking (shift down indices after deleted row)
-      const newEditedRows = new Set<number>();
-      const newOriginalErrors: { [key: number]: string } = {};
-
-      this.editedRows.forEach(rowIndex => {
-        if (rowIndex > index) {
-          newEditedRows.add(rowIndex - 1);
-        } else if (rowIndex < index) {
-          newEditedRows.add(rowIndex);
-        }
-      });
-
-      Object.keys(this.originalErrors).forEach(key => {
-        const rowIndex = parseInt(key);
-        if (rowIndex > index) {
-          newOriginalErrors[rowIndex - 1] = this.originalErrors[rowIndex];
-        } else if (rowIndex < index) {
-          newOriginalErrors[rowIndex] = this.originalErrors[rowIndex];
-        }
-      });
-
-      this.editedRows = newEditedRows;
-      this.originalErrors = newOriginalErrors;
-
-      if (this.editedIndex !== null && this.editedIndex >= index) {
-        this.editedIndex = null;
-        this.selectedError = '';
-      }
-
-      if (this.predictedErrors.length === 0) {
-        this.decision = 'approve';
-      }
+    const row = this.reviewRows[index];
+    if (!row) return;
+    row.removed = !row.removed;
+    if (row.removed) {
+      row.finalCode = '';
+      row.reviewStatus = 'removed';
+    } else {
+      row.reviewStatus = row.finalCode
+        ? (row.finalCode === row.classifierCode ? 'kept_classifier' : 'corrected')
+        : 'needs_review';
     }
+    this.syncLegacyPredictionArrays();
   }
 }
