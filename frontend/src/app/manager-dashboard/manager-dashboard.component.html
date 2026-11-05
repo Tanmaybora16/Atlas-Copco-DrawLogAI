@@ -34,13 +34,19 @@
         <tr *ngFor="let err of teamErrors">
           <td>{{ err.emp_name }} <span class="emp-id">({{ err.emp_id }})</span></td>
           <td>
-            <span class="error-code">E-{{ err.error_code }}</span>
+            <span *ngIf="err.error_code && err.error_code !== 'N/A'" class="error-code">E-{{ err.error_code }}</span>
+            <span *ngIf="!err.error_code || err.error_code === 'N/A'" class="status-badge completed">Zero Errors</span>
             {{ err.error_description }}
           </td>
           <td><span class="count-badge">{{ err.error_count }}</span></td>
-          <td class="training-name">{{ err.recommended_training }}</td>
+          <td class="training-name" [style.color]="err.recommended_training === 'None required' ? '#006644' : '#0052cc'">
+            {{ err.recommended_training }}
+          </td>
           <td>
-            <button class="btn-assign" (click)="assignTraining(err)" [disabled]="isAssigning">
+            <span *ngIf="err.error_count === 0 || err.recommended_training === 'None required'" class="badge-clean">
+              ✓ Compliant
+            </span>
+            <button *ngIf="err.error_count > 0 && err.recommended_training !== 'None required'" class="btn-assign" (click)="assignTraining(err)" [disabled]="isAssigning">
               Assign Training
             </button>
           </td>

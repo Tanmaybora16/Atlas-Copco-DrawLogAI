@@ -154,6 +154,17 @@
       }
     }
 
+    .badge-clean {
+      display: inline-block;
+      background: #e3fcef;
+      color: #006644;
+      padding: 6px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
     .status-badge {
       padding: 4px 10px;
       border-radius: 12px;

@@ -386,7 +386,9 @@ export class UploadsComponent {
       return;
     }
     if (this.reviewRows.length && !this.feedbackReady) {
-      Swal.fire('Database migration required', 'Ask the database administrator to apply the reviewer feedback migration before submitting this review.', 'error');
+      const title = this.authService.hasApiToken() ? 'Database migration required' : 'Sign-in Session Required';
+      const message = this.predictionError || 'Ask the database administrator to apply the reviewer feedback migration before submitting this review.';
+      Swal.fire(title, message, 'error');
       return;
     }
 

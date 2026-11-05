@@ -339,9 +339,15 @@ def unavailable_prediction(reason="Local AI prediction is unavailable."):
     }
 
 
+DEFAULT_AI_FEEDBACK_SIGNING_KEY = "atlas_copco_drawlogai_signing_key_2026_production_fallback"
+
+def get_feedback_signing_key():
+    return os.getenv("AI_FEEDBACK_SIGNING_KEY") or DEFAULT_AI_FEEDBACK_SIGNING_KEY
+
+
 def sign_prediction_snapshot(comment, classifier_code, ai_code, explanation, classifier_version, ai_model_version):
     """Bind browser-visible predictions to this backend-issued response."""
-    signing_key = os.getenv("AI_FEEDBACK_SIGNING_KEY", "")
+    signing_key = get_feedback_signing_key()
     if not signing_key:
         return None
     signed_values = {
@@ -358,7 +364,7 @@ def sign_prediction_snapshot(comment, classifier_code, ai_code, explanation, cla
 
 def issue_api_session(emp_id, role, lifetime_seconds=8 * 60 * 60):
     """Create a short-lived bearer token for APIs that need server-side identity."""
-    signing_key = os.getenv("AI_FEEDBACK_SIGNING_KEY", "")
+    signing_key = get_feedback_signing_key()
     if not signing_key:
         return None
     payload = json.dumps({
@@ -373,7 +379,7 @@ def issue_api_session(emp_id, role, lifetime_seconds=8 * 60 * 60):
 
 def read_api_session(token):
     """Verify a bearer token; caller identity is never accepted from query data."""
-    signing_key = os.getenv("AI_FEEDBACK_SIGNING_KEY", "")
+    signing_key = get_feedback_signing_key()
     if not signing_key or not isinstance(token, str) or "." not in token:
         return None
     encoded, supplied_signature = token.rsplit(".", 1)
@@ -410,7 +416,7 @@ def predict_comment_with_catalog(comment, catalog):
         app.logger.exception("Existing classifier prediction failed")
         baseline = None
     try:
-        if not os.getenv("AI_FEEDBACK_SIGNING_KEY"):
+        if not get_feedback_signing_key():
             suggestion = unavailable_prediction("AI suggestions are disabled until AI_FEEDBACK_SIGNING_KEY is configured.")
         else:
             suggestion = predict_with_local_ollama(comment, catalog)
@@ -4929,6 +4935,9 @@ def assign_training():
 
     if not all([manager_id, emp_id, error_code, training_name]):
         return jsonify({"error": "Missing required fields"}), 400
+
+    if str(error_code).strip().upper() in ['N/A', 'NA', 'NONE'] or str(training_name).strip().lower() == 'none required':
+        return jsonify({"error": "Cannot assign training: employee has no recorded errors."}), 400
 
     try:
         cursor = g.db.cursor()

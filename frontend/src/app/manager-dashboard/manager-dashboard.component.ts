@@ -64,6 +64,10 @@ export class ManagerDashboardComponent implements OnInit {
 
   assignTraining(error: any) {
     if (this.isAssigning) return;
+    if (error.error_count === 0 || error.recommended_training === 'None required' || error.error_code === 'N/A') {
+      Swal.fire('Compliant', 'This employee has no recorded errors. No training is required.', 'info');
+      return;
+    }
     if (error.recommended_training === 'No training mapped') {
       Swal.fire('Info', 'No training mapped for this error code yet.', 'info');
       return;
