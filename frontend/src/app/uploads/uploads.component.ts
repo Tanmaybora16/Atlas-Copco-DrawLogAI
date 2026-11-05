@@ -63,6 +63,8 @@ export class UploadsComponent {
   feedbackHistory: FeedbackHistoryItem[] = [];
   feedbackHistoryError = '';
   feedbackHistoryLoading = false;
+  readonly feedbackHistoryPageSize = 10;
+  feedbackHistoryPage = 1;
   classifierModelVersion = '';
   predictionError = '';
   errorCounts: ErrorCodeCount[] = [];
@@ -88,6 +90,7 @@ export class UploadsComponent {
   editedIndex: number | null = null;
   selectedError = '';
   submitted = false;
+  submissionSucceeded = false;
   isRevisionReadonly = true;
 
   // Prevent duplicate calls
@@ -110,17 +113,29 @@ export class UploadsComponent {
       if (drawingId) {
         this.prefillFromServer(drawingId, rev);
         if (rev) this.loadFeedbackHistory(drawingId, Number(rev));
+        else {
+          this.feedbackHistory = [];
+          this.feedbackHistoryPage = 1;
+        }
+      } else {
+        this.feedbackHistory = [];
+        this.feedbackHistoryPage = 1;
       }
     });
   }
 
   private loadFeedbackHistory(drawingNo: string, revision: number) {
+    this.feedbackHistoryPage = 1;
     this.feedbackHistoryLoading = true;
     this.feedbackHistoryError = '';
     this.http.get<any>(`${this.API}/api/drawings/${encodeURIComponent(drawingNo)}/${revision}/feedback`).subscribe({
-      next: response => this.feedbackHistory = response?.feedback || [],
+      next: response => {
+        this.feedbackHistory = response?.feedback || [];
+        this.feedbackHistoryPage = 1;
+      },
       error: error => {
         this.feedbackHistory = [];
+        this.feedbackHistoryPage = 1;
         this.feedbackHistoryError = error?.status === 403 || error?.status === 401
           ? 'You are not authorized to view feedback for this drawing.'
           : error?.status === 503
@@ -129,6 +144,23 @@ export class UploadsComponent {
       },
       complete: () => this.feedbackHistoryLoading = false
     });
+  }
+
+  get feedbackHistoryTotalPages(): number {
+    return Math.max(1, Math.ceil(this.feedbackHistory.length / this.feedbackHistoryPageSize));
+  }
+
+  get pagedFeedbackHistory(): FeedbackHistoryItem[] {
+    const start = (this.feedbackHistoryPage - 1) * this.feedbackHistoryPageSize;
+    return this.feedbackHistory.slice(start, start + this.feedbackHistoryPageSize);
+  }
+
+  previousFeedbackHistoryPage() {
+    if (this.feedbackHistoryPage > 1) this.feedbackHistoryPage--;
+  }
+
+  nextFeedbackHistoryPage() {
+    if (this.feedbackHistoryPage < this.feedbackHistoryTotalPages) this.feedbackHistoryPage++;
   }
 
   exportFeedbackCsv(audit = false) {
@@ -262,11 +294,6 @@ export class UploadsComponent {
     this.syncLegacyPredictionArrays();
   }
 
-  acceptClassifierPrediction(index: number) {
-    const row = this.reviewRows[index];
-    if (row?.classifierCode) this.updateFinalCode(index, row.classifierCode);
-  }
-
   private syncLegacyPredictionArrays() {
     const active = this.reviewRows.filter(row => !row.removed);
     this.extractedComments = active.map(row => row.comment);
@@ -279,6 +306,7 @@ export class UploadsComponent {
   onFileSelected(event: Event) {
     const fileInput = event.target as HTMLInputElement;
     if (!fileInput.files || fileInput.files.length === 0) return;
+    this.submissionSucceeded = false;
     this.selectedFile = fileInput.files[0];
     this.fileName = this.selectedFile.name;
     this.isRevisionReadonly = false;
@@ -430,6 +458,7 @@ export class UploadsComponent {
 
     this.http.post(`${this.API}/submit`, submissionData).subscribe({
       next: (_response: any) => {
+        this.submissionSucceeded = true;
         Swal.fire({
           icon: 'success',
           title: 'Submission Successful',
@@ -445,6 +474,7 @@ export class UploadsComponent {
         this.resetFormState();
       },
       error: (error) => {
+        this.isSubmitting = false;
         console.error('Submission Error:', error);
         const message = this.getFriendlyErrorMessage(error);
         Swal.fire({ icon: 'error', title: 'Submission Failed', text: message });
